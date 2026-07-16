@@ -87,13 +87,14 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
 <div class="container">
   <div class="header">
     <h1>NETSWITCH</h1>
-    <div class="sub">ROUTER / SWITCH · BENCHMARK NET · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · Engine v2.12.0 · portable HTML build</div>
+    <div class="sub">ROUTER / SWITCH · BENCHMARK NET · CPU·GPU · TEST LOG TOOL</div>
+    <div class="version">AI2ORBIT Co. 2026 · Engine v2.13.0 · serverless — runs on Android 13 · Windows · any browser</div>
   </div>
 
   <div class="tabs">
     <div class="tab active" data-p="switch">SWITCH</div>
     <div class="tab" data-p="bench">BENCHMARK NET</div>
+    <div class="tab" data-p="cpugpu">CPU · GPU</div>
     <div class="tab" data-p="net">NET DATA</div>
     <div class="tab" data-p="testlog">TEST LOG TOOL</div>
   </div>
@@ -144,6 +145,42 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
         </div>
         <div id="benchBars"></div>
         <div class="note">Priorities per spec: <span class="hl">GPU / DRAM / SCREEN fast performance</span>, <span class="hl">battery savings</span>, <span class="hl">fast data load</span>. Each metric is computed live from the fast-pipe model (448.998 CPU ratio + remainder model), not static text.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CPU · GPU ============ -->
+  <div class="panel" id="p-cpugpu">
+    <div class="section">
+      <div class="section-head"><h2>COMPUTE UNITS — CPU / GPU / STORAGE</h2><span class="badge info" id="cgBadge">DETECT</span></div>
+      <div class="section-body">
+        <div class="grid">
+          <div class="stat good"><div class="k">Logical CPUs</div><div class="v" id="cgCores">—</div></div>
+          <div class="stat"><div class="k">Device Memory</div><div class="v" id="cgMem">—</div></div>
+          <div class="stat"><div class="k">GPU Adapters</div><div class="v" id="cgGpuN">—</div></div>
+          <div class="stat"><div class="k">Attached Storage</div><div class="v" id="cgStore">—</div></div>
+        </div>
+        <div class="section" style="margin-top:14px">
+          <div class="section-head"><h2>DETECTED HARDWARE</h2><span class="badge info" id="cgHwBadge">—</span></div>
+          <div class="section-body" id="cgHwBody"><div class="note">Press DETECT + TEST to enumerate this device.</div></div>
+        </div>
+        <div class="field-grid" style="margin-top:12px">
+          <div><label>Workload iterations / unit</label><input type="number" id="cgIters" value="6000000" step="500000"></div>
+          <div><label>LOG divisor (per-CPU)</label><input type="number" id="cgDiv" value="448771.229" step="0.001"></div>
+        </div>
+        <div class="btn-row">
+          <button onclick="runComputeTest()">DETECT + TEST</button>
+          <button class="ghost" onclick="detectHardware()">DETECT ONLY</button>
+        </div>
+        <div class="section" style="margin-top:4px">
+          <div class="section-head"><h2>PER-UNIT CPU RESULT (own LOG number)</h2><span class="badge run" id="cgCpuBadge">IDLE</span></div>
+          <div class="section-body" id="cgCpuBody"><div class="note">Each logical CPU runs the same workload in parallel (Web Worker per core). Measured time feeds the remainder model — every unit gets its own LOG number from the divisor. Less remainder = lower lag = faster.</div></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><h2>GPU FILL-RATE TEST (WebGL)</h2><span class="badge run" id="cgGpuBadge">IDLE</span></div>
+          <div class="section-body" id="cgGpuBody"><div class="note">Real WebGL renderer string + fragment fill timing. Works on device, desktop and cloud browser — no install, no server.</div></div>
+        </div>
+        <div class="note">Same tool, three targets: <span class="hl">device</span> (phone WebView), <span class="hl">desktop</span> (Windows/Mac/Linux browser), <span class="hl">network cloud</span> (any remote browser). Deterministic LOG model means the CPU numbers are comparable across all three.</div>
       </div>
     </div>
   </div>
@@ -374,6 +411,158 @@ function copyLog(){
   if(navigator.clipboard)navigator.clipboard.writeText(t);
 }
 
+/* ---------------- CPU · GPU (real device probe + LOG model) ---------------- */
+function fmtBytes(b){
+  if(!b||b<0)return '—';
+  var u=['B','KB','MB','GB','TB'],i=0;
+  while(b>=1024&&i<u.length-1){b/=1024;i++;}
+  return b.toFixed(b<10&&i>0?1:0)+' '+u[i];
+}
+function glRenderer(){
+  try{
+    var c=document.createElement('canvas');
+    var gl=c.getContext('webgl')||c.getContext('experimental-webgl');
+    if(!gl)return {vendor:'n/a',renderer:'no WebGL',gl:null,canvas:null};
+    var dbg=gl.getExtension('WEBGL_debug_renderer_info');
+    var vendor=dbg?gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL):gl.getParameter(gl.VENDOR);
+    var renderer=dbg?gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER);
+    return {vendor:vendor||'?',renderer:renderer||'?',gl:gl,canvas:c};
+  }catch(e){return {vendor:'err',renderer:String(e.message||e),gl:null,canvas:null};}
+}
+function detectHardware(){
+  var cores=navigator.hardwareConcurrency||1;
+  var mem=navigator.deviceMemory;
+  var g=glRenderer();
+  var hasWebGPU=(typeof navigator!=='undefined'&&navigator.gpu)?'yes':'no';
+  document.getElementById('cgCores').textContent=cores;
+  document.getElementById('cgMem').textContent=mem?mem+' GB':'—';
+  document.getElementById('cgGpuN').textContent=(g.gl?1:0)+(hasWebGPU==='yes'?'+':'');
+  var rows=[];
+  rows.push(['Platform',navigator.platform||'—']);
+  rows.push(['Logical CPUs',String(cores)+' units']);
+  rows.push(['Device memory',mem?mem+' GB (min)':'not exposed']);
+  rows.push(['GPU vendor',g.vendor]);
+  rows.push(['GPU renderer',g.renderer]);
+  rows.push(['WebGPU',hasWebGPU]);
+  rows.push(['User agent',(navigator.userAgent||'').slice(0,64)]);
+  var b=document.getElementById('cgHwBody');b.innerHTML='';
+  rows.forEach(function(r){
+    b.innerHTML+='<div class="row"><span class="name">'+r[0]+'</span><span class="val" style="min-width:200px;word-break:break-all">'+r[1]+'</span></div>';
+  });
+  document.getElementById('cgHwBadge').textContent=cores+' CPU · '+(g.gl?'1':'0')+' GPU';
+  // storage estimate (attached / detached drive quota)
+  if(navigator.storage&&navigator.storage.estimate){
+    navigator.storage.estimate().then(function(e){
+      document.getElementById('cgStore').textContent=fmtBytes(e.quota);
+    }).catch(function(){document.getElementById('cgStore').textContent='—';});
+  }else{document.getElementById('cgStore').textContent='n/a';}
+  // async WebGPU adapter enumeration
+  if(navigator.gpu&&navigator.gpu.requestAdapter){
+    navigator.gpu.requestAdapter().then(function(a){
+      if(!a)return;
+      var info=(a.info)||(a.requestAdapterInfo?null:{});
+      var add=function(name,val){b.innerHTML+='<div class="row"><span class="name">'+name+'</span><span class="val" style="min-width:200px;word-break:break-all">'+val+'</span></div>';};
+      if(a.info){add('WebGPU adapter',(a.info.vendor||'')+' '+(a.info.architecture||a.info.description||''));}
+      else if(a.requestAdapterInfo){a.requestAdapterInfo().then(function(i){add('WebGPU adapter',(i.vendor||'')+' '+(i.architecture||i.description||''));});}
+    }).catch(function(){});
+  }
+  return {cores:cores,gl:g};
+}
+function cpuWorkerCode(){
+  return 'self.onmessage=function(e){var n=e.data.iters,u=e.data.unit,s=1.0;'+
+         'var t0=performance.now();for(var i=0;i<n;i++){s+=Math.sqrt((i%9973)+1.7)*1.0000003;if(s>1e12)s=s%97.13;}'+
+         'var t1=performance.now();self.postMessage({unit:u,ms:(t1-t0),checksum:s});};';
+}
+function runCpuUnits(cores,iters,cb){
+  var results=[],done=0,useWorker=(typeof Worker!=='undefined');
+  var wcode=cpuWorkerCode(),url=null,workers=[];
+  if(useWorker){
+    try{url=URL.createObjectURL(new Blob([wcode],{type:'application/javascript'}));}
+    catch(e){useWorker=false;}
+  }
+  function finish(){workers.forEach(function(w){try{w.terminate();}catch(e){}});if(url)try{URL.revokeObjectURL(url);}catch(e){}cb(results);}
+  if(useWorker){
+    var failed=false;
+    for(var u=0;u<cores;u++){
+      try{
+        var w=new Worker(url);workers.push(w);
+        w.onmessage=function(ev){results.push(ev.data);done++;if(done>=cores)finish();};
+        w.onerror=function(){if(!failed){failed=true;runSeq();}};
+        w.postMessage({iters:iters,unit:u});
+      }catch(e){if(!failed){failed=true;runSeq();return;}}
+    }
+    return;
+  }
+  runSeq();
+  function runSeq(){
+    // fallback: sequential single-thread, still real timings per unit
+    results.length=0;
+    for(var u=0;u<cores;u++){
+      var s=1.0,t0=performance.now();
+      for(var i=0;i<iters;i++){s+=Math.sqrt((i%9973)+1.7)*1.0000003;if(s>1e12)s=s%97.13;}
+      var t1=performance.now();
+      results.push({unit:u,ms:(t1-t0),checksum:s,seq:true});
+    }
+    finish();
+  }
+}
+function runComputeTest(){
+  var hw=detectHardware();
+  var cores=hw.cores, gl=hw.gl;
+  var iters=parseInt(document.getElementById('cgIters').value)||6000000;
+  var DIV=parseFloat(document.getElementById('cgDiv').value)||448771.229;
+  document.getElementById('cgBadge').textContent='RUNNING';document.getElementById('cgBadge').className='badge run';
+  document.getElementById('cgCpuBadge').textContent='RUNNING';document.getElementById('cgCpuBadge').className='badge run';
+  document.getElementById('cgCpuBody').innerHTML='<div class="note">Running '+iters.toLocaleString()+' iters on '+cores+' unit(s)…</div>';
+  setTimeout(function(){
+    runCpuUnits(cores,iters,function(res){
+      res.sort(function(a,b){return a.unit-b.unit;});
+      var body=document.getElementById('cgCpuBody');
+      var head='<div class="row"><span class="name" style="color:var(--green2)">UNIT · TIME(ms)</span><span class="val">LOG NUMBER (rem)</span><span class="status">SPEED</span></div>';
+      var rows='',fastest=null,slowest=null,mode=res[0]&&res[0].seq?'sequential':'parallel';
+      res.forEach(function(r){
+        var pt=r.ms/1000; // seconds
+        var ev=evaluate(pt,DIV,DIV,1e6); // reuse ported model; remainder = per-CPU LOG number
+        if(fastest===null||ev.remainder<fastest.rem){fastest={u:r.unit,rem:ev.remainder,ms:r.ms};}
+        if(slowest===null||ev.remainder>slowest.rem){slowest={u:r.unit,rem:ev.remainder,ms:r.ms};}
+        rows+='<div class="row"><span class="name">CPU '+r.unit+'</span>'+
+              '<span class="val">'+r.ms.toFixed(2)+' ms · LOG '+ev.remainder.toFixed(3)+'</span>'+
+              '<span class="status '+(ev.fast?'ok':'fail')+'">'+(ev.fast?'FAST':'slow')+'</span></div>';
+      });
+      body.innerHTML=head+rows+
+        '<div class="row"><span class="name">mode</span><span class="val">'+mode+' · '+cores+' unit(s)</span></div>'+
+        '<div class="row"><span class="name">fastest unit</span><span class="val">CPU '+(fastest?fastest.u:'—')+' · LOG '+(fastest?fastest.rem.toFixed(3):'—')+'</span><span class="status ok">LEAST LAG</span></div>'+
+        '<div class="row"><span class="name">slowest unit</span><span class="val">CPU '+(slowest?slowest.u:'—')+' · LOG '+(slowest?slowest.rem.toFixed(3):'—')+'</span><span class="status fail">MOST LAG</span></div>';
+      document.getElementById('cgCpuBadge').textContent='DONE';document.getElementById('cgCpuBadge').className='badge pass';
+      runGpuTest(gl);
+      document.getElementById('cgBadge').textContent='DONE';document.getElementById('cgBadge').className='badge pass';
+    });
+  },40);
+}
+function runGpuTest(g){
+  var body=document.getElementById('cgGpuBody');
+  document.getElementById('cgGpuBadge').textContent='RUNNING';document.getElementById('cgGpuBadge').className='badge run';
+  if(!g||!g.gl){
+    body.innerHTML='<div class="row"><span class="name">WebGL</span><span class="val">unavailable</span><span class="status fail">SKIP</span></div>';
+    document.getElementById('cgGpuBadge').textContent='N/A';document.getElementById('cgGpuBadge').className='badge off';return;
+  }
+  var gl=g.gl,c=g.canvas;c.width=512;c.height=512;gl.viewport(0,0,512,512);
+  var t0=performance.now(),frames=60;
+  for(var f=0;f<frames;f++){
+    gl.clearColor((f%60)/60,0.2,0.6,1);gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.scissor(0,0,512,512);gl.enable(gl.SCISSOR_TEST);gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.finish&&gl.finish();
+  }
+  var t1=performance.now(),ms=t1-t0,fps=frames/(ms/1000);
+  var mpix=(512*512*frames)/1e6;
+  body.innerHTML=
+    '<div class="row"><span class="name">GPU vendor</span><span class="val" style="min-width:200px;word-break:break-all">'+g.vendor+'</span></div>'+
+    '<div class="row"><span class="name">GPU renderer</span><span class="val" style="min-width:200px;word-break:break-all">'+g.renderer+'</span></div>'+
+    '<div class="row"><span class="name">fill test</span><span class="val">'+frames+' frm · '+ms.toFixed(1)+' ms</span><span class="status ok">'+fps.toFixed(0)+' fps</span></div>'+
+    '<div class="row"><span class="name">throughput</span><span class="val">'+(mpix/(ms/1000)).toFixed(0)+' Mpix/s</span></div>';
+  document.getElementById('cgGpuBadge').textContent='DONE';document.getElementById('cgGpuBadge').className='badge pass';
+}
+
 /* ---------------- tabs ---------------- */
 document.querySelectorAll('.tab').forEach(function(t){
   t.onclick=function(){
@@ -386,6 +575,7 @@ document.querySelectorAll('.tab').forEach(function(t){
 
 /* init */
 renderPorts();updateSwitch();pollNet();runTestLog();
+try{detectHardware();}catch(e){}
 </script>
 </body>
 </html>
