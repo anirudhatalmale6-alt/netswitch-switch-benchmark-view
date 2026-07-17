@@ -88,7 +88,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
   <div class="header">
     <h1>NETSWITCH</h1>
     <div class="sub">ROUTER / SWITCH · BENCHMARK NET · CPU·GPU · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · Engine v2.13.0 · serverless — runs on Android 13 · Windows · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · Engine v2.14.0 · serverless — runs on Android 13 · Windows · any browser</div>
   </div>
 
   <div class="tabs">
@@ -180,6 +180,19 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
           <div class="section-head"><h2>GPU FILL-RATE TEST (WebGL)</h2><span class="badge run" id="cgGpuBadge">IDLE</span></div>
           <div class="section-body" id="cgGpuBody"><div class="note">Real WebGL renderer string + fragment fill timing. Works on device, desktop and cloud browser — no install, no server.</div></div>
         </div>
+        <div class="section">
+          <div class="section-head"><h2>MEMORY / JAM GUARD (RAM, not ROM)</h2><span class="badge run" id="memBadge">—</span></div>
+          <div class="section-body">
+            <div class="grid">
+              <div class="stat"><div class="k">Used JS Heap</div><div class="v" id="memUsed">—</div></div>
+              <div class="stat"><div class="k">Heap Limit</div><div class="v" id="memLimit">—</div></div>
+              <div class="stat" id="memPctStat"><div class="k">RAM Pressure</div><div class="v" id="memPct">—</div></div>
+            </div>
+            <div class="bar-wrap"><div class="bar"><span id="memBar" style="width:0%"></span></div><div class="bar-lbl"><span>heap used</span><span id="memBarLbl">—</span></div></div>
+            <div class="btn-row"><button onclick="freeMemory()">FREE MEMORY</button><button class="ghost" onclick="readMemory()">READ NOW</button><button class="ghost" onclick="stressMemory()">SIMULATE LOAD</button></div>
+            <div class="note"><span class="hl">RAM (heap), not ROM (storage)</span>, is what fills when a page pulls a big file from a cloud disk into HTML — the whole file lands in the tab's memory. Many tabs + a big pull crosses the per-app RAM limit and Chrome freezes (the "isn't responding" jam). Fix: <span class="hl">close pages before the jam</span>, and load big files in chunks, not all at once. The phone camera stalls for the same reason — it needs a large free RAM buffer for each frame; if RAM is near the limit the camera can't get a buffer.</div>
+          </div>
+        </div>
         <div class="note">Same tool, three targets: <span class="hl">device</span> (phone WebView), <span class="hl">desktop</span> (Windows/Mac/Linux browser), <span class="hl">network cloud</span> (any remote browser). Deterministic LOG model means the CPU numbers are comparable across all three.</div>
       </div>
     </div>
@@ -201,7 +214,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
           <div class="section-body" id="hopBody"></div>
         </div>
         <div class="btn-row"><button onclick="pollNet()">REFRESH DATA</button></div>
-        <div class="note">Hop table mirrors the engine's reroute_trace module: router name / IP / MAC-OUI vendor per hop, cheaper-path selection, port-keyed flow.</div>
+        <div class="note">Hop table mirrors the engine's reroute_trace module: router name / IP / MAC-OUI vendor / <span class="hl">geolocated city</span> per hop. MAP opens that server's city in Google Maps. City is derived from the IP octet (LA / Washington / London / Frankfurt buckets in this build); a full offline GeoIP database drops in for exact city per real IP.</div>
       </div>
     </div>
   </div>
@@ -308,7 +321,7 @@ function resetBench(){
 }
 
 /* ---------------- NET DATA ---------------- */
-var HOPS=[['gw-core-01','10.0.0.1','00:1B:21 · Intel'],['edge-rtr-04','172.16.4.9','00:50:56 · VMware'],['isp-bng-11','203.0.113.7','B4:FB:E4 · Cisco'],['peer-ix-02','198.51.100.22','E4:8D:8C · MikroTik']];
+var HOPS=[['gw-core-01','10.0.0.1','00:1B:21 · Intel','local / LAN'],['edge-rtr-04','172.16.4.9','00:50:56 · VMware','Los Angeles, US'],['isp-bng-11','203.0.113.7','B4:FB:E4 · Cisco','Washington DC, US'],['peer-ix-02','198.51.100.22','E4:8D:8C · MikroTik','London, UK']];
 var netTick=0;
 function pollNet(){
   netTick++;
@@ -322,7 +335,8 @@ function pollNet(){
   document.getElementById('nHopBadge').textContent=HOPS.length+' HOPS';
   var b=document.getElementById('hopBody');b.innerHTML='';
   HOPS.forEach(function(h,ix){
-    b.innerHTML+='<div class="row"><span class="name">hop '+(ix+1)+' · '+h[0]+'</span><span class="val">'+h[1]+'</span><span class="status ok">'+h[2]+'</span></div>';
+    var city=h[3]||geoFromIp(h[1]);
+    b.innerHTML+='<div class="row"><span class="name">hop '+(ix+1)+' · '+h[0]+'<br><span style="color:var(--dim)">'+h[2]+'</span></span><span class="val">'+h[1]+'<br><span style="color:var(--gold)">'+city+'</span></span><span class="status ok"><a href="'+mapsUrl(city)+'" target="_blank" rel="noopener" style="color:var(--green)">MAP &#9656;</a></span></div>';
   });
 }
 
@@ -563,6 +577,56 @@ function runGpuTest(g){
   document.getElementById('cgGpuBadge').textContent='DONE';document.getElementById('cgGpuBadge').className='badge pass';
 }
 
+/* ---------------- MEMORY / JAM GUARD ---------------- */
+function fmtMB(b){return (b/1048576).toFixed(1)+' MB';}
+function readMemory(){
+  var m=(window.performance&&performance.memory)?performance.memory:null;
+  var badge=document.getElementById('memBadge');
+  if(!m){
+    badge.textContent='N/A';badge.className='badge off';
+    document.getElementById('memUsed').textContent='not exposed';
+    document.getElementById('memLimit').textContent='—';
+    document.getElementById('memPct').textContent='—';
+    document.getElementById('memBarLbl').textContent='count your tabs';
+    return;
+  }
+  var used=m.usedJSHeapSize,lim=m.jsHeapSizeLimit||1,pct=used/lim*100;
+  document.getElementById('memUsed').textContent=fmtMB(used);
+  document.getElementById('memLimit').textContent=fmtMB(lim);
+  document.getElementById('memPct').textContent=pct.toFixed(0)+' %';
+  var bar=document.getElementById('memBar');bar.style.width=Math.min(100,pct).toFixed(0)+'%';
+  document.getElementById('memBarLbl').textContent=pct.toFixed(0)+' %';
+  var st,cls;
+  if(pct<60){st='SAFE';cls='pass';}
+  else if(pct<85){st='NEAR JAM';cls='run';}
+  else{st='CRITICAL — CLOSE PAGES';cls='off';}
+  badge.textContent=st;badge.className='badge '+cls;
+  document.getElementById('memPctStat').className='stat '+(pct<60?'good':(pct<85?'warn':''));
+}
+var MEMHOLD=[];
+function stressMemory(){ // demo: shows how pulling a big blob into HTML raises RAM
+  try{MEMHOLD.push(new Array(4000000).fill(7));}catch(e){}
+  readMemory();
+}
+function freeMemory(){
+  MEMHOLD.length=0;
+  try{if(window.caches&&caches.keys)caches.keys().then(function(k){k.forEach(function(n){caches.delete(n);});});}catch(e){}
+  try{if(window.gc)window.gc();}catch(e){}
+  readMemory();
+}
+
+/* ---------------- geolocation for reroute hops (octet -> city) ---------------- */
+function geoFromIp(ip){
+  if(!ip)return 'unknown';
+  if(/^10\.|^192\.168\.|^172\.(1[6-9]|2\d|3[01])\.|^127\./.test(ip))return 'local / LAN';
+  var f=parseInt(ip.split('.')[0],10)||0;
+  if(f<64)return 'Los Angeles, US';
+  if(f<128)return 'Washington DC, US';
+  if(f<192)return 'London, UK';
+  return 'Frankfurt, EU';
+}
+function mapsUrl(city){return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(city);}
+
 /* ---------------- tabs ---------------- */
 document.querySelectorAll('.tab').forEach(function(t){
   t.onclick=function(){
@@ -576,6 +640,7 @@ document.querySelectorAll('.tab').forEach(function(t){
 /* init */
 renderPorts();updateSwitch();pollNet();runTestLog();
 try{detectHardware();}catch(e){}
+try{readMemory();setInterval(readMemory,2000);}catch(e){}
 </script>
 </body>
 </html>
