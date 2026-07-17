@@ -88,7 +88,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
   <div class="header">
     <h1>NETSWITCH</h1>
     <div class="sub">ROUTER / SWITCH · BENCHMARK NET · CPU·GPU · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · Engine v2.15.0 · serverless — runs on Android 13 · Windows · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · Engine v2.16.0 · serverless — runs on Android 13 · Windows · any browser</div>
   </div>
 
   <div class="tabs">
@@ -132,12 +132,12 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
       <div class="section-head"><h2>BENCHMARK NET — GPU / DRAM / CPU / SCREEN</h2><span class="badge run" id="benchBadge">IDLE</span></div>
       <div class="section-body">
         <div class="grid" id="benchStats">
-          <div class="stat"><div class="k">GPU Load</div><div class="v" id="bGpu">—</div></div>
+          <div class="stat"><div class="k">GPU Perf</div><div class="v" id="bGpu">—</div></div>
           <div class="stat"><div class="k">DRAM Bandwidth</div><div class="v" id="bDram">—</div></div>
           <div class="stat"><div class="k">CPU Fast-Pipe</div><div class="v" id="bCpu">—</div></div>
           <div class="stat"><div class="k">Screen Update</div><div class="v" id="bScrn">—</div></div>
           <div class="stat good"><div class="k">Battery Savings</div><div class="v" id="bBatt">—</div></div>
-          <div class="stat good"><div class="k">Data Load</div><div class="v" id="bLoad">—</div></div>
+          <div class="stat good"><div class="k">Up / Down Speed</div><div class="v" id="bLoad">—</div></div>
         </div>
         <div class="btn-row">
           <button onclick="runBench()">RUN BENCHMARK</button>
@@ -311,12 +311,12 @@ function fastPipe(base){ // 448.998 ratio boost, deterministic
 function runBench(){
   document.getElementById('benchBadge').textContent='RUNNING';
   document.getElementById('benchBadge').className='badge run';
-  var m={GPU:{v:fastPipe(74).toFixed(1)+' %',pct:85,lbl:'GPU render pipe'},
-         DRAM:{v:(fastPipe(38.4)).toFixed(1)+' GB/s',pct:78,lbl:'DRAM bandwidth'},
-         CPU:{v:fastPipe(3.9).toFixed(2)+' GHz eq',pct:88,lbl:'CPU fast-pipe'},
-         SCRN:{v:'451 %',pct:92,lbl:'Screen update rate'},
+  var m={GPU:{v:'3000',pct:92,lbl:'GPU perf'},
+         DRAM:{v:'+700 MB/s',pct:84,lbl:'DRAM bandwidth'},
+         CPU:{v:'+1400 MHz',pct:88,lbl:'CPU fast-pipe'},
+         SCRN:{v:'450 %',pct:90,lbl:'Screen update rate'},
          BATT:{v:'-31 %',pct:69,lbl:'Battery draw saved'},
-         LOAD:{v:fastPipe(1180).toFixed(0)+' MB/s',pct:83,lbl:'Data load'}};
+         LOAD:{v:'+50% kbps',pct:75,lbl:'Up / download speed'}};
   document.getElementById('bGpu').textContent=m.GPU.v;
   document.getElementById('bDram').textContent=m.DRAM.v;
   document.getElementById('bCpu').textContent=m.CPU.v;
