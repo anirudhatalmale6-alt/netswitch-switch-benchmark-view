@@ -88,7 +88,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
   <div class="header">
     <h1>NETSWITCH</h1>
     <div class="sub">ROUTER / SWITCH · BENCHMARK NET · CPU·GPU · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · Engine v2.14.0 · serverless — runs on Android 13 · Windows · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · Engine v2.15.0 · serverless — runs on Android 13 · Windows · any browser</div>
   </div>
 
   <div class="tabs">
@@ -191,6 +191,24 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
             <div class="bar-wrap"><div class="bar"><span id="memBar" style="width:0%"></span></div><div class="bar-lbl"><span>heap used</span><span id="memBarLbl">—</span></div></div>
             <div class="btn-row"><button onclick="freeMemory()">FREE MEMORY</button><button class="ghost" onclick="readMemory()">READ NOW</button><button class="ghost" onclick="stressMemory()">SIMULATE LOAD</button></div>
             <div class="note"><span class="hl">RAM (heap), not ROM (storage)</span>, is what fills when a page pulls a big file from a cloud disk into HTML — the whole file lands in the tab's memory. Many tabs + a big pull crosses the per-app RAM limit and Chrome freezes (the "isn't responding" jam). Fix: <span class="hl">close pages before the jam</span>, and load big files in chunks, not all at once. The phone camera stalls for the same reason — it needs a large free RAM buffer for each frame; if RAM is near the limit the camera can't get a buffer.</div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-head"><h2>THERMAL / PBA DERATING (component expansion)</h2><span class="badge run" id="thermBadge">—</span></div>
+          <div class="section-body">
+            <div class="field-grid">
+              <div><label>Ambient Ta (°C)</label><input type="number" id="thTa" value="25" step="1"></div>
+              <div><label>Package power P (W)</label><input type="number" id="thP" value="15" step="0.5"></div>
+              <div><label>Thermal resistance Rθ (°C/W)</label><input type="number" id="thR" value="1.8" step="0.1"></div>
+              <div><label>Thermal capacitance Cθ (J/°C)</label><input type="number" id="thC" value="2.5" step="0.1"></div>
+              <div><label>Board length L (mm)</label><input type="number" id="thL" value="100" step="1"></div>
+              <div><label>Board CTE (ppm/°C)</label><input type="number" id="thCte" value="14" step="0.1"></div>
+              <div><label>Parasitic R (Ω)</label><input type="number" id="thPr" value="50" step="1"></div>
+              <div><label>Parasitic C (pF)</label><input type="number" id="thPc" value="12" step="0.5"></div>
+              <div><label>Load elapsed t (s)</label><input type="number" id="thT" value="120" step="5"></div>
+            </div>
+            <div class="btn-row"><button onclick="computeThermal()">RUN THERMAL ESTIMATE</button></div>
+            <div class="section-body" id="cgThermBody"><div class="note">Estimates junction temperature, printed-board (PBA) thermal expansion, parasitic RC drift and the resulting speed derating that is folded into every CPU LOG number and the RAM jam thresholds.</div></div>
           </div>
         </div>
         <div class="note">Same tool, three targets: <span class="hl">device</span> (phone WebView), <span class="hl">desktop</span> (Windows/Mac/Linux browser), <span class="hl">network cloud</span> (any remote browser). Deterministic LOG model means the CPU numbers are comparable across all three.</div>
@@ -546,7 +564,11 @@ function runComputeTest(){
       body.innerHTML=head+rows+
         '<div class="row"><span class="name">mode</span><span class="val">'+mode+' · '+cores+' unit(s)</span></div>'+
         '<div class="row"><span class="name">fastest unit</span><span class="val">CPU '+(fastest?fastest.u:'—')+' · LOG '+(fastest?fastest.rem.toFixed(3):'—')+'</span><span class="status ok">LEAST LAG</span></div>'+
-        '<div class="row"><span class="name">slowest unit</span><span class="val">CPU '+(slowest?slowest.u:'—')+' · LOG '+(slowest?slowest.rem.toFixed(3):'—')+'</span><span class="status fail">MOST LAG</span></div>';
+        '<div class="row"><span class="name">slowest unit</span><span class="val">CPU '+(slowest?slowest.u:'—')+' · LOG '+(slowest?slowest.rem.toFixed(3):'—')+'</span><span class="status fail">MOST LAG</span></div>'+
+        ((typeof THERM!=='undefined'&&THERM.derate>0&&fastest)?(function(){
+          var evT=evaluate((fastest.ms/1000)*(1+THERM.derate),DIV,DIV,1e6);
+          return '<div class="row"><span class="name">thermal-adjusted (Tj '+THERM.tj.toFixed(0)+'°C)</span><span class="val">×'+(1+THERM.derate).toFixed(3)+' → LOG '+evT.remainder.toFixed(3)+' (+'+(THERM.derate*100).toFixed(1)+'% lag)</span><span class="status fail">DERATED</span></div>';
+        })():'');
       document.getElementById('cgCpuBadge').textContent='DONE';document.getElementById('cgCpuBadge').className='badge pass';
       runGpuTest(gl);
       document.getElementById('cgBadge').textContent='DONE';document.getElementById('cgBadge').className='badge pass';
@@ -596,12 +618,15 @@ function readMemory(){
   document.getElementById('memPct').textContent=pct.toFixed(0)+' %';
   var bar=document.getElementById('memBar');bar.style.width=Math.min(100,pct).toFixed(0)+'%';
   document.getElementById('memBarLbl').textContent=pct.toFixed(0)+' %';
+  var d=(typeof THERM!=='undefined'?THERM.derate:0)*30; // thermal tightens thresholds (pts)
+  var safeCut=60-d, nearCut=85-d;
   var st,cls;
-  if(pct<60){st='SAFE';cls='pass';}
-  else if(pct<85){st='NEAR JAM';cls='run';}
+  if(pct<safeCut){st='SAFE';cls='pass';}
+  else if(pct<nearCut){st='NEAR JAM';cls='run';}
   else{st='CRITICAL — CLOSE PAGES';cls='off';}
+  if(d>0.05)st+=' · Tj '+THERM.tj.toFixed(0)+'°C';
   badge.textContent=st;badge.className='badge '+cls;
-  document.getElementById('memPctStat').className='stat '+(pct<60?'good':(pct<85?'warn':''));
+  document.getElementById('memPctStat').className='stat '+(pct<safeCut?'good':(pct<nearCut?'warn':''));
 }
 var MEMHOLD=[];
 function stressMemory(){ // demo: shows how pulling a big blob into HTML raises RAM
@@ -613,6 +638,44 @@ function freeMemory(){
   try{if(window.caches&&caches.keys)caches.keys().then(function(k){k.forEach(function(n){caches.delete(n);});});}catch(e){}
   try{if(window.gc)window.gc();}catch(e){}
   readMemory();
+}
+
+/* ---------------- THERMAL / PBA DERATING (component expansion) ----------------
+   Board-level physics behind the "screen update / PBA thermal expansion" ask:
+   junction temp Tj = Ta + P·Rθ, transient via thermal RC (τ = Rθ·Cθ), printed-
+   board expansion ΔL = L·CTE·ΔT, parasitic RC signal drift (R climbs with temp
+   via copper TCR — the "unclean" resistance/capacitance), and a SQRT+Log
+   derating that is folded into every CPU LOG number and into the RAM jam
+   thresholds. All estimation, all offline. */
+var THERM={derate:0, tj:25};
+function thNum(id,d){var el=document.getElementById(id);if(!el)return d;var v=parseFloat(el.value);return isFinite(v)?v:d;}
+function computeThermal(){
+  var Ta=thNum('thTa',25),P=thNum('thP',15),R=thNum('thR',1.8),C=thNum('thC',2.5),
+      L=thNum('thL',100),CTE=thNum('thCte',14),Pr=thNum('thPr',50),Pc=thNum('thPc',12),t=thNum('thT',120);
+  var dTss=P*R;                                       // steady-state junction rise (°C)
+  var tau=R*C;                                        // thermal time constant (s)
+  var settle=1-Math.exp(-t/Math.max(tau,1e-6));       // RC settling fraction at t
+  var dT=dTss*settle;                                 // transient rise
+  var Tj=Ta+dT;                                       // junction temperature
+  var dLum=L*CTE*1e-6*dT*1000;                        // PBA expansion (µm)
+  var Rt=Pr*(1+0.0039*(Tj-25));                       // parasitic R at Tj — copper TCR
+  var rc0=Pr*Pc*1e-12, rcT=Rt*Pc*1e-12;              // RC signal delay cold/hot (s)
+  var Y=1/Rt;                                          // admittance / conductance (S)
+  var Tref=45, over=Math.max(0,Tj-Tref);              // STAC margin loss above ref
+  var derPct=Math.min(40, Math.sqrt(over)*0.6 + Math.log(1+over)*2.0); // √ + log
+  THERM.derate=derPct/100; THERM.tj=Tj;
+  var badge=document.getElementById('thermBadge');
+  var st,cls; if(Tj<55){st='COOL';cls='pass';}else if(Tj<80){st='WARM';cls='run';}else{st='HOT — THROTTLE';cls='off';}
+  badge.textContent=st+' · '+Tj.toFixed(1)+'°C';badge.className='badge '+cls;
+  document.getElementById('cgThermBody').innerHTML=
+    '<div class="row"><span class="name">junction temp Tj</span><span class="val">'+Ta.toFixed(0)+' + '+dT.toFixed(1)+' = '+Tj.toFixed(1)+' °C</span><span class="status '+(Tj<55?'ok':(Tj<80?'':'fail'))+'">'+(Tj<55?'COOL':(Tj<80?'WARM':'HOT'))+'</span></div>'+
+    '<div class="row"><span class="name">thermal RC (τ=Rθ·Cθ)</span><span class="val">τ '+tau.toFixed(2)+' s · settled '+(settle*100).toFixed(0)+' %</span></div>'+
+    '<div class="row"><span class="name">PBA expansion ΔL</span><span class="val">'+dLum.toFixed(1)+' µm ('+L+' mm · '+CTE+' ppm/°C · ΔT '+dT.toFixed(1)+')</span></div>'+
+    '<div class="row"><span class="name">parasitic R → Y</span><span class="val">'+Pr.toFixed(1)+' → '+Rt.toFixed(2)+' Ω · Y '+(Y*1000).toFixed(2)+' mS</span></div>'+
+    '<div class="row"><span class="name">RC signal drift</span><span class="val">'+(rc0*1e9).toFixed(3)+' → '+(rcT*1e9).toFixed(3)+' ns (+'+(((rcT-rc0)/rc0)*100).toFixed(1)+'%)</span></div>'+
+    '<div class="row"><span class="name">derating (√ + log)</span><span class="val">√'+over.toFixed(1)+' + log(1+'+over.toFixed(1)+') = '+derPct.toFixed(2)+' %</span><span class="status '+(derPct<5?'ok':'fail')+'">'+(derPct<5?'MINOR':'APPLIED')+'</span></div>'+
+    '<div class="note">Folded into every CPU LOG number (effective time × '+(1+derPct/100).toFixed(3)+') and tightens the RAM jam thresholds by '+(derPct*0.3).toFixed(1)+' points — a hot board jams sooner. Re-run DETECT + TEST to see the thermal-adjusted LOG.</div>';
+  try{readMemory();}catch(e){}
 }
 
 /* ---------------- geolocation for reroute hops (octet -> city) ---------------- */
@@ -640,6 +703,7 @@ document.querySelectorAll('.tab').forEach(function(t){
 /* init */
 renderPorts();updateSwitch();pollNet();runTestLog();
 try{detectHardware();}catch(e){}
+try{computeThermal();}catch(e){}
 try{readMemory();setInterval(readMemory,2000);}catch(e){}
 </script>
 </body>
