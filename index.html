@@ -87,8 +87,8 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
 <div class="container">
   <div class="header">
     <h1>NETSWITCH</h1>
-    <div class="sub">ROUTER / SWITCH · BENCHMARK NET · CPU·GPU · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · Engine v2.16.0 · serverless — runs on Android 13 · Windows · any browser</div>
+    <div class="sub">ROUTER / SWITCH · BENCHMARK NET · CPU·GPU · AREA MAP · TEST LOG TOOL</div>
+    <div class="version">AI2ORBIT Co. 2026 · Engine v2.17.0 · serverless — runs on Android 13 · Windows · any browser</div>
   </div>
 
   <div class="tabs">
@@ -96,6 +96,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
     <div class="tab" data-p="bench">BENCHMARK NET</div>
     <div class="tab" data-p="cpugpu">CPU · GPU</div>
     <div class="tab" data-p="net">NET DATA</div>
+    <div class="tab" data-p="areamap">AREA MAP</div>
     <div class="tab" data-p="testlog">TEST LOG TOOL</div>
   </div>
 
@@ -238,6 +239,32 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
   </div>
 
   <!-- ============ TEST LOG TOOL ============ -->
+  <div class="panel" id="p-areamap">
+    <div class="section">
+      <div class="section-head"><h2>AREA MAP — MARK &amp; MEASURE (users · routing · ISP · hardware)</h2><span class="badge info" id="amBadge">TAP TO PLACE SPOTS</span></div>
+      <div class="section-body">
+        <div class="note" style="margin-top:0">Tap the map to drop spots where users are in the city (2 to 4). The Switch draws the lines, measures each line length and the triangle area A between the users and the active routing node. Press <span class="hl">MEASURE NETWORK</span> to route traffic through the ISP + hardware, then <span class="hl">REROUTE TRAFFIC</span> to send it a different way — watch area A and the longest line change.</div>
+        <div style="width:100%;overflow-x:auto"><canvas id="amCanvas" width="920" height="460" style="display:block;width:100%;max-width:920px;background:#060c07;border:1px solid var(--border);border-radius:4px;cursor:crosshair;touch-action:none"></canvas></div>
+        <div class="btn-row">
+          <button onclick="amMeasure()">MEASURE NETWORK</button>
+          <button class="ghost" onclick="amReroute()">REROUTE TRAFFIC</button>
+          <button class="ghost" onclick="amDemo()">DEMO SPOTS</button>
+          <button class="ghost" onclick="amClear()">CLEAR</button>
+        </div>
+        <div class="grid" style="margin-top:6px">
+          <div class="stat good"><div class="k">Network area A (via relay)</div><div class="v" id="amArea">— <small>km²</small></div></div>
+          <div class="stat"><div class="k">Spot triangle (geo)</div><div class="v" id="amGeo">— <small>km²</small></div></div>
+          <div class="stat warn"><div class="k">Longest line</div><div class="v" id="amLong">— <small>km</small></div></div>
+          <div class="stat"><div class="k">Route path (measured)</div><div class="v" id="amRoute">— <small>km</small></div></div>
+          <div class="stat"><div class="k">ΔA on reroute</div><div class="v" id="amDelta">—</div></div>
+          <div class="stat"><div class="k">Active route via</div><div class="v" id="amVia" style="font-size:16px">—</div></div>
+        </div>
+        <div id="amEdges" style="margin-top:10px"></div>
+        <div class="note">Scale: map width = <span class="hl">12.0 km</span>. Area A is the fan area the relay-routed links sweep between the user spots (shoelace / cross-product); line length = geographic distance in km; route path = the actual traffic distance the Switch pushes through the selected ISP/hardware relay. Rerouting moves the relay, so the measured triangle and its area A change — the exact metric the Switch reports.</div>
+      </div>
+    </div>
+  </div>
+
   <div class="panel" id="p-testlog">
     <div class="section">
       <div class="section-head"><h2>TEST LOG TOOL — DATA FROM MOBILE .txt</h2><span class="badge run" id="logBadge">READY</span></div>
@@ -690,6 +717,149 @@ function geoFromIp(ip){
 }
 function mapsUrl(city){return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(city);}
 
+/* ---------------- AREA MAP — mark & measure ---------------- */
+var AM_W=920, AM_H=460, AM_KMW=12.0;            /* map width = 12 km */
+var AM_KPP=AM_KMW/AM_W;                          /* km per pixel */
+var amPts=[];                                    /* user spots {x,y} */
+var amISP={x:110,y:66,n:'ISP'};
+var amHW=[{x:470,y:104,n:'HW-A'},{x:772,y:250,n:'HW-B'},{x:300,y:376,n:'HW-C'}]; /* relays */
+var amRelay=0;                                   /* active hardware relay index */
+var amPrevA=null;                                /* last network area, for ΔA */
+function amCtx(){return document.getElementById('amCanvas').getContext('2d');}
+function amDist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)*AM_KPP;}                 /* km */
+function amTri(a,b,c){return Math.abs((b.x-a.x)*(c.y-a.y)-(c.x-a.x)*(b.y-a.y))/2*AM_KPP*AM_KPP;} /* km² */
+function amFmt(n,d){return (Math.round(n*Math.pow(10,d))/Math.pow(10,d)).toFixed(d);}
+
+/* network area = fan of triangles (spot_i, relay, spot_i+1) — depends on relay */
+function amNetArea(){
+  if(amPts.length<2) return 0;
+  var R=amHW[amRelay], a=0;
+  for(var i=0;i<amPts.length-1;i++) a+=amTri(amPts[i],R,amPts[i+1]);
+  return a;
+}
+/* pure geographic polygon area of the spots (shoelace) */
+function amGeoArea(){
+  if(amPts.length<3) return 0;
+  var s=0;
+  for(var i=0;i<amPts.length;i++){var p=amPts[i],q=amPts[(i+1)%amPts.length];s+=p.x*q.y-q.x*p.y;}
+  return Math.abs(s)/2*AM_KPP*AM_KPP;
+}
+
+function amDraw(){
+  var c=amCtx(); c.clearRect(0,0,AM_W,AM_H);
+  /* city grid */
+  c.strokeStyle='rgba(31,51,32,0.55)'; c.lineWidth=1;
+  for(var gx=0;gx<=AM_W;gx+=46){c.beginPath();c.moveTo(gx,0);c.lineTo(gx,AM_H);c.stroke();}
+  for(var gy=0;gy<=AM_H;gy+=46){c.beginPath();c.moveTo(0,gy);c.lineTo(AM_W,gy);c.stroke();}
+  var R=amHW[amRelay];
+  /* backbone ISP -> active relay */
+  c.strokeStyle='rgba(255,215,64,0.35)'; c.setLineDash([6,5]); c.lineWidth=2;
+  c.beginPath();c.moveTo(amISP.x,amISP.y);c.lineTo(R.x,R.y);c.stroke(); c.setLineDash([]);
+  /* relay legs (spot -> active relay) */
+  c.strokeStyle='rgba(255,215,64,0.55)'; c.setLineDash([4,4]); c.lineWidth=1.5;
+  amPts.forEach(function(p){c.beginPath();c.moveTo(p.x,p.y);c.lineTo(R.x,R.y);c.stroke();});
+  c.setLineDash([]);
+  /* user lines (consecutive spots) + km labels */
+  c.strokeStyle='#00e676'; c.lineWidth=2;
+  for(var i=0;i<amPts.length-1;i++){
+    var p=amPts[i],q=amPts[i+1];
+    c.beginPath();c.moveTo(p.x,p.y);c.lineTo(q.x,q.y);c.stroke();
+    var mx=(p.x+q.x)/2,my=(p.y+q.y)/2;
+    c.fillStyle='#9fd6a8';c.font='11px Courier New';c.fillText(amFmt(amDist(p,q),2)+' km',mx+4,my-4);
+  }
+  /* close the polygon faintly if triangle+ */
+  if(amPts.length>=3){
+    var f=amPts[0],l=amPts[amPts.length-1];
+    c.strokeStyle='rgba(0,230,118,0.4)';c.setLineDash([3,4]);
+    c.beginPath();c.moveTo(l.x,l.y);c.lineTo(f.x,f.y);c.stroke();c.setLineDash([]);
+  }
+  /* infra nodes */
+  function node(p,col,r,fill){
+    c.beginPath();c.arc(p.x,p.y,r,0,7);c.fillStyle=fill||col;c.fill();
+    c.lineWidth=2;c.strokeStyle=col;c.stroke();
+    c.fillStyle='#e8ede9';c.font='11px Courier New';c.fillText(p.n,p.x+r+3,p.y+4);
+  }
+  node(amISP,'#ffd740',7,'rgba(255,215,64,0.25)');
+  amHW.forEach(function(h,idx){
+    if(idx===amRelay){c.beginPath();c.arc(h.x,h.y,13,0,7);c.strokeStyle='rgba(255,215,64,0.6)';c.lineWidth=2;c.stroke();}
+    node(h,idx===amRelay?'#ffd740':'#2979ff',7,idx===amRelay?'rgba(255,215,64,0.3)':'rgba(41,121,255,0.25)');
+  });
+  /* user spots */
+  amPts.forEach(function(p,i){
+    c.beginPath();c.arc(p.x,p.y,8,0,7);c.fillStyle='rgba(0,230,118,0.85)';c.fill();
+    c.lineWidth=2;c.strokeStyle='#0a0f0a';c.stroke();
+    c.fillStyle='#0a0f0a';c.font='bold 11px Courier New';c.fillText('U'+(i+1),p.x-6,p.y+4);
+  });
+}
+
+function amCanvasXY(ev){
+  var cv=document.getElementById('amCanvas'), r=cv.getBoundingClientRect();
+  var cx=(ev.touches?ev.touches[0].clientX:ev.clientX)-r.left;
+  var cy=(ev.touches?ev.touches[0].clientY:ev.clientY)-r.top;
+  return {x:cx*(AM_W/r.width), y:cy*(AM_H/r.height)};
+}
+function amAdd(ev){
+  ev.preventDefault();
+  if(amPts.length>=4){ amBadge('MAX 4 SPOTS — CLEAR TO RESET','run'); return; }
+  var p=amCanvasXY(ev); amPts.push({x:p.x,y:p.y}); amDraw();
+  amBadge(amPts.length+' SPOT'+(amPts.length>1?'S':'')+' — PRESS MEASURE','info');
+}
+function amBadge(t,cls){var b=document.getElementById('amBadge');b.textContent=t;b.className='badge '+(cls||'info');}
+
+function amMeasure(){
+  if(amPts.length<2){ amBadge('PLACE AT LEAST 2 SPOTS','run'); return; }
+  amDraw();
+  var R=amHW[amRelay];
+  var A=amNetArea(), geo=amGeoArea();
+  /* segments: user lines + relay legs */
+  var segs=[], longest=0, routePath=0;
+  for(var i=0;i<amPts.length-1;i++){var d=amDist(amPts[i],amPts[i+1]);segs.push({n:'U'+(i+1)+' — U'+(i+2)+' (user line)',km:d});if(d>longest)longest=d;}
+  if(amPts.length>=3){var dc=amDist(amPts[amPts.length-1],amPts[0]);segs.push({n:'U'+amPts.length+' — U1 (user line)',km:dc});if(dc>longest)longest=dc;}
+  amPts.forEach(function(p,i){var d=amDist(p,R);segs.push({n:'U'+(i+1)+' → '+R.n+' (route leg)',km:d,leg:true});if(d>longest)longest=d;});
+  /* route path = traffic hopping spot -> relay -> next spot around the ring */
+  for(var j=0;j<amPts.length;j++){var a=amPts[j],b=amPts[(j+1)%amPts.length];routePath+=amDist(a,R)+amDist(R,b);}
+  document.getElementById('amArea').innerHTML=amFmt(A,3)+' <small>km²</small>';
+  document.getElementById('amGeo').innerHTML=(amPts.length>=3?amFmt(geo,3):'—')+' <small>km²</small>';
+  document.getElementById('amLong').innerHTML=amFmt(longest,2)+' <small>km</small>';
+  document.getElementById('amRoute').innerHTML=amFmt(routePath,2)+' <small>km</small>';
+  document.getElementById('amVia').textContent=R.n+' + '+amISP.n;
+  if(amPrevA===null){document.getElementById('amDelta').innerHTML='<span style="color:var(--dim)">reroute to compare</span>';}
+  else{var d=A-amPrevA,pct=amPrevA?d/amPrevA*100:0,col=d>=0?'var(--green)':'var(--red)';
+    document.getElementById('amDelta').innerHTML='<span style="color:'+col+'">'+(d>=0?'+':'')+amFmt(d,3)+' km² ('+(d>=0?'+':'')+amFmt(pct,1)+'%)</span>';}
+  /* edges table with per-link latency + throughput */
+  var h='<table style="width:100%;border-collapse:collapse;font-family:Courier New;font-size:11px">';
+  h+='<tr style="color:var(--dim)"><td style="padding:4px 6px">LINK</td><td style="text-align:right">LENGTH</td><td style="text-align:right">LATENCY</td><td style="text-align:right">THROUGHPUT</td></tr>';
+  segs.forEach(function(s){
+    var lat=2+s.km*0.92, mbps=Math.max(60,Math.round(1000-s.km*46));
+    h+='<tr style="border-top:1px solid rgba(31,51,32,0.5)"><td style="padding:4px 6px;color:'+(s.leg?'var(--gold)':'var(--green)')+'">'+s.n+'</td><td style="text-align:right;color:#e8ede9">'+amFmt(s.km,2)+' km</td><td style="text-align:right;color:#e8ede9">'+amFmt(lat,1)+' ms</td><td style="text-align:right;color:#e8ede9">'+mbps+' Mbps</td></tr>';
+  });
+  h+='</table>';
+  document.getElementById('amEdges').innerHTML=h;
+  amBadge('MEASURED · A = '+amFmt(A,2)+' km²','pass');
+  amPrevA=A;
+}
+function amReroute(){
+  if(amPts.length<2){ amBadge('PLACE SPOTS FIRST','run'); return; }
+  amRelay=(amRelay+1)%amHW.length;
+  amBadge('REROUTED → '+amHW[amRelay].n,'run');
+  amMeasure();
+}
+function amDemo(){
+  amPts=[{x:190,y:300},{x:560,y:150},{x:800,y:360}]; amRelay=0; amPrevA=null;
+  amDraw(); amMeasure();
+}
+function amClear(){ amPts=[]; amRelay=0; amPrevA=null; amDraw();
+  ['amArea','amGeo','amLong','amRoute'].forEach(function(id){document.getElementById(id).innerHTML='— <small>'+(id==='amArea'||id==='amGeo'?'km²':'km')+'</small>';});
+  document.getElementById('amDelta').textContent='—';document.getElementById('amVia').textContent='—';
+  document.getElementById('amEdges').innerHTML=''; amBadge('TAP TO PLACE SPOTS','info');
+}
+function amInit(){
+  var cv=document.getElementById('amCanvas'); if(!cv)return;
+  cv.addEventListener('click',amAdd);
+  cv.addEventListener('touchstart',amAdd,{passive:false});
+  amDraw();
+}
+
 /* ---------------- tabs ---------------- */
 document.querySelectorAll('.tab').forEach(function(t){
   t.onclick=function(){
@@ -705,6 +875,7 @@ renderPorts();updateSwitch();pollNet();runTestLog();
 try{detectHardware();}catch(e){}
 try{computeThermal();}catch(e){}
 try{readMemory();setInterval(readMemory,2000);}catch(e){}
+try{amInit();}catch(e){}
 </script>
 </body>
 </html>
