@@ -102,6 +102,10 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
 #p-routes tr:nth-child(even) td{background:#f6faf7}
 #p-routes .rt-note{font-size:11px;color:#5a6b60;margin-top:10px;font-family:var(--mono);line-height:1.6}
 #p-routes .rt-mapwrap{width:100%;overflow-x:auto}
+#p-routes .rt-geo{font-family:var(--mono);font-size:12px;color:#12261a;background:#eef7f1;border:1px solid #bfe0cc;border-left:4px solid #0b6b39;border-radius:4px;padding:9px 12px;margin:0 0 12px;line-height:1.55;display:none}
+#p-routes .rt-geo.on{display:block}
+#p-routes .rt-geo b{color:#0b6b39}
+#p-routes button.live{background:#0b6b39;color:#fff;border-color:#0b6b39}
 </style>
 </head>
 <body>
@@ -109,7 +113,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
   <div class="header">
     <h1>NETSWITCH</h1>
     <div class="sub">ROUTER / SWITCH · BENCHMARK NET · CPU·GPU · AREA MAP · UK ROUTES · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · Engine v2.19.0 · serverless — runs on Android 13 · Windows · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · Engine v2.20.0 · serverless — runs on Android 13 · Windows · any browser</div>
   </div>
 
   <div class="tabs">
@@ -298,11 +302,13 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
         <div><label>To</label><select id="rtTo"></select></div>
         <button onclick="rtRoute()">ROUTE</button>
         <button class="ghost" onclick="rtReroute()">REROUTE</button>
+        <button class="ghost" id="rtGpsBtn" onclick="rtToggleGPS()">USE MY LOCATION (GPS)</button>
       </div>
+      <div id="rtGeo" class="rt-geo"></div>
       <div class="rt-mapwrap"><canvas id="rtCanvas" width="560" height="580"></canvas></div>
       <div class="rt-summary" id="rtSummary"></div>
       <div id="rtHops"></div>
-      <div class="rt-note">Pick a From and To city and press ROUTE. The map shows the exact path the traffic takes through the backbone POPs, and the table lists every hop with its address, IP, link latency and distance. REROUTE switches to the alternate carrier path (the greyed line) so you can compare which route is live. Distances are great-circle km between real UK locations; latency scales with distance.</div>
+      <div class="rt-note">Pick a From and To city and press ROUTE. Or tap USE MY LOCATION (GPS) — the app reads the phone's live GPS and routes from where you actually are to the domain, updating by itself as you move from one street to the next. The map shows the exact path the traffic takes through the backbone POPs, and the table lists every hop with its address, IP, link latency and distance. REROUTE switches to the alternate carrier path (the greyed line). Distances are great-circle km between real locations; latency scales with distance. GPS needs the page opened over the https link (allow location when the phone asks).</div>
     </div>
   </div>
 
@@ -981,6 +987,7 @@ function rtPairKey(f,t){
 }
 function rtActivePath(){
   var f=document.getElementById('rtFrom').value, t=document.getElementById('rtTo').value;
+  if(rtGPS && f==='My location') return rtGpsPath();   /* live device location */
   if(f===t) return null;
   var pk=rtPairKey(f,t);
   var path;
@@ -988,6 +995,44 @@ function rtActivePath(){
   else { path=[f,t]; }        /* fallback direct */
   return path;
 }
+/* ---- live GPS routing (origin = the phone's real location) ---- */
+var rtGPS=null, rtWatch=null;
+function rtHav2(la1,lo1,la2,lo2){ var R=6371,tr=Math.PI/180,dLa=(la2-la1)*tr,dLo=(lo2-lo1)*tr;
+  var s=Math.sin(dLa/2)*Math.sin(dLa/2)+Math.cos(la1*tr)*Math.cos(la2*tr)*Math.sin(dLo/2)*Math.sin(dLo/2);
+  return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s)); }
+function rtNearest(lon,lat){ var best=null,bd=Infinity;
+  for(var n in RT_CITY){ var c=RT_CITY[n]; if(c.gps||c.dest) continue;
+    var d=rtHav2(lat,lon,c.lat,c.lon); if(d<bd){bd=d;best=n;} } return best; }
+function rtGpsPath(){
+  var to=document.getElementById('rtTo').value, near=rtNearest(rtGPS.lon,rtGPS.lat);
+  var tail = (RT_CITY[to]&&RT_CITY[to].dest) ? ['London EC2','Fastly LON',to] : [to];
+  var path=['My location',near].concat(tail);
+  return path.filter(function(n,i){return i===0||n!==path[i-1];});   /* dedupe */
+}
+function rtToggleGPS(){
+  var btn=document.getElementById('rtGpsBtn');
+  if(rtWatch!==null){ navigator.geolocation.clearWatch(rtWatch); rtWatch=null; rtGPS=null;
+    delete RT_CITY['My location']; btn.classList.remove('live'); btn.textContent='USE MY LOCATION (GPS)';
+    var f=document.getElementById('rtFrom'); for(var i=f.options.length-1;i>=0;i--){ if(f.options[i].value==='My location') f.remove(i); }
+    f.value='London EC2'; document.getElementById('rtGeo').className='rt-geo'; rtAlt=0; rtRender(); return; }
+  if(!navigator.geolocation){ var g=document.getElementById('rtGeo'); g.className='rt-geo on'; g.innerHTML='This browser has no GPS support. Open the link on a phone.'; return; }
+  btn.textContent='LOCATING…';
+  rtWatch=navigator.geolocation.watchPosition(rtOnPos,rtOnErr,{enableHighAccuracy:true,maximumAge:2000,timeout:15000});
+}
+function rtOnPos(pos){
+  var la=pos.coords.latitude, lo=pos.coords.longitude, acc=Math.round(pos.coords.accuracy||0);
+  rtGPS={lat:la,lon:lo,acc:acc};
+  RT_CITY['My location']={lon:lo,lat:la,ip:'(this device)',addr:'Live GPS · '+la.toFixed(5)+', '+lo.toFixed(5),pri:1,gps:1};
+  var f=document.getElementById('rtFrom');
+  var has=false; for(var i=0;i<f.options.length;i++){ if(f.options[i].value==='My location') has=true; }
+  if(!has){ var o=new Option('My location (GPS)','My location'); f.add(o,f.options[0]); }
+  f.value='My location';
+  var btn=document.getElementById('rtGpsBtn'); btn.classList.add('live'); btn.textContent='GPS LIVE — TAP TO STOP';
+  rtAlt=0; rtRender();
+}
+function rtOnErr(e){ var g=document.getElementById('rtGeo'); g.className='rt-geo on';
+  g.innerHTML='Could not read GPS ('+(e&&e.message?e.message:'permission denied')+'). On the phone, allow Location for this site and make sure you opened the https link.';
+  var btn=document.getElementById('rtGpsBtn'); btn.textContent='USE MY LOCATION (GPS)'; rtWatch=null; }
 function rtAltPath(){
   var f=document.getElementById('rtFrom').value, t=document.getElementById('rtTo').value;
   var pk=rtPairKey(f,t); if(!pk) return null;
@@ -1080,6 +1125,14 @@ function rtRender(){
     '<div class="rt-card"><div class="k">Total latency</div><div class="v">'+totMs.toFixed(2)+' ms</div></div>'+
     '<div class="rt-card"><div class="k">Hops</div><div class="v">'+(path.length-1)+'</div></div>';
   hops.innerHTML='<table><thead><tr><th>#</th><th>City / node</th><th>Address</th><th>IP</th><th>Link</th><th>Distance</th><th>Cumulative</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  /* live GPS readout */
+  var geo=document.getElementById('rtGeo');
+  if(rtGPS && path[0]==='My location'){
+    geo.className='rt-geo on';
+    geo.innerHTML='<b>GPS LIVE</b> · your position '+rtGPS.lat.toFixed(5)+', '+rtGPS.lon.toFixed(5)+' (±'+rtGPS.acc+' m)<br>'+
+      'Nearest network node: <b>'+path[1]+'</b> ('+rtHav('My location',path[1]).toFixed(2)+' km) · destination <b>'+path[path.length-1]+'</b> · '+totKm.toFixed(1)+' km, '+totMs.toFixed(2)+' ms end to end.<br>'+
+      'Walk to another street and the origin dot and the whole route update on their own.';
+  } else { geo.className='rt-geo'; }
 }
 function rtInit(){
   var f=document.getElementById('rtFrom'), t=document.getElementById('rtTo'); if(!f)return;
