@@ -109,7 +109,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
   <div class="header">
     <h1>NETSWITCH</h1>
     <div class="sub">ROUTER / SWITCH · BENCHMARK NET · CPU·GPU · AREA MAP · UK ROUTES · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · Engine v2.18.0 · serverless — runs on Android 13 · Windows · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · Engine v2.19.0 · serverless — runs on Android 13 · Windows · any browser</div>
   </div>
 
   <div class="tabs">
@@ -915,7 +915,12 @@ var RT_CITY={
  'Croydon':{lon:-0.099,lat:51.376,ip:'195.66.225.8',addr:'Croydon POP, Wellesley Rd, Croydon CR0'},
  'Gatwick':{lon:-0.190,lat:51.156,ip:'185.1.94.12',addr:'Gatwick POP, Beehive Ring Rd, Gatwick RH6'},
  'Redhill':{lon:-0.170,lat:51.240,ip:'185.1.94.20',addr:'Redhill POP, Station Rd, Redhill RH1'},
- 'Haywards Heath':{lon:-0.102,lat:50.998,ip:'185.1.94.32',addr:'Haywards Heath POP, Sussex Rd, RH16'}
+ 'Haywards Heath':{lon:-0.102,lat:50.998,ip:'185.1.94.32',addr:'Haywards Heath POP, Sussex Rd, RH16'},
+ /* London-area access POPs + a public domain destination */
+ 'Greenwich':{lon:-0.008,lat:51.483,ip:'195.99.174.10',addr:'Greenwich access POP, Creek Rd, London SE10',pri:1},
+ 'Camden Town':{lon:-0.143,lat:51.539,ip:'213.120.62.10',addr:'Camden access POP, Camden High St, London NW1',pri:1},
+ 'Fastly LON':{lon:-0.018,lat:51.512,ip:'151.101.0.81',addr:'Fastly LON edge, Telehouse North, Coriander Ave E14'},
+ 'BBC.co.uk':{lon:0.040,lat:51.500,ip:'146.75.120.81',addr:'BBC.co.uk · bbc.map.fastly.net (Fastly anycast 151.101.0.81)',pri:1,dest:1}
 };
 var RT_ROUTES={
  'London EC2|Birmingham':[
@@ -926,18 +931,43 @@ var RT_ROUTES={
    ['London EC2','Redhill','Haywards Heath','Brighton']],
  'Birmingham|Brighton':[
    ['Birmingham','Coventry','Milton Keynes','Croydon','Brighton'],
-   ['Birmingham','Oxford','Reading','Gatwick','Brighton']]
+   ['Birmingham','Oxford','Reading','Gatwick','Brighton']],
+ /* London office comparison + BBC.co.uk (Fastly) destination */
+ 'Greenwich|Camden Town':[
+   ['Greenwich','London EC2','Camden Town'],
+   ['Greenwich','Croydon','London EC2','Camden Town']],
+ 'Greenwich|BBC.co.uk':[
+   ['Greenwich','London EC2','Fastly LON','BBC.co.uk'],
+   ['Greenwich','Croydon','London EC2','Fastly LON','BBC.co.uk']],
+ 'Camden Town|BBC.co.uk':[
+   ['Camden Town','London EC2','Fastly LON','BBC.co.uk'],
+   ['Camden Town','Luton','London EC2','Fastly LON','BBC.co.uk']]
 };
-var RT_PRIMARIES=['London EC2','Birmingham','Brighton'];
+var RT_PRIMARIES=['London EC2','Birmingham','Brighton','Greenwich','Camden Town','BBC.co.uk'];
 var rtAlt=0;                                 /* 0=primary path, 1=alternate */
-/* projection window (southern/central England) */
+/* projection window (southern/central England) — national default */
 var RT_LON0=-2.7,RT_LON1=1.0,RT_LAT0=50.45,RT_LAT1=52.85,RT_PAD=34;
+/* live view window: auto-fits to the active route (zooms into London when needed) */
+var rtV={lon0:RT_LON0,lon1:RT_LON1,lat0:RT_LAT0,lat1:RT_LAT1};
 function rtPX(lon,lat){
   var w=560,h=580;
-  var x=RT_PAD+(lon-RT_LON0)/(RT_LON1-RT_LON0)*(w-2*RT_PAD);
-  var y=RT_PAD+(RT_LAT1-lat)/(RT_LAT1-RT_LAT0)*(h-2*RT_PAD);
+  var x=RT_PAD+(lon-rtV.lon0)/(rtV.lon1-rtV.lon0)*(w-2*RT_PAD);
+  var y=RT_PAD+(rtV.lat1-lat)/(rtV.lat1-rtV.lat0)*(h-2*RT_PAD);
   return {x:x,y:y};
 }
+function rtComputeView(paths){
+  var pts=[]; paths.forEach(function(pp){ if(pp) pp.forEach(function(n){ if(RT_CITY[n]) pts.push(RT_CITY[n]); }); });
+  if(!pts.length){ rtV={lon0:RT_LON0,lon1:RT_LON1,lat0:RT_LAT0,lat1:RT_LAT1}; return; }
+  var mnLo=Infinity,mxLo=-Infinity,mnLa=Infinity,mxLa=-Infinity;
+  pts.forEach(function(p){ if(p.lon<mnLo)mnLo=p.lon; if(p.lon>mxLo)mxLo=p.lon; if(p.lat<mnLa)mnLa=p.lat; if(p.lat>mxLa)mxLa=p.lat; });
+  var loSpan=mxLo-mnLo, laSpan=mxLa-mnLa, loMin=0.24, laMin=0.17;
+  if(loSpan<loMin){ var cx=(mnLo+mxLo)/2; mnLo=cx-loMin/2; mxLo=cx+loMin/2; loSpan=loMin; }
+  if(laSpan<laMin){ var cy=(mnLa+mxLa)/2; mnLa=cy-laMin/2; mxLa=cy+laMin/2; laSpan=laMin; }
+  var mLo=loSpan*0.18, mLa=laSpan*0.18;
+  rtV={lon0:mnLo-mLo,lon1:mxLo+mLo,lat0:mnLa-mLa,lat1:mxLa+mLa};
+}
+function rtStep(span){ return span>3?1: span>1.4?0.5: span>0.6?0.25: span>0.28?0.1: 0.05; }
+function rtLonLbl(v,dec){ if(dec==null)dec=2; var a=Math.abs(v)<1e-9?0:v; var s=Math.abs(a).toFixed(dec); return a===0?'0°':(a<0?s+'°W':s+'°E'); }
 function rtHav(a,b){ /* great-circle km */
   var A=RT_CITY[a],B=RT_CITY[b],R=6371,tr=Math.PI/180;
   var dLat=(B.lat-A.lat)*tr,dLon=(B.lon-A.lon)*tr;
@@ -986,31 +1016,45 @@ function rtDrawPath(c,path,active){
 function rtDraw(){
   var cv=document.getElementById('rtCanvas'); if(!cv)return; var c=cv.getContext('2d');
   c.clearRect(0,0,560,580);
-  /* sea + south coast for orientation */
-  var coast=[[-2.7,50.60],[-2.0,50.62],[-1.55,50.74],[-1.09,50.79],[-0.55,50.78],[-0.137,50.83],[0.28,50.77],[0.75,50.86],[1.0,51.02]];
-  c.beginPath();
-  coast.forEach(function(pt,i){var p=rtPX(pt[0],pt[1]); if(i===0)c.moveTo(p.x,p.y); else c.lineTo(p.x,p.y);});
-  c.lineTo(rtPX(1.0,50.45).x,580); c.lineTo(rtPX(-2.7,50.45).x,580); c.closePath();
-  c.fillStyle='#eaf4fb'; c.fill();
-  c.strokeStyle='#bcd6ea'; c.lineWidth=1.5; c.beginPath();
-  coast.forEach(function(pt,i){var p=rtPX(pt[0],pt[1]); if(i===0)c.moveTo(p.x,p.y); else c.lineTo(p.x,p.y);});
-  c.stroke();
-  /* graticule */
+  var path=rtActivePath(), alt=rtAltPath();
+  rtComputeView([path]);                      /* auto-fit the map to the active route */
+  var wide=(rtV.lat0<51.05);                 /* national view shows the coast */
+  if(wide){ /* sea + south coast for orientation */
+    var coast=[[-2.7,50.60],[-2.0,50.62],[-1.55,50.74],[-1.09,50.79],[-0.55,50.78],[-0.137,50.83],[0.28,50.77],[0.75,50.86],[1.0,51.02]];
+    c.beginPath();
+    coast.forEach(function(pt,i){var p=rtPX(pt[0],pt[1]); if(i===0)c.moveTo(p.x,p.y); else c.lineTo(p.x,p.y);});
+    c.lineTo(rtPX(1.0,rtV.lat0).x,580); c.lineTo(rtPX(-2.7,rtV.lat0).x,580); c.closePath();
+    c.fillStyle='#eaf4fb'; c.fill();
+    c.strokeStyle='#bcd6ea'; c.lineWidth=1.5; c.beginPath();
+    coast.forEach(function(pt,i){var p=rtPX(pt[0],pt[1]); if(i===0)c.moveTo(p.x,p.y); else c.lineTo(p.x,p.y);});
+    c.stroke();
+  }
+  /* graticule (auto step) */
   c.strokeStyle='#eef3ef'; c.lineWidth=1; c.fillStyle='#9fb0a4'; c.font='10px Courier New';
-  [-2,-1,0,1].forEach(function(lo){var p=rtPX(lo,RT_LAT1);c.beginPath();c.moveTo(p.x,RT_PAD);c.lineTo(p.x,580-RT_PAD);c.stroke();c.fillText((lo<0?(-lo)+'°W':lo>0?lo+'°E':'0°'),p.x+2,580-RT_PAD+12);});
-  [51,52].forEach(function(la){var p=rtPX(RT_LON0,la);c.beginPath();c.moveTo(RT_PAD,p.y);c.lineTo(560-RT_PAD,p.y);c.stroke();c.fillText(la+'°N',RT_PAD-2,p.y-3);});
+  var loStep=rtStep(rtV.lon1-rtV.lon0), laStep=rtStep(rtV.lat1-rtV.lat0);
+  var loDec=loStep>=1?0:(loStep>=0.1?1:2), laDec=laStep>=1?0:(laStep>=0.1?1:2);
+  for(var lo=Math.ceil(rtV.lon0/loStep)*loStep; lo<=rtV.lon1; lo+=loStep){
+    var pl=rtPX(lo,rtV.lat1); c.beginPath(); c.moveTo(pl.x,RT_PAD); c.lineTo(pl.x,580-RT_PAD); c.stroke();
+    c.fillText(rtLonLbl(lo,loDec),pl.x+2,580-RT_PAD+12);
+  }
+  for(var la=Math.ceil(rtV.lat0/laStep)*laStep; la<=rtV.lat1; la+=laStep){
+    var pa=rtPX(rtV.lon0,la); c.beginPath(); c.moveTo(RT_PAD,pa.y); c.lineTo(560-RT_PAD,pa.y); c.stroke();
+    c.fillText(la.toFixed(laDec)+'°N',RT_PAD-2,pa.y-3);
+  }
   /* alternate (greyed) then active route */
-  rtDrawPath(c,rtAltPath(),false);
-  var path=rtActivePath();
+  rtDrawPath(c,alt,false);
   rtDrawPath(c,path,true);
-  /* all city dots */
+  /* city dots (only those inside the current view) */
   var onPath={}; if(path) path.forEach(function(n){onPath[n]=1;});
+  var onAlt={}; if(alt) alt.forEach(function(n){onAlt[n]=1;});
   for(var name in RT_CITY){
-    var ct=RT_CITY[name],p=rtPX(ct.lon,ct.lat),on=onPath[name],pri=ct.pri;
-    c.beginPath(); c.arc(p.x,p.y,on?6:(pri?5:3.5),0,7);
-    c.fillStyle=on?'#0b6b39':(pri?'#12261a':'#b7c4bb'); c.fill();
+    var ct=RT_CITY[name],on=onPath[name],ol=onAlt[name],pri=ct.pri;
+    if(!on && (ct.lon<rtV.lon0||ct.lon>rtV.lon1||ct.lat<rtV.lat0||ct.lat>rtV.lat1)) continue;
+    var p=rtPX(ct.lon,ct.lat);
+    c.beginPath(); c.arc(p.x,p.y,on?6:(pri||ol?5:3.5),0,7);
+    c.fillStyle=on?'#0b6b39':(pri?'#12261a':(ol?'#7d8f83':'#b7c4bb')); c.fill();
     if(on){c.lineWidth=2;c.strokeStyle='#fff';c.stroke();}
-    if(pri||on){ c.fillStyle='#12261a'; c.font=(pri?'bold ':'')+'11px Courier New'; c.fillText(name,p.x+8,p.y+4); }
+    if(pri||on||ol){ c.fillStyle=on?'#12261a':(ol?'#5c6b60':'#12261a'); c.font=((pri||on)?'bold ':'')+'11px Courier New'; c.fillText(name,p.x+8,p.y+4); }
   }
 }
 function rtRoute(){ rtAlt=0; rtRender(); }
