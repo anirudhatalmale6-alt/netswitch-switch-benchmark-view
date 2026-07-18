@@ -106,6 +106,15 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
 #p-routes .rt-geo.on{display:block}
 #p-routes .rt-geo b{color:#0b6b39}
 #p-routes button.live{background:#0b6b39;color:#fff;border-color:#0b6b39}
+#p-routes .rt-sec-h{font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#0b6b39;font-weight:700;margin:18px 0 8px;padding-bottom:5px;border-bottom:1px solid #dce6df}
+#p-routes .rt-formula{background:#f6faf7;border:1px solid #dce6df;border-left:4px solid #0b6b39;border-radius:4px;padding:10px 12px;margin-bottom:10px;font-family:var(--mono);font-size:11px;color:#12261a;line-height:1.7}
+#p-routes .rt-formula b{color:#0b6b39}
+#p-routes .rt-formula .mono{background:#e7f1ea;padding:1px 5px;border-radius:3px}
+#p-routes td.calc{color:#0b6b39}
+#p-routes .rt-role{font-size:10px;font-family:var(--mono);padding:1px 6px;border-radius:3px;background:#e7f1ea;color:#0b6b39;white-space:nowrap}
+#p-routes .rt-role.dest{background:#0b6b39;color:#fff}
+#p-routes .rt-role.gps{background:#ffe9b8;color:#7a5300}
+#p-routes tfoot td{border-top:2px solid #cdd9d0;font-weight:700;color:#0b6b39;background:#eef7f1}
 </style>
 </head>
 <body>
@@ -113,7 +122,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
   <div class="header">
     <h1>NETSWITCH</h1>
     <div class="sub">ROUTER / SWITCH · BENCHMARK NET · CPU·GPU · AREA MAP · UK ROUTES · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · Engine v2.20.0 · serverless — runs on Android 13 · Windows · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · Engine v2.21.0 · serverless — runs on Android 13 · Windows · any browser</div>
   </div>
 
   <div class="tabs">
@@ -307,7 +316,12 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
       <div id="rtGeo" class="rt-geo"></div>
       <div class="rt-mapwrap"><canvas id="rtCanvas" width="560" height="580"></canvas></div>
       <div class="rt-summary" id="rtSummary"></div>
+      <div class="rt-sec-h" id="rtHopsH" style="display:none">ROUTE HOPS — every node the traffic passes through</div>
       <div id="rtHops"></div>
+      <div class="rt-sec-h" id="rtCalcH" style="display:none">PATH CALCULATION — how the distance &amp; latency are worked out</div>
+      <div id="rtCalc"></div>
+      <div class="rt-sec-h">DATA LISTING — every node in the routing dataset</div>
+      <div id="rtData"></div>
       <div class="rt-note">Pick a From and To city and press ROUTE. Or tap USE MY LOCATION (GPS) — the app reads the phone's live GPS and routes from where you actually are to the domain, updating by itself as you move from one street to the next. The map shows the exact path the traffic takes through the backbone POPs, and the table lists every hop with its address, IP, link latency and distance. REROUTE switches to the alternate carrier path (the greyed line). Distances are great-circle km between real locations; latency scales with distance. GPS needs the page opened over the https link (allow location when the phone asks).</div>
     </div>
   </div>
@@ -1108,7 +1122,8 @@ function rtRender(){
   var path=rtActivePath();
   rtDraw();
   var sum=document.getElementById('rtSummary'), hops=document.getElementById('rtHops');
-  if(!path){ sum.innerHTML='<div class="rt-card"><div class="k">Route</div><div class="v">Pick two different cities</div></div>'; hops.innerHTML=''; return; }
+  var calcEl=document.getElementById('rtCalc'), hopsH=document.getElementById('rtHopsH'), calcH=document.getElementById('rtCalcH');
+  if(!path){ sum.innerHTML='<div class="rt-card"><div class="k">Route</div><div class="v">Pick two different cities</div></div>'; hops.innerHTML=''; calcEl.innerHTML=''; hopsH.style.display='none'; calcH.style.display='none'; rtRenderData(); return; }
   var totKm=0,totMs=0,rows='';
   for(var i=0;i<path.length;i++){
     var name=path[i],ct=RT_CITY[name],linkKm=i?rtHav(path[i-1],name):0,linkMs=i?(0.6+linkKm*0.014):0;
@@ -1125,6 +1140,23 @@ function rtRender(){
     '<div class="rt-card"><div class="k">Total latency</div><div class="v">'+totMs.toFixed(2)+' ms</div></div>'+
     '<div class="rt-card"><div class="k">Hops</div><div class="v">'+(path.length-1)+'</div></div>';
   hops.innerHTML='<table><thead><tr><th>#</th><th>City / node</th><th>Address</th><th>IP</th><th>Link</th><th>Distance</th><th>Cumulative</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  hopsH.style.display='block'; calcH.style.display='block';
+  /* per-hop path calculation — show the math behind every number */
+  var crows='';
+  for(var j=1;j<path.length;j++){
+    var a=path[j-1],b=path[j],km=rtHav(a,b),ms=0.6+km*0.014;
+    crows+='<tr><td>'+j+'</td><td>'+a+' &#8594; '+b+'</td><td class="calc">haversine = '+km.toFixed(1)+' km</td><td class="calc">0.60 + 0.014&#215;'+km.toFixed(1)+' = '+ms.toFixed(2)+' ms</td></tr>';
+  }
+  calcEl.innerHTML=
+    '<div class="rt-formula">'+
+    '<b>Distance</b> — great-circle (haversine) between each node\'s real coordinates:<br>'+
+    'd = 2R&#183;asin(&#8730;(sin&#178;(&#916;&#966;/2) + cos&#966;&#8321;&#183;cos&#966;&#8322;&#183;sin&#178;(&#916;&#955;/2))), &nbsp; R = <span class="mono">6371 km</span><br>'+
+    '<b>Link latency</b> = <span class="mono">0.60 ms</span> base (switching) + <span class="mono">0.014 ms/km</span> &#215; distance (propagation)<br>'+
+    '<b>Totals</b> = sum of every hop &#8594; <span class="mono">'+totKm.toFixed(1)+' km</span>, <span class="mono">'+totMs.toFixed(2)+' ms</span> over '+(path.length-1)+' hops'+
+    '</div>'+
+    '<table><thead><tr><th>Hop</th><th>Segment</th><th>Distance</th><th>Latency</th></tr></thead><tbody>'+crows+
+    '</tbody><tfoot><tr><td colspan="2">TOTAL &#183; '+(path.length-1)+' hops</td><td>'+totKm.toFixed(1)+' km</td><td>'+totMs.toFixed(2)+' ms</td></tr></tfoot></table>';
+  rtRenderData();
   /* live GPS readout */
   var geo=document.getElementById('rtGeo');
   if(rtGPS && path[0]==='My location'){
@@ -1133,6 +1165,23 @@ function rtRender(){
       'Nearest network node: <b>'+path[1]+'</b> ('+rtHav('My location',path[1]).toFixed(2)+' km) · destination <b>'+path[path.length-1]+'</b> · '+totKm.toFixed(1)+' km, '+totMs.toFixed(2)+' ms end to end.<br>'+
       'Walk to another street and the origin dot and the whole route update on their own.';
   } else { geo.className='rt-geo'; }
+}
+function rtRole(name,c){
+  if(c.gps) return {l:'Your device (GPS)',cls:'gps'};
+  if(c.dest) return {l:'Destination (domain)',cls:'dest'};
+  if(/Fastly/.test(name)) return {l:'CDN edge',cls:''};
+  if(c.pri) return {l:'Primary POP',cls:''};
+  return {l:'Relay POP',cls:''};
+}
+function rtRenderData(){
+  var el=document.getElementById('rtData'); if(!el)return;
+  var rows='',n=0;
+  for(var k in RT_CITY){ if(!RT_CITY.hasOwnProperty(k))continue; n++;
+    var c=RT_CITY[k],r=rtRole(k,c);
+    rows+='<tr><td><b>'+k+'</b></td><td><span class="rt-role '+r.cls+'">'+r.l+'</span></td><td>'+c.lat.toFixed(3)+'</td><td>'+c.lon.toFixed(3)+'</td><td>'+c.ip+'</td><td>'+c.addr+'</td></tr>';
+  }
+  el.innerHTML='<div class="rt-formula">'+n+' nodes in the routing dataset — origins, backbone POPs, CDN edges and the destination domain. Every route is built from these, and each row shows the real coordinates and IP used in the calculation above.</div>'+
+    '<table><thead><tr><th>Node</th><th>Role</th><th>Lat</th><th>Lon</th><th>IP</th><th>Address</th></tr></thead><tbody>'+rows+'</tbody></table>';
 }
 function rtInit(){
   var f=document.getElementById('rtFrom'), t=document.getElementById('rtTo'); if(!f)return;
