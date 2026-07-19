@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NetSwitch — Switch &amp; Benchmark Net</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a0f0a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NetSwitch">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 <style>
 :root{
 --bg:#0a0f0a;--card:#111a12;--card2:#0d150e;--border:#1f3320;
@@ -115,6 +123,21 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
 #p-routes .rt-role.dest{background:#0b6b39;color:#fff}
 #p-routes .rt-role.gps{background:#ffe9b8;color:#7a5300}
 #p-routes tfoot td{border-top:2px solid #cdd9d0;font-weight:700;color:#0b6b39;background:#eef7f1}
+/* source-confirm gate (shown to each user on entering the routing view) */
+#rtGate{position:fixed;inset:0;background:rgba(6,10,7,.82);display:none;align-items:center;justify-content:center;z-index:9999;padding:18px}
+#rtGate.on{display:flex}
+#rtGate .box{background:#fff;color:#12261a;border-radius:10px;max-width:440px;width:100%;padding:22px 22px 18px;box-shadow:0 18px 50px rgba(0,0,0,.4)}
+#rtGate h3{font-size:18px;color:#0b6b39;margin-bottom:6px;letter-spacing:.3px}
+#rtGate p{font-size:13px;color:#41544a;line-height:1.55;margin-bottom:14px}
+#rtGate label{display:block;color:#5a6b60;text-transform:uppercase;font-size:10px;font-family:var(--mono);letter-spacing:1px;margin:0 0 4px}
+#rtGate select{width:100%;background:#f6faf7;border:1px solid #cdd9d0;color:#12261a;font-family:var(--mono);font-size:13px;padding:10px;border-radius:5px}
+#rtGate .row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+#rtGate button{flex:1;min-width:150px;font-family:var(--mono);font-size:12px;letter-spacing:1px;padding:11px;border-radius:5px;cursor:pointer;font-weight:700;border:none;background:#0b6b39;color:#fff}
+#rtGate button.ghost{background:#fff;border:1px solid #0b6b39;color:#0b6b39}
+#rtGate .hint{font-family:var(--mono);font-size:11px;color:#0b6b39;background:#eef7f1;border:1px solid #bfe0cc;border-radius:5px;padding:8px 10px;margin-top:12px;display:none}
+#rtGate .hint.on{display:block}
+#rtSrcTag{font-family:var(--mono);font-size:11px;color:#0b6b39;cursor:pointer;text-decoration:underline;white-space:nowrap}
+#rtInstall{font-family:var(--mono);font-size:11px;letter-spacing:1px;padding:7px 12px;border-radius:3px;cursor:pointer;font-weight:700;border:1px solid #0b6b39;background:#fff;color:#0b6b39;display:none}
 </style>
 </head>
 <body>
@@ -122,7 +145,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
   <div class="header">
     <h1>NETSWITCH</h1>
     <div class="sub">ROUTER / SWITCH · BENCHMARK NET · CPU·GPU · AREA MAP · UK ROUTES · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · Engine v2.26.0 · serverless — runs on Android 13 · Windows · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · Engine v2.27.0 · serverless · installable app (PWA) — runs on Android 13 · Windows · any browser</div>
   </div>
 
   <div class="tabs">
@@ -301,10 +324,25 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
   </div>
 
   <div class="panel" id="p-routes">
+    <div id="rtGate"><div class="box">
+      <h3>Confirm your source</h3>
+      <p>Before routing, confirm where you are connecting from. Each person testing confirms their own source on their own device — this build supports a small group (5–10) at once.</p>
+      <label>Your source location</label>
+      <select id="rtSrcSel"></select>
+      <div class="hint" id="rtGateHint"></div>
+      <div class="row">
+        <button class="ghost" onclick="rtGateGPS()">DETECT (GPS)</button>
+        <button onclick="rtGateConfirm()">CONFIRM SOURCE</button>
+      </div>
+    </div></div>
     <div class="rt-wrap">
       <div class="rt-head">
         <h2>UK TRAFFIC ROUTING — which route the data actually takes</h2>
-        <span class="rt-badge">DIRECTOR VIEW</span>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <span id="rtSrcTag" onclick="rtOpenGate()" title="Change your source"></span>
+          <button id="rtInstall" onclick="rtInstallApp()">INSTALL APP</button>
+          <span class="rt-badge">DIRECTOR VIEW</span>
+        </div>
       </div>
       <div class="rt-controls">
         <div><label>From</label><select id="rtFrom"></select></div>
@@ -1313,11 +1351,53 @@ function rtRenderData(){
   el.innerHTML='<div class="rt-formula">'+n+' nodes in the routing dataset — origins, backbone POPs, CDN edges and the destination domain. Every route is built from these, and each row shows the real coordinates and IP used in the calculation above.</div>'+
     '<table><thead><tr><th>Node</th><th>Role</th><th>Lat</th><th>Lon</th><th>IP</th><th>Address</th></tr></thead><tbody>'+rows+'</tbody></table>';
 }
+/* ---------------- source-confirm gate + install-as-app (PWA) ---------------- */
+var rtSrcConfirmed=false, rtDeferredPrompt=null;
+function rtSetSrcTag(){
+  var tag=document.getElementById('rtSrcTag'); if(!tag)return;
+  var src=document.getElementById('rtFrom').value;
+  tag.textContent=rtSrcConfirmed?('Source: '+src+' · change'):'';
+}
+function rtOpenGate(){
+  var g=document.getElementById('rtGate'), sel=document.getElementById('rtSrcSel');
+  sel.innerHTML=''; RT_PRIMARIES.forEach(function(n){ if(!(RT_CITY[n]&&RT_CITY[n].dest)) sel.add(new Option(n,n)); });
+  sel.value=document.getElementById('rtFrom').value||'London EC2';
+  document.getElementById('rtGateHint').className='hint';
+  g.className='on';
+}
+function rtGateGPS(){
+  var hint=document.getElementById('rtGateHint');
+  if(!navigator.geolocation){ hint.className='hint on'; hint.textContent='This device has no GPS — pick your nearest location from the list.'; return; }
+  hint.className='hint on'; hint.textContent='Locating…';
+  navigator.geolocation.getCurrentPosition(function(p){
+    var near=rtNearest(p.coords.longitude,p.coords.latitude);
+    document.getElementById('rtSrcSel').value=near;
+    hint.textContent='Nearest source detected: '+near+' ('+rtKmTo(p.coords.longitude,p.coords.latitude,near).toFixed(1)+' km away). Confirm to use it.';
+  },function(){ hint.textContent='Could not read GPS — pick your nearest location from the list.'; },{enableHighAccuracy:true,timeout:8000});
+}
+function rtKmTo(lon,lat,name){ var c=RT_CITY[name]; var R=6371,toR=Math.PI/180;
+  var dLat=(c.lat-lat)*toR,dLon=(c.lon-lon)*toR,a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat*toR)*Math.cos(c.lat*toR)*Math.sin(dLon/2)*Math.sin(dLon/2);
+  return 2*R*Math.asin(Math.sqrt(a)); }
+function rtGateConfirm(){
+  var src=document.getElementById('rtSrcSel').value, f=document.getElementById('rtFrom');
+  f.value=src;
+  if(document.getElementById('rtTo').value===src){ var alt=RT_PRIMARIES.filter(function(n){return n!==src;})[0]; if(alt)document.getElementById('rtTo').value=alt; }
+  rtSrcConfirmed=true; rtSetSrcTag();
+  document.getElementById('rtGate').className='';
+  rtAlt=0; rtRender();
+}
+function rtInstallApp(){
+  if(rtDeferredPrompt){ rtDeferredPrompt.prompt(); rtDeferredPrompt.userChoice.then(function(){ rtDeferredPrompt=null; document.getElementById('rtInstall').style.display='none'; }); }
+}
+window.addEventListener('beforeinstallprompt',function(e){ e.preventDefault(); rtDeferredPrompt=e; var b=document.getElementById('rtInstall'); if(b)b.style.display='inline-block'; });
+window.addEventListener('appinstalled',function(){ var b=document.getElementById('rtInstall'); if(b)b.style.display='none'; });
+if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); }); }
 function rtInit(){
   var f=document.getElementById('rtFrom'), t=document.getElementById('rtTo'); if(!f)return;
   RT_PRIMARIES.forEach(function(n){f.add(new Option(n,n)); t.add(new Option(n,n));});
   f.value='London EC2'; t.value='Birmingham';
   f.onchange=function(){rtAlt=0;rtRender();}; t.onchange=function(){rtAlt=0;rtRender();};
+  rtSetSrcTag();
   rtRender();
 }
 
@@ -1328,6 +1408,7 @@ document.querySelectorAll('.tab').forEach(function(t){
     document.querySelectorAll('.panel').forEach(function(x){x.classList.remove('active');});
     t.classList.add('active');
     document.getElementById('p-'+t.getAttribute('data-p')).classList.add('active');
+    if(t.getAttribute('data-p')==='routes' && !rtSrcConfirmed){ rtOpenGate(); }
   };
 });
 
