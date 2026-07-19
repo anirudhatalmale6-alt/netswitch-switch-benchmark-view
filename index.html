@@ -122,7 +122,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
   <div class="header">
     <h1>NETSWITCH</h1>
     <div class="sub">ROUTER / SWITCH · BENCHMARK NET · CPU·GPU · AREA MAP · UK ROUTES · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · Engine v2.22.0 · serverless — runs on Android 13 · Windows · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · Engine v2.23.0 · serverless — runs on Android 13 · Windows · any browser</div>
   </div>
 
   <div class="tabs">
@@ -939,6 +939,12 @@ var RT_CITY={
  /* London-area access POPs + a public domain destination */
  'Greenwich':{lon:-0.008,lat:51.483,ip:'195.99.174.10',addr:'Greenwich access POP, Creek Rd, London SE10',pri:1},
  'Camden Town':{lon:-0.143,lat:51.539,ip:'213.120.62.10',addr:'Camden access POP, Camden High St, London NW1',pri:1},
+ 'Stratford':{lon:-0.004,lat:51.542,ip:'213.120.63.10',addr:'Stratford access POP, Great Eastern Rd, London E15',acc:1},
+ 'Islington':{lon:-0.103,lat:51.538,ip:'213.120.64.10',addr:'Islington access POP, Upper St, London N1',acc:1},
+ 'Hammersmith':{lon:-0.224,lat:51.492,ip:'213.120.65.10',addr:'Hammersmith access POP, King St, London W6',acc:1},
+ 'Wimbledon':{lon:-0.206,lat:51.421,ip:'213.120.66.10',addr:'Wimbledon access POP, The Broadway, London SW19',acc:1},
+ 'Ealing':{lon:-0.301,lat:51.513,ip:'213.120.67.10',addr:'Ealing access POP, The Broadway, London W5',acc:1},
+ 'Wembley':{lon:-0.296,lat:51.556,ip:'213.120.68.10',addr:'Wembley access POP, Empire Way, London HA9',acc:1},
  'Fastly LON':{lon:-0.018,lat:51.512,ip:'151.101.0.81',addr:'Fastly LON edge, Telehouse North, Coriander Ave E14'},
  'BBC.co.uk':{lon:0.040,lat:51.500,ip:'146.75.120.81',addr:'BBC.co.uk · bbc.map.fastly.net (Fastly anycast 151.101.0.81)',pri:1,dest:1}
 };
@@ -963,7 +969,7 @@ var RT_ROUTES={
    ['Camden Town','London EC2','Fastly LON','BBC.co.uk'],
    ['Camden Town','Luton','London EC2','Fastly LON','BBC.co.uk']]
 };
-var RT_PRIMARIES=['London EC2','Birmingham','Brighton','Greenwich','Camden Town','BBC.co.uk'];
+var RT_PRIMARIES=['London EC2','Greenwich','Camden Town','Stratford','Islington','Hammersmith','Wimbledon','Ealing','Wembley','Croydon','BBC.co.uk','Birmingham','Brighton'];
 var rtAlt=0;                                 /* 0=primary path, 1=alternate */
 /* projection window (southern/central England) — national default */
 var RT_LON0=-2.7,RT_LON1=1.0,RT_LAT0=50.45,RT_LAT1=52.85,RT_PAD=34;
@@ -999,15 +1005,28 @@ function rtPairKey(f,t){
   if(RT_ROUTES[t+'|'+f]) return {key:t+'|'+f,rev:true};
   return null;
 }
+/* general path builder — routes ANY origin to any city/domain via the London gateway,
+   so every From/To combination resolves even without a hand-defined route. alt=0 primary, 1 alternate */
+function rtBuildPath(f,t,alt){
+  var gw='London EC2', edge='Fastly LON', altPop='Croydon';
+  function build(o,d){
+    var mid=[];
+    if(alt && o!==altPop && d!==altPop && o!==gw && d!==gw) mid.push(altPop);
+    if(o!==gw && d!==gw) mid.push(gw);
+    var tail=(RT_CITY[d]&&RT_CITY[d].dest)?[edge,d]:[d];
+    return [o].concat(mid,tail);
+  }
+  var fD=RT_CITY[f]&&RT_CITY[f].dest;
+  var path=fD?build(t,f).reverse():build(f,t);
+  return path.filter(function(n,i){return i===0||n!==path[i-1];});   /* dedupe consecutive */
+}
 function rtActivePath(){
   var f=document.getElementById('rtFrom').value, t=document.getElementById('rtTo').value;
   if(rtGPS && f==='My location') return rtGpsPath();   /* live device location */
   if(f===t) return null;
   var pk=rtPairKey(f,t);
-  var path;
-  if(pk){ path=RT_ROUTES[pk.key][rtAlt].slice(); if(pk.rev) path.reverse(); }
-  else { path=[f,t]; }        /* fallback direct */
-  return path;
+  if(pk){ var path=RT_ROUTES[pk.key][rtAlt].slice(); if(pk.rev) path.reverse(); return path; }
+  return rtBuildPath(f,t,rtAlt);
 }
 /* ---- live GPS routing (origin = the phone's real location) ---- */
 var rtGPS=null, rtWatch=null;
@@ -1049,8 +1068,11 @@ function rtOnErr(e){ var g=document.getElementById('rtGeo'); g.className='rt-geo
   var btn=document.getElementById('rtGpsBtn'); btn.textContent='USE MY LOCATION (GPS)'; rtWatch=null; }
 function rtAltPath(){
   var f=document.getElementById('rtFrom').value, t=document.getElementById('rtTo').value;
-  var pk=rtPairKey(f,t); if(!pk) return null;
-  var path=RT_ROUTES[pk.key][rtAlt?0:1].slice(); if(pk.rev) path.reverse(); return path;
+  if(rtGPS && f==='My location') return null;
+  if(f===t) return null;
+  var pk=rtPairKey(f,t);
+  if(pk){ var path=RT_ROUTES[pk.key][rtAlt?0:1].slice(); if(pk.rev) path.reverse(); return path; }
+  return rtBuildPath(f,t,rtAlt?0:1);
 }
 function rtDrawPath(c,path,active){
   if(!path) return;
@@ -1174,6 +1196,7 @@ function rtRole(name,c){
   if(c.gps) return {l:'Your device (GPS)',cls:'gps'};
   if(c.dest) return {l:'Destination (domain)',cls:'dest'};
   if(/Fastly/.test(name)) return {l:'CDN edge',cls:''};
+  if(c.acc) return {l:'London access POP',cls:''};
   if(c.pri) return {l:'Primary POP',cls:''};
   return {l:'Relay POP',cls:''};
 }
