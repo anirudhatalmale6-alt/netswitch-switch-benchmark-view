@@ -122,7 +122,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
   <div class="header">
     <h1>NETSWITCH</h1>
     <div class="sub">ROUTER / SWITCH · BENCHMARK NET · CPU·GPU · AREA MAP · UK ROUTES · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · Engine v2.25.0 · serverless — runs on Android 13 · Windows · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · Engine v2.26.0 · serverless — runs on Android 13 · Windows · any browser</div>
   </div>
 
   <div class="tabs">
@@ -312,6 +312,10 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
         <button onclick="rtRoute()">ROUTE</button>
         <button class="ghost" onclick="rtReroute()">REROUTE</button>
         <button class="ghost" id="rtGpsBtn" onclick="rtToggleGPS()">USE MY LOCATION (GPS)</button>
+        <div><label>Addressing</label><select id="rtMaskMode" onchange="rtRender()">
+          <option value="present">Presentation · /24 (easiest to show)</option>
+          <option value="prod">Production · /30–/31 point-to-point + DHCP</option>
+        </select></div>
       </div>
       <div id="rtGeo" class="rt-geo"></div>
       <div class="rt-mapwrap"><canvas id="rtCanvas" width="560" height="580"></canvas></div>
@@ -1178,11 +1182,24 @@ function rtEquip(name){
   var keys=Object.keys(RT_OUI), oui=keys[h%keys.length];
   if(!macReturned) oui=RT_VPOOL[h%RT_VPOOL.length];
   var mac=oui.toLowerCase()+':'+m3, ven=RT_OUI[oui];
+  /* subnet plan changes with the number of devices the box serves (client's spec):
+     - presentation mode: /24 everywhere, easiest to show
+     - production mode: device-serving nodes (access POPs, gateway, destination) keep /24 + DHCP;
+       backbone transit routers sit on point-to-point links -> /31 (RFC 3021, 2 devices, static, no DHCP). */
+  var mode=(document.getElementById('rtMaskMode')||{}).value||'present';
+  var manyDevices=!!(c.acc||c.pri||c.dest||name.indexOf('Fastly')>=0);
+  var net=oct[0]+'.'+oct[1]+'.'+oct[2], plan;
+  if(mode==='present' || manyDevices){
+    plan={ mask:'255.255.255.0  (/24)', devs:'up to 254 devices',
+           gw:net+'.1', dhcp:net+'.100 – .199 · lease 24h' };
+  } else {
+    var peer=(oct[3]&1)?oct[3]-1:oct[3]+1;    /* the one neighbour on a point-to-point link */
+    plan={ mask:'255.255.255.254  (/31)', devs:'2 devices · point-to-point',
+           gw:net+'.'+peer+' (peer)', dhcp:'static /31 — no DHCP  (/30 255.255.255.252 is the classic equivalent)' };
+  }
   return {
     name:name, ll:rtMacToLL(mac), mac:mac, oui:oui, ven:ven, macAssigned:!macReturned,
-    ip:ip, mask:'255.255.255.0  (/24)',
-    gw:oct[0]+'.'+oct[1]+'.'+oct[2]+'.1',
-    dhcp:oct[0]+'.'+oct[1]+'.'+oct[2]+'.100 – .199 · lease 24h'
+    ip:ip, mask:plan.mask, devs:plan.devs, gw:plan.gw, dhcp:plan.dhcp
   };
 }
 function rtEquipCard(e){
@@ -1194,9 +1211,9 @@ function rtEquipCard(e){
     row('MAC (EUI-64 derived)', e.mac, e.macAssigned?'(not returned → assigned)':'')+
     row('Vendor · model', e.ven.v+' · '+e.ven.m+' · '+e.ven.c+'  <span style="color:#6b7d6e">[OUI '+e.oui+']</span>')+
     row('IPv4', e.ip)+
-    row('Subnet mask', e.mask, '(assigned)')+
+    row('Subnet mask', e.mask+'  <span style="color:#6b7d6e">'+e.devs+'</span>', '(assigned)')+
     row('Gateway', e.gw, '(assigned)')+
-    row('DHCP pool', e.dhcp, '(assigned)')+
+    row('DHCP', e.dhcp, '(assigned)')+
     '</tbody></table></div>';
 }
 /* Stacey-Reynold router finder — locate equipment on the path from the change in data speed.
@@ -1223,7 +1240,7 @@ function rtRouterScan(path){
     '</div>'+
     '<table><thead><tr><th>Hop</th><th>Segment</th><th>Data speed</th><th>Change</th><th>Equip. share</th><th>Verdict</th></tr></thead><tbody>'+rows+'</tbody></table>'+
     (found.length?
-      '<div class="rt-formula" style="margin-top:14px"><b>Equipment detail — hexad manufacturer list</b>. For each located box the IPv6 link-local (the hexad) is read and reversed through <b>EUI-64</b> to the hardware MAC (drop <span class="mono">ff:fe</span>, flip the U/L bit — e.g. <span class="mono">fe80::2e54:91ff:fe88:c9e3 → 2c:54:91:88:c9:e3</span>). The first three octets (the OUI) give make / model / country from the IEEE list. Any field the box does not return — MAC, mask, gateway, DHCP — is assigned, as in the spec.</div>'+
+      '<div class="rt-formula" style="margin-top:14px"><b>Equipment detail — hexad manufacturer list</b>. For each located box the IPv6 link-local (the hexad) is read and reversed through <b>EUI-64</b> to the hardware MAC (drop <span class="mono">ff:fe</span>, flip the U/L bit — e.g. <span class="mono">fe80::2e54:91ff:fe88:c9e3 → 2c:54:91:88:c9:e3</span>). The first three octets (the OUI) give make / model / country from the IEEE list. Any field the box does not return — MAC, mask, gateway, DHCP — is assigned, as in the spec. The subnet plan follows the device count: <b>Presentation</b> keeps every box on <span class="mono">/24</span> (easiest to show); <b>Production</b> puts device-serving nodes on <span class="mono">/24</span> + DHCP and backbone point-to-point links on <span class="mono">/31</span> (static, no DHCP). Switch it with the Addressing selector above.</div>'+
       found.map(function(n){return rtEquipCard(rtEquip(n));}).join(''):'');
 }
 function rtRender(){
