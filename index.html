@@ -122,7 +122,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
   <div class="header">
     <h1>NETSWITCH</h1>
     <div class="sub">ROUTER / SWITCH · BENCHMARK NET · CPU·GPU · AREA MAP · UK ROUTES · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · Engine v2.21.0 · serverless — runs on Android 13 · Windows · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · Engine v2.22.0 · serverless — runs on Android 13 · Windows · any browser</div>
   </div>
 
   <div class="tabs">
@@ -1118,17 +1118,19 @@ function rtDraw(){
 }
 function rtRoute(){ rtAlt=0; rtRender(); }
 function rtReroute(){ if(!rtAltPath()){ return; } rtAlt=rtAlt?0:1; rtRender(); }
+/* signal-path (cable) distance in km from latency, client's constant 1607/10000000 = 0.0001607 m per picosecond */
+function rtSig(ms){ return 0.0001607 * (ms*1e9) / 1000; }
 function rtRender(){
   var path=rtActivePath();
   rtDraw();
   var sum=document.getElementById('rtSummary'), hops=document.getElementById('rtHops');
   var calcEl=document.getElementById('rtCalc'), hopsH=document.getElementById('rtHopsH'), calcH=document.getElementById('rtCalcH');
   if(!path){ sum.innerHTML='<div class="rt-card"><div class="k">Route</div><div class="v">Pick two different cities</div></div>'; hops.innerHTML=''; calcEl.innerHTML=''; hopsH.style.display='none'; calcH.style.display='none'; rtRenderData(); return; }
-  var totKm=0,totMs=0,rows='';
+  var totKm=0,totMs=0,totSig=0,rows='';
   for(var i=0;i<path.length;i++){
-    var name=path[i],ct=RT_CITY[name],linkKm=i?rtHav(path[i-1],name):0,linkMs=i?(0.6+linkKm*0.014):0;
-    totKm+=linkKm; totMs+=linkMs;
-    rows+='<tr><td>'+i+'</td><td><b>'+name+'</b></td><td>'+ct.addr+'</td><td>'+ct.ip+'</td><td>'+(i?linkMs.toFixed(2)+' ms':'—')+'</td><td>'+(i?linkKm.toFixed(1)+' km':'—')+'</td><td>'+totKm.toFixed(1)+' km</td></tr>';
+    var name=path[i],ct=RT_CITY[name],linkKm=i?rtHav(path[i-1],name):0,linkMs=i?(0.6+linkKm*0.014):0,sigKm=i?rtSig(linkMs):0;
+    totKm+=linkKm; totMs+=linkMs; totSig+=sigKm;
+    rows+='<tr><td>'+i+'</td><td><b>'+name+'</b></td><td>'+ct.addr+'</td><td>'+ct.ip+'</td><td>'+(i?linkMs.toFixed(2)+' ms':'—')+'</td><td>'+(i?linkKm.toFixed(1)+' km':'—')+'</td><td>'+(i?sigKm.toFixed(1)+' km':'—')+'</td><td>'+totKm.toFixed(1)+' km</td></tr>';
   }
   var altName=(rtAlt===0)?'Primary path':'Alternate path';
   var via=path.slice(1,-1).join(', ')||'direct';
@@ -1137,25 +1139,27 @@ function rtRender(){
     '<div class="rt-card"><div class="k">Path</div><div class="v" style="font-size:13px">'+path[0]+' → '+path[path.length-1]+'</div></div>'+
     '<div class="rt-card"><div class="k">Via</div><div class="v" style="font-size:13px">'+via+'</div></div>'+
     '<div class="rt-card"><div class="k">Total distance</div><div class="v">'+totKm.toFixed(1)+' km</div></div>'+
+    '<div class="rt-card"><div class="k">Signal-path (cable)</div><div class="v">'+totSig.toFixed(0)+' km</div></div>'+
     '<div class="rt-card"><div class="k">Total latency</div><div class="v">'+totMs.toFixed(2)+' ms</div></div>'+
     '<div class="rt-card"><div class="k">Hops</div><div class="v">'+(path.length-1)+'</div></div>';
-  hops.innerHTML='<table><thead><tr><th>#</th><th>City / node</th><th>Address</th><th>IP</th><th>Link</th><th>Distance</th><th>Cumulative</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  hops.innerHTML='<table><thead><tr><th>#</th><th>City / node</th><th>Address</th><th>IP</th><th>Link</th><th>Distance</th><th>Signal-path</th><th>Cumulative</th></tr></thead><tbody>'+rows+'</tbody></table>';
   hopsH.style.display='block'; calcH.style.display='block';
   /* per-hop path calculation — show the math behind every number */
   var crows='';
   for(var j=1;j<path.length;j++){
-    var a=path[j-1],b=path[j],km=rtHav(a,b),ms=0.6+km*0.014;
-    crows+='<tr><td>'+j+'</td><td>'+a+' &#8594; '+b+'</td><td class="calc">haversine = '+km.toFixed(1)+' km</td><td class="calc">0.60 + 0.014&#215;'+km.toFixed(1)+' = '+ms.toFixed(2)+' ms</td></tr>';
+    var a=path[j-1],b=path[j],km=rtHav(a,b),ms=0.6+km*0.014,sig=rtSig(ms);
+    crows+='<tr><td>'+j+'</td><td>'+a+' &#8594; '+b+'</td><td class="calc">haversine = '+km.toFixed(1)+' km</td><td class="calc">0.60 + 0.014&#215;'+km.toFixed(1)+' = '+ms.toFixed(2)+' ms</td><td class="calc">0.0001607&#215;'+(ms*1e9).toFixed(0)+' ps = '+sig.toFixed(1)+' km</td></tr>';
   }
   calcEl.innerHTML=
     '<div class="rt-formula">'+
     '<b>Distance</b> — great-circle (haversine) between each node\'s real coordinates:<br>'+
     'd = 2R&#183;asin(&#8730;(sin&#178;(&#916;&#966;/2) + cos&#966;&#8321;&#183;cos&#966;&#8322;&#183;sin&#178;(&#916;&#955;/2))), &nbsp; R = <span class="mono">6371 km</span><br>'+
     '<b>Link latency</b> = <span class="mono">0.60 ms</span> base (switching) + <span class="mono">0.014 ms/km</span> &#215; distance (propagation)<br>'+
-    '<b>Totals</b> = sum of every hop &#8594; <span class="mono">'+totKm.toFixed(1)+' km</span>, <span class="mono">'+totMs.toFixed(2)+' ms</span> over '+(path.length-1)+' hops'+
+    '<b>Signal-path (cable) distance</b> — worked from the latency using your constant: d = <span class="mono">1607 / 10000000</span> &#215; time(ps) = <span class="mono">0.0001607</span> m per picosecond &#8594; signal speed <span class="mono">160,700 km/s</span> (&#8776;54% of light, matching a real cable). This is the actual cable length the signal travels through the network — much longer than the straight-line map distance.<br>'+
+    '<b>Totals</b> = sum of every hop &#8594; <span class="mono">'+totKm.toFixed(1)+' km</span> straight-line, <span class="mono">'+totSig.toFixed(0)+' km</span> signal-path, <span class="mono">'+totMs.toFixed(2)+' ms</span> over '+(path.length-1)+' hops'+
     '</div>'+
-    '<table><thead><tr><th>Hop</th><th>Segment</th><th>Distance</th><th>Latency</th></tr></thead><tbody>'+crows+
-    '</tbody><tfoot><tr><td colspan="2">TOTAL &#183; '+(path.length-1)+' hops</td><td>'+totKm.toFixed(1)+' km</td><td>'+totMs.toFixed(2)+' ms</td></tr></tfoot></table>';
+    '<table><thead><tr><th>Hop</th><th>Segment</th><th>Distance</th><th>Latency</th><th>Signal-path (cable)</th></tr></thead><tbody>'+crows+
+    '</tbody><tfoot><tr><td colspan="2">TOTAL &#183; '+(path.length-1)+' hops</td><td>'+totKm.toFixed(1)+' km</td><td>'+totMs.toFixed(2)+' ms</td><td>'+totSig.toFixed(0)+' km</td></tr></tfoot></table>';
   rtRenderData();
   /* live GPS readout */
   var geo=document.getElementById('rtGeo');
