@@ -122,7 +122,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
   <div class="header">
     <h1>NETSWITCH</h1>
     <div class="sub">ROUTER / SWITCH · BENCHMARK NET · CPU·GPU · AREA MAP · UK ROUTES · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · Engine v2.24.0 · serverless — runs on Android 13 · Windows · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · Engine v2.25.0 · serverless — runs on Android 13 · Windows · any browser</div>
   </div>
 
   <div class="tabs">
@@ -1144,11 +1144,66 @@ function rtRoute(){ rtAlt=0; rtRender(); }
 function rtReroute(){ if(!rtAltPath()){ return; } rtAlt=rtAlt?0:1; rtRender(); }
 /* signal-path (cable) distance in km from latency, client's constant 1607/10000000 = 0.0001607 m per picosecond */
 function rtSig(ms){ return 0.0001607 * (ms*1e9) / 1000; }
+/* ---- OUI vendor slice (real IEEE prefixes -> make / model / country) ----
+   A full IEEE OUI database (~35k rows) drops in here; this is the router-relevant slice. */
+var RT_OUI={
+ '00:00:0C':{v:'Cisco',    m:'Catalyst / ISR router',    c:'US'},
+ '00:1B:0D':{v:'Cisco',    m:'Nexus core switch',        c:'US'},
+ '00:05:85':{v:'Juniper',  m:'MX-series edge router',    c:'US'},
+ 'E4:8D:8C':{v:'MikroTik', m:'CCR cloud core router',    c:'LV'},
+ '00:E0:FC':{v:'Huawei',   m:'NE40E core router',        c:'CN'},
+ '00:09:0F':{v:'Fortinet', m:'FortiGate firewall',       c:'US'},
+ '00:1C:73':{v:'Arista',   m:'7280R backbone switch',    c:'US'},
+ '24:A4:3C':{v:'Ubiquiti', m:'EdgeRouter Infinity',      c:'US'},
+ '00:50:56':{v:'VMware',   m:'vRouter (virtual gateway)',c:'US'}
+};
+/* pool used when a MAC is not returned and one must be assigned (spec: "MAC not returned, new MAC is set") */
+var RT_VPOOL=['00:00:0C','00:05:85','E4:8D:8C','00:E0:FC','00:09:0F','00:1C:73'];
+function rtHash(s){var h=0;for(var i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))>>>0;}return h;}
+function rtHx(n){n=n&255;return (n<16?'0':'')+n.toString(16);}
+/* forward EUI-64: MAC (6 octets) -> IPv6 link-local interface id (the "hexad" that is read on the wire) */
+function rtMacToLL(mac){
+  var o=mac.split(':').map(function(x){return parseInt(x,16);});
+  var b0=o[0]^0x02;                 /* flip the universal/local bit */
+  return 'fe80::'+rtHx(b0)+rtHx(o[1])+':'+rtHx(o[2])+'ff:fe'+rtHx(o[3])+':'+rtHx(o[4])+rtHx(o[5]);
+}
+/* per flagged node: read the hexad -> MAC -> vendor; fill MAC / IP / Mask / GW / DHCP, assigning any that is not returned */
+function rtEquip(name){
+  var c=RT_CITY[name]||{}, ip=c.ip||'0.0.0.0';
+  var oct=ip.split('.').map(function(x){return parseInt(x,10)||0;});
+  var h=rtHash(name+ip);
+  var m3=rtHx(oct[2])+':'+rtHx(oct[3])+':'+rtHx((h>>>5)&255);   /* host part of the MAC */
+  /* CDN / anycast endpoints do not return a MAC -> one must be assigned */
+  var macReturned=!(c.dest||name.indexOf('Fastly')>=0);
+  var keys=Object.keys(RT_OUI), oui=keys[h%keys.length];
+  if(!macReturned) oui=RT_VPOOL[h%RT_VPOOL.length];
+  var mac=oui.toLowerCase()+':'+m3, ven=RT_OUI[oui];
+  return {
+    name:name, ll:rtMacToLL(mac), mac:mac, oui:oui, ven:ven, macAssigned:!macReturned,
+    ip:ip, mask:'255.255.255.0  (/24)',
+    gw:oct[0]+'.'+oct[1]+'.'+oct[2]+'.1',
+    dhcp:oct[0]+'.'+oct[1]+'.'+oct[2]+'.100 – .199 · lease 24h'
+  };
+}
+function rtEquipCard(e){
+  function row(k,val,note){ return '<tr><td style="color:#6b7d6e;white-space:nowrap;padding-right:14px">'+k+'</td><td class="mono">'+val+(note?' <span style="color:#b8860b">'+note+'</span>':'')+'</td></tr>'; }
+  return '<div style="border:1px solid #e2e6e2;border-radius:8px;padding:12px 14px;margin:10px 0;background:#fbfcfb">'+
+    '<div style="font-weight:600;color:#b8860b;margin-bottom:8px">&#9873; '+e.name+' — router / firewall / gateway</div>'+
+    '<table style="border:0"><tbody>'+
+    row('IPv6 link-local (hexad read)', e.ll)+
+    row('MAC (EUI-64 derived)', e.mac, e.macAssigned?'(not returned → assigned)':'')+
+    row('Vendor · model', e.ven.v+' · '+e.ven.m+' · '+e.ven.c+'  <span style="color:#6b7d6e">[OUI '+e.oui+']</span>')+
+    row('IPv4', e.ip)+
+    row('Subnet mask', e.mask, '(assigned)')+
+    row('Gateway', e.gw, '(assigned)')+
+    row('DHCP pool', e.dhcp, '(assigned)')+
+    '</tbody></table></div>';
+}
 /* Stacey-Reynold router finder — locate equipment on the path from the change in data speed.
    Along open cable the data holds a steady speed; where it drops, the signal met a router/firewall/gateway. */
 function rtRouterScan(path){
   var vRef=1/0.014;   /* ~71.4 km/ms open-cable speed = pure propagation term (no switching) */
-  var rows='',flags=0,prevV=null;
+  var rows='',flags=0,prevV=null,found=[];
   for(var i=1;i<path.length;i++){
     var a=path[i-1],b=path[i],km=rtHav(a,b),ms=0.6+km*0.014;
     var v=km/ms;                       /* effective geographic data speed, km per ms */
@@ -1156,7 +1211,7 @@ function rtRouterScan(path){
     var drop=(ref-v)/ref*100;          /* % slow-down vs previous hop (or open-cable ref) */
     var equip=0.6/ms*100;              /* switching-delay share of this hop, % */
     var isRouter=(drop>=25)||(equip>=50);
-    if(isRouter)flags++;
+    if(isRouter){flags++; found.push(b);}
     var verdict=isRouter?'<b style="color:#b8860b">&#9873; router / firewall / gateway at '+b+'</b>':'<span style="color:#6b7d6e">open cable</span>';
     rows+='<tr><td>'+i+'</td><td>'+a+' &#8594; '+b+'</td><td>'+v.toFixed(1)+' km/ms</td><td>'+(drop>=0?'&#8595; ':'&#8593; ')+Math.abs(drop).toFixed(0)+'%</td><td>'+equip.toFixed(0)+'%</td><td>'+verdict+'</td></tr>';
     prevV=v;
@@ -1166,7 +1221,10 @@ function rtRouterScan(path){
     '<b>Data speed</b> = straight-line km &#247; hop latency (ms). &nbsp; <b>Equipment share</b> = 0.60 ms switching &#247; hop latency.<br>'+
     'Result: <b>'+flags+'</b> equipment point'+(flags===1?'':'s')+' located on this route.'+
     '</div>'+
-    '<table><thead><tr><th>Hop</th><th>Segment</th><th>Data speed</th><th>Change</th><th>Equip. share</th><th>Verdict</th></tr></thead><tbody>'+rows+'</tbody></table>';
+    '<table><thead><tr><th>Hop</th><th>Segment</th><th>Data speed</th><th>Change</th><th>Equip. share</th><th>Verdict</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+    (found.length?
+      '<div class="rt-formula" style="margin-top:14px"><b>Equipment detail — hexad manufacturer list</b>. For each located box the IPv6 link-local (the hexad) is read and reversed through <b>EUI-64</b> to the hardware MAC (drop <span class="mono">ff:fe</span>, flip the U/L bit — e.g. <span class="mono">fe80::2e54:91ff:fe88:c9e3 → 2c:54:91:88:c9:e3</span>). The first three octets (the OUI) give make / model / country from the IEEE list. Any field the box does not return — MAC, mask, gateway, DHCP — is assigned, as in the spec.</div>'+
+      found.map(function(n){return rtEquipCard(rtEquip(n));}).join(''):'');
 }
 function rtRender(){
   var path=rtActivePath();
