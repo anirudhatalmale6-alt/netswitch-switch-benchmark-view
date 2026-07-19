@@ -122,7 +122,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
   <div class="header">
     <h1>NETSWITCH</h1>
     <div class="sub">ROUTER / SWITCH · BENCHMARK NET · CPU·GPU · AREA MAP · UK ROUTES · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · Engine v2.23.0 · serverless — runs on Android 13 · Windows · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · Engine v2.24.0 · serverless — runs on Android 13 · Windows · any browser</div>
   </div>
 
   <div class="tabs">
@@ -320,6 +320,8 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
       <div id="rtHops"></div>
       <div class="rt-sec-h" id="rtCalcH" style="display:none">PATH CALCULATION — how the distance &amp; latency are worked out</div>
       <div id="rtCalc"></div>
+      <div class="rt-sec-h" id="rtScanH" style="display:none">ROUTER FINDER — Stacey-Reynold: locate equipment from the change in data speed</div>
+      <div id="rtScan"></div>
       <div class="rt-sec-h">DATA LISTING — every node in the routing dataset</div>
       <div id="rtData"></div>
       <div class="rt-note">Pick a From and To city and press ROUTE. Or tap USE MY LOCATION (GPS) — the app reads the phone's live GPS and routes from where you actually are to the domain, updating by itself as you move from one street to the next. The map shows the exact path the traffic takes through the backbone POPs, and the table lists every hop with its address, IP, link latency and distance. REROUTE switches to the alternate carrier path (the greyed line). Distances are great-circle km between real locations; latency scales with distance. GPS needs the page opened over the https link (allow location when the phone asks).</div>
@@ -1142,12 +1144,37 @@ function rtRoute(){ rtAlt=0; rtRender(); }
 function rtReroute(){ if(!rtAltPath()){ return; } rtAlt=rtAlt?0:1; rtRender(); }
 /* signal-path (cable) distance in km from latency, client's constant 1607/10000000 = 0.0001607 m per picosecond */
 function rtSig(ms){ return 0.0001607 * (ms*1e9) / 1000; }
+/* Stacey-Reynold router finder — locate equipment on the path from the change in data speed.
+   Along open cable the data holds a steady speed; where it drops, the signal met a router/firewall/gateway. */
+function rtRouterScan(path){
+  var vRef=1/0.014;   /* ~71.4 km/ms open-cable speed = pure propagation term (no switching) */
+  var rows='',flags=0,prevV=null;
+  for(var i=1;i<path.length;i++){
+    var a=path[i-1],b=path[i],km=rtHav(a,b),ms=0.6+km*0.014;
+    var v=km/ms;                       /* effective geographic data speed, km per ms */
+    var ref=(prevV==null)?vRef:prevV;
+    var drop=(ref-v)/ref*100;          /* % slow-down vs previous hop (or open-cable ref) */
+    var equip=0.6/ms*100;              /* switching-delay share of this hop, % */
+    var isRouter=(drop>=25)||(equip>=50);
+    if(isRouter)flags++;
+    var verdict=isRouter?'<b style="color:#b8860b">&#9873; router / firewall / gateway at '+b+'</b>':'<span style="color:#6b7d6e">open cable</span>';
+    rows+='<tr><td>'+i+'</td><td>'+a+' &#8594; '+b+'</td><td>'+v.toFixed(1)+' km/ms</td><td>'+(drop>=0?'&#8595; ':'&#8593; ')+Math.abs(drop).toFixed(0)+'%</td><td>'+equip.toFixed(0)+'%</td><td>'+verdict+'</td></tr>';
+    prevV=v;
+  }
+  return '<div class="rt-formula">'+
+    '<b>Stacey-Reynold router finder</b> — along open cable the data holds a steady speed (~<span class="mono">71 km/ms</span>, the pure-propagation term). Where the effective speed <b>drops</b> from one hop to the next, the signal met equipment (router / firewall / gateway) that added processing time. A node is flagged when the speed falls &#8805;<span class="mono">25%</span> vs the hop before, or when switching delay is &#8805;<span class="mono">50%</span> of that hop\'s latency.<br>'+
+    '<b>Data speed</b> = straight-line km &#247; hop latency (ms). &nbsp; <b>Equipment share</b> = 0.60 ms switching &#247; hop latency.<br>'+
+    'Result: <b>'+flags+'</b> equipment point'+(flags===1?'':'s')+' located on this route.'+
+    '</div>'+
+    '<table><thead><tr><th>Hop</th><th>Segment</th><th>Data speed</th><th>Change</th><th>Equip. share</th><th>Verdict</th></tr></thead><tbody>'+rows+'</tbody></table>';
+}
 function rtRender(){
   var path=rtActivePath();
   rtDraw();
   var sum=document.getElementById('rtSummary'), hops=document.getElementById('rtHops');
   var calcEl=document.getElementById('rtCalc'), hopsH=document.getElementById('rtHopsH'), calcH=document.getElementById('rtCalcH');
-  if(!path){ sum.innerHTML='<div class="rt-card"><div class="k">Route</div><div class="v">Pick two different cities</div></div>'; hops.innerHTML=''; calcEl.innerHTML=''; hopsH.style.display='none'; calcH.style.display='none'; rtRenderData(); return; }
+  var scanEl=document.getElementById('rtScan'), scanH=document.getElementById('rtScanH');
+  if(!path){ sum.innerHTML='<div class="rt-card"><div class="k">Route</div><div class="v">Pick two different cities</div></div>'; hops.innerHTML=''; calcEl.innerHTML=''; scanEl.innerHTML=''; hopsH.style.display='none'; calcH.style.display='none'; scanH.style.display='none'; rtRenderData(); return; }
   var totKm=0,totMs=0,totSig=0,rows='';
   for(var i=0;i<path.length;i++){
     var name=path[i],ct=RT_CITY[name],linkKm=i?rtHav(path[i-1],name):0,linkMs=i?(0.6+linkKm*0.014):0,sigKm=i?rtSig(linkMs):0;
@@ -1182,6 +1209,7 @@ function rtRender(){
     '</div>'+
     '<table><thead><tr><th>Hop</th><th>Segment</th><th>Distance</th><th>Latency</th><th>Signal-path (cable)</th></tr></thead><tbody>'+crows+
     '</tbody><tfoot><tr><td colspan="2">TOTAL &#183; '+(path.length-1)+' hops</td><td>'+totKm.toFixed(1)+' km</td><td>'+totMs.toFixed(2)+' ms</td><td>'+totSig.toFixed(0)+' km</td></tr></tfoot></table>';
+  scanEl.innerHTML=rtRouterScan(path); scanH.style.display='block';
   rtRenderData();
   /* live GPS readout */
   var geo=document.getElementById('rtGeo');
