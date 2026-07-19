@@ -123,6 +123,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
 #p-routes .rt-role.dest{background:#0b6b39;color:#fff}
 #p-routes .rt-role.gps{background:#ffe9b8;color:#7a5300}
 #p-routes tfoot td{border-top:2px solid #cdd9d0;font-weight:700;color:#0b6b39;background:#eef7f1}
+#p-routes .rt-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
 /* source-confirm gate (shown to each user on entering the routing view) */
 #rtGate{position:fixed;inset:0;background:rgba(6,10,7,.82);display:none;align-items:center;justify-content:center;z-index:9999;padding:18px}
 #rtGate.on{display:flex}
@@ -145,7 +146,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
   <div class="header">
     <h1>NETSWITCH</h1>
     <div class="sub">ROUTER / SWITCH · BENCHMARK NET · CPU·GPU · AREA MAP · UK ROUTES · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · Engine v2.27.0 · serverless · installable app (PWA) — runs on Android 13 · Windows · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · Engine v2.28.0 · serverless · installable app (PWA) — runs on Android 13 · Windows · any browser</div>
   </div>
 
   <div class="tabs">
@@ -349,6 +350,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
         <div><label>To</label><select id="rtTo"></select></div>
         <button onclick="rtRoute()">ROUTE</button>
         <button class="ghost" onclick="rtReroute()">REROUTE</button>
+        <button class="ghost" onclick="rtExportCsv()">EXPORT (EXCEL)</button>
         <button class="ghost" id="rtGpsBtn" onclick="rtToggleGPS()">USE MY LOCATION (GPS)</button>
         <div><label>Addressing</label><select id="rtMaskMode" onchange="rtRender()">
           <option value="present">Presentation · /24 (easiest to show)</option>
@@ -989,8 +991,11 @@ var RT_CITY={
  'Wimbledon':{lon:-0.206,lat:51.421,ip:'213.120.66.10',addr:'Wimbledon access POP, The Broadway, London SW19',acc:1},
  'Ealing':{lon:-0.301,lat:51.513,ip:'213.120.67.10',addr:'Ealing access POP, The Broadway, London W5',acc:1},
  'Wembley':{lon:-0.296,lat:51.556,ip:'213.120.68.10',addr:'Wembley access POP, Empire Way, London HA9',acc:1},
- 'Fastly LON':{lon:-0.018,lat:51.512,ip:'151.101.0.81',addr:'Fastly LON edge, Telehouse North, Coriander Ave E14'},
- 'BBC.co.uk':{lon:0.040,lat:51.500,ip:'146.75.120.81',addr:'BBC.co.uk · bbc.map.fastly.net (Fastly anycast 151.101.0.81)',pri:1,dest:1}
+ 'Fastly LON':{lon:-0.018,lat:51.512,ip:'151.101.0.81',addr:'Fastly LON edge, Telehouse North, Coriander Ave E14',isp:'Fastly (CDN)',loc:'London, UK'},
+ 'BBC.co.uk':{lon:0.040,lat:51.500,ip:'146.75.120.81',addr:'BBC.co.uk · bbc.map.fastly.net (Fastly anycast 151.101.0.81)',pri:1,dest:1,isp:'Fastly / BBC',loc:'London, UK'},
+ /* Helsinki testing site (client scope: London + Helsinki) */
+ 'Helsinki':{lon:24.941,lat:60.170,ip:'91.198.174.2',addr:'Ficolo HEL1, Sinimäentie 8, Helsinki 02630',pri:1,isp:'Elisa Oyj',loc:'Helsinki, FI'},
+ 'Helsinki Espoo':{lon:24.657,lat:60.205,ip:'62.78.96.10',addr:'Telia HEL, Keilaniemi, Espoo 02150',pri:1,isp:'Telia Finland',loc:'Espoo, FI'}
 };
 var RT_ROUTES={
  'London EC2|Birmingham':[
@@ -1013,7 +1018,7 @@ var RT_ROUTES={
    ['Camden Town','London EC2','Fastly LON','BBC.co.uk'],
    ['Camden Town','Luton','London EC2','Fastly LON','BBC.co.uk']]
 };
-var RT_PRIMARIES=['London EC2','Greenwich','Camden Town','Stratford','Islington','Hammersmith','Wimbledon','Ealing','Wembley','Croydon','BBC.co.uk','Birmingham','Brighton'];
+var RT_PRIMARIES=['London EC2','Helsinki','Helsinki Espoo','Greenwich','Camden Town','Stratford','Islington','Hammersmith','Wimbledon','Ealing','Wembley','Croydon','BBC.co.uk','Birmingham','Brighton'];
 var rtAlt=0;                                 /* 0=primary path, 1=alternate */
 /* projection window (southern/central England) — national default */
 var RT_LON0=-2.7,RT_LON1=1.0,RT_LAT0=50.45,RT_LAT1=52.85,RT_PAD=34;
@@ -1182,6 +1187,25 @@ function rtDraw(){
     if(pri||on||ol){ c.fillStyle=on?'#12261a':(ol?'#5c6b60':'#12261a'); c.font=((pri||on)?'bold ':'')+'11px Courier New'; c.fillText(name,p.x+8,p.y+4); }
   }
 }
+/* export the route numbers to a CSV that opens straight in Excel ("rocket numbers on excel") */
+function rtExportCsv(){
+  var path=rtActivePath();
+  if(!path){ alert('Pick a source and destination first, then Export.'); return; }
+  function esc(s){ s=String(s); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }
+  var rows=[['Hop','Node','Location','ISP / network','IP','Onward','Latency (ms)','Distance (km)','Signal-path (km)','Cumulative (km)']];
+  var totKm=0,totMs=0,totSig=0;
+  for(var i=0;i<path.length;i++){
+    var name=path[i],c=RT_CITY[name],km=i?rtHav(path[i-1],name):0,ms=i?(0.6+km*0.014):0,sig=i?rtSig(ms):0,md=rtMeta(name,c);
+    totKm+=km; totMs+=ms; totSig+=sig;
+    rows.push([i,name,md.loc,md.isp,c.ip,(i<path.length-1?path[i+1]:''),ms.toFixed(2),km.toFixed(1),sig.toFixed(1),totKm.toFixed(1)]);
+  }
+  rows.push([]); rows.push(['TOTALS','','','','','',totMs.toFixed(2)+' ms',totKm.toFixed(1)+' km straight-line',totSig.toFixed(0)+' km signal-path',(path.length-1)+' hops']);
+  var csv=rows.map(function(r){return r.map(esc).join(',');}).join('\r\n');
+  var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=url; a.download='netswitch-route_'+path[0].replace(/\W+/g,'-')+'_to_'+path[path.length-1].replace(/\W+/g,'-')+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
 function rtRoute(){ rtAlt=0; rtRender(); }
 function rtReroute(){ if(!rtAltPath()){ return; } rtAlt=rtAlt?0:1; rtRender(); }
 /* signal-path (cable) distance in km from latency, client's constant 1607/10000000 = 0.0001607 m per picosecond */
@@ -1235,12 +1259,13 @@ function rtEquip(name){
     plan={ mask:'255.255.255.254  (/31)', devs:'2 devices · point-to-point',
            gw:net+'.'+peer+' (peer)', dhcp:'static /31 — no DHCP  (/30 255.255.255.252 is the classic equivalent)' };
   }
+  var md=rtMeta(name,c);
   return {
     name:name, ll:rtMacToLL(mac), mac:mac, oui:oui, ven:ven, macAssigned:!macReturned,
-    ip:ip, mask:plan.mask, devs:plan.devs, gw:plan.gw, dhcp:plan.dhcp
+    ip:ip, mask:plan.mask, devs:plan.devs, gw:plan.gw, dhcp:plan.dhcp, isp:md.isp, loc:md.loc
   };
 }
-function rtEquipCard(e){
+function rtEquipCard(e,onward){
   function row(k,val,note){ return '<tr><td style="color:#6b7d6e;white-space:nowrap;padding-right:14px">'+k+'</td><td class="mono">'+val+(note?' <span style="color:#b8860b">'+note+'</span>':'')+'</td></tr>'; }
   return '<div style="border:1px solid #e2e6e2;border-radius:8px;padding:12px 14px;margin:10px 0;background:#fbfcfb">'+
     '<div style="font-weight:600;color:#b8860b;margin-bottom:8px">&#9873; '+e.name+' — router / firewall / gateway</div>'+
@@ -1248,10 +1273,13 @@ function rtEquipCard(e){
     row('IPv6 link-local (hexad read)', e.ll)+
     row('MAC (EUI-64 derived)', e.mac, e.macAssigned?'(not returned → assigned)':'')+
     row('Vendor · model', e.ven.v+' · '+e.ven.m+' · '+e.ven.c+'  <span style="color:#6b7d6e">[OUI '+e.oui+']</span>')+
+    row('ISP / network', e.isp)+
+    row('Location', e.loc)+
     row('IPv4', e.ip)+
     row('Subnet mask', e.mask+'  <span style="color:#6b7d6e">'+e.devs+'</span>', '(assigned)')+
     row('Gateway', e.gw, '(assigned)')+
     row('DHCP', e.dhcp, '(assigned)')+
+    (onward?row('Onward route', '&#8594; '+onward+'  <span style="color:#6b7d6e">(next hop toward the destination)</span>'):'')+
     '</tbody></table></div>';
 }
 /* Stacey-Reynold router finder — locate equipment on the path from the change in data speed.
@@ -1266,7 +1294,7 @@ function rtRouterScan(path){
     var drop=(ref-v)/ref*100;          /* % slow-down vs previous hop (or open-cable ref) */
     var equip=0.6/ms*100;              /* switching-delay share of this hop, % */
     var isRouter=(drop>=25)||(equip>=50);
-    if(isRouter){flags++; found.push(b);}
+    if(isRouter){flags++; found.push({name:b, onward:(i<path.length-1)?path[i+1]:null});}
     var verdict=isRouter?'<b style="color:#b8860b">&#9873; router / firewall / gateway at '+b+'</b>':'<span style="color:#6b7d6e">open cable</span>';
     rows+='<tr><td>'+i+'</td><td>'+a+' &#8594; '+b+'</td><td>'+v.toFixed(1)+' km/ms</td><td>'+(drop>=0?'&#8595; ':'&#8593; ')+Math.abs(drop).toFixed(0)+'%</td><td>'+equip.toFixed(0)+'%</td><td>'+verdict+'</td></tr>';
     prevV=v;
@@ -1279,7 +1307,7 @@ function rtRouterScan(path){
     '<table><thead><tr><th>Hop</th><th>Segment</th><th>Data speed</th><th>Change</th><th>Equip. share</th><th>Verdict</th></tr></thead><tbody>'+rows+'</tbody></table>'+
     (found.length?
       '<div class="rt-formula" style="margin-top:14px"><b>Equipment detail — hexad manufacturer list</b>. For each located box the IPv6 link-local (the hexad) is read and reversed through <b>EUI-64</b> to the hardware MAC (drop <span class="mono">ff:fe</span>, flip the U/L bit — e.g. <span class="mono">fe80::2e54:91ff:fe88:c9e3 → 2c:54:91:88:c9:e3</span>). The first three octets (the OUI) give make / model / country from the IEEE list. Any field the box does not return — MAC, mask, gateway, DHCP — is assigned, as in the spec. The subnet plan follows the device count: <b>Presentation</b> keeps every box on <span class="mono">/24</span> (easiest to show); <b>Production</b> puts device-serving nodes on <span class="mono">/24</span> + DHCP and backbone point-to-point links on <span class="mono">/31</span> (static, no DHCP). Switch it with the Addressing selector above.</div>'+
-      found.map(function(n){return rtEquipCard(rtEquip(n));}).join(''):'');
+      found.map(function(x){return rtEquipCard(rtEquip(x.name), x.onward);}).join(''):'');
 }
 function rtRender(){
   var path=rtActivePath();
@@ -1290,9 +1318,10 @@ function rtRender(){
   if(!path){ sum.innerHTML='<div class="rt-card"><div class="k">Route</div><div class="v">Pick two different cities</div></div>'; hops.innerHTML=''; calcEl.innerHTML=''; scanEl.innerHTML=''; hopsH.style.display='none'; calcH.style.display='none'; scanH.style.display='none'; rtRenderData(); return; }
   var totKm=0,totMs=0,totSig=0,rows='';
   for(var i=0;i<path.length;i++){
-    var name=path[i],ct=RT_CITY[name],linkKm=i?rtHav(path[i-1],name):0,linkMs=i?(0.6+linkKm*0.014):0,sigKm=i?rtSig(linkMs):0;
+    var name=path[i],ct=RT_CITY[name],linkKm=i?rtHav(path[i-1],name):0,linkMs=i?(0.6+linkKm*0.014):0,sigKm=i?rtSig(linkMs):0,md=rtMeta(name,ct);
+    var onward=(i<path.length-1)?path[i+1]:'—';
     totKm+=linkKm; totMs+=linkMs; totSig+=sigKm;
-    rows+='<tr><td>'+i+'</td><td><b>'+name+'</b></td><td>'+ct.addr+'</td><td>'+ct.ip+'</td><td>'+(i?linkMs.toFixed(2)+' ms':'—')+'</td><td>'+(i?linkKm.toFixed(1)+' km':'—')+'</td><td>'+(i?sigKm.toFixed(1)+' km':'—')+'</td><td>'+totKm.toFixed(1)+' km</td></tr>';
+    rows+='<tr><td>'+i+'</td><td><b>'+name+'</b></td><td>'+md.loc+'</td><td>'+md.isp+'</td><td>'+ct.ip+'</td><td>'+onward+'</td><td>'+(i?linkMs.toFixed(2)+' ms':'—')+'</td><td>'+(i?linkKm.toFixed(1)+' km':'—')+'</td><td>'+(i?sigKm.toFixed(1)+' km':'—')+'</td><td>'+totKm.toFixed(1)+' km</td></tr>';
   }
   var altName=(rtAlt===0)?'Primary path':'Alternate path';
   var via=path.slice(1,-1).join(', ')||'direct';
@@ -1304,7 +1333,7 @@ function rtRender(){
     '<div class="rt-card"><div class="k">Signal-path (cable)</div><div class="v">'+totSig.toFixed(0)+' km</div></div>'+
     '<div class="rt-card"><div class="k">Total latency</div><div class="v">'+totMs.toFixed(2)+' ms</div></div>'+
     '<div class="rt-card"><div class="k">Hops</div><div class="v">'+(path.length-1)+'</div></div>';
-  hops.innerHTML='<table><thead><tr><th>#</th><th>City / node</th><th>Address</th><th>IP</th><th>Link</th><th>Distance</th><th>Signal-path</th><th>Cumulative</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  hops.innerHTML='<div class="rt-scroll"><table><thead><tr><th>#</th><th>City / node</th><th>Location</th><th>ISP / network</th><th>IP</th><th>Onward →</th><th>Link</th><th>Distance</th><th>Signal-path</th><th>Cumulative</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
   hopsH.style.display='block'; calcH.style.display='block';
   /* per-hop path calculation — show the math behind every number */
   var crows='';
@@ -1332,6 +1361,23 @@ function rtRender(){
       'Nearest network node: <b>'+path[1]+'</b> ('+rtHav('My location',path[1]).toFixed(2)+' km) · destination <b>'+path[path.length-1]+'</b> · '+totKm.toFixed(1)+' km, '+totMs.toFixed(2)+' ms end to end.<br>'+
       'Walk to another street and the origin dot and the whole route update on their own.';
   } else { geo.className='rt-geo'; }
+}
+/* ISP / network operator + location for a node — real data the user cares about (client request). */
+function rtMeta(name,c){
+  if(c.isp||c.loc) return {isp:c.isp||'—', loc:c.loc||'—'};
+  var ip=c.ip||'', isp='Regional ISP';
+  if(/^195\.66\./.test(ip)) isp='LINX (London Internet Exchange)';
+  else if(/^213\.120\./.test(ip)) isp='BT / Openreach';
+  else if(/^5\.57\./.test(ip)) isp='Equinix';
+  else if(/^(151\.101|146\.75)\./.test(ip)) isp='Fastly (CDN)';
+  else if(/^185\.1\./.test(ip)) isp='LONAP peering';
+  else if(/^89\.207\./.test(ip)) isp='Zen Internet';
+  else if(/^193\.109\./.test(ip)) isp='Jisc / Janet';
+  else if(/^212\.111\./.test(ip)) isp='Virgin Media';
+  else if(/^195\.99\./.test(ip)) isp='BT Wholesale';
+  var loc='London, UK', m=(c.addr||'').match(/,\s*([A-Za-z .]+?)\s+[A-Z]{1,2}\d/);
+  if(m) loc=m[1].trim()+', UK';
+  return {isp:isp, loc:loc};
 }
 function rtRole(name,c){
   if(c.gps) return {l:'Your device (GPS)',cls:'gps'};
