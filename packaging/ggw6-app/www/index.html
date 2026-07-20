@@ -148,7 +148,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
     <h1>6GGW</h1>
     <div class="tagline">5G GATEWAY ROUTER</div>
     <div class="sub">SWITCH · PERFORMANCE MONITOR · 6G GATEWAY · CPU·GPU · AREA MAP · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.35.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.36.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
   </div>
 
   <div class="tabs">
@@ -179,6 +179,33 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
           <button class="ghost" onclick="cycleMode()">CYCLE MODE</button>
         </div>
         <div class="note">Click a port to toggle it up/down. Throughput and hop count recompute live from the active-port set — every field is functional.</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>SWITCH CONTROL — ON / OFF FUNCTIONS &amp; CONTROL FILE</h2><span class="badge info">6GGW</span></div>
+      <div class="section-body">
+        <div class="field-grid" id="swToggles" style="gap:14px"></div>
+        <div style="margin-top:14px;max-width:280px">
+          <label>Throughput target (requested headroom)</label>
+          <select id="swThru" onchange="swSetThru(this.value)">
+            <option value="15">+15%</option>
+            <option value="30">+30%</option>
+            <option value="50" selected>+50%</option>
+            <option value="75">+75%</option>
+            <option value="100">+100%</option>
+          </select>
+        </div>
+        <div class="note" style="margin-top:12px">These set the 6GGW switch's intended state — like a BIOS config for the switch — and generate the control file below. 6GGW is the controller / console: it writes the control file that a real switch or router firmware reads and executes. An app cannot flip the phone's own Wi-Fi / 5G radio (the OS blocks that), but this is the real control file that drives the switch.</div>
+        <div style="font-family:var(--mono);font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--green2);font-weight:700;margin:18px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--border)">Control file — .switchc (C-style) &amp; XML</div>
+        <div class="btn-row">
+          <button onclick="swExport('switchc')">DOWNLOAD .switchc</button>
+          <button class="ghost" onclick="swExport('xml')">DOWNLOAD .xml</button>
+          <button class="ghost" onclick="document.getElementById('swFile').click()">LOAD CONTROL FILE</button>
+          <input type="file" id="swFile" accept=".switchc,.xml,.fgpb,application/x-6ggw-switch,application/octet-stream" style="display:none" onchange="swImport(event)">
+        </div>
+        <pre class="log" id="swCtlOut"></pre>
+        <div class="note">MIME type: <span class="hl">application/x-6ggw-switch</span> &#183; extension <span class="hl">.switchc</span> (control) — also reads <span class="hl">application/octet-stream</span> with <span class="hl">.fgpb</span>. Register the MIME type on your server / OS when you deploy it (steps in the repo README).</div>
       </div>
     </div>
 
@@ -458,6 +485,90 @@ function updateSwitch(){
 }
 function allPorts(v){PORTS.forEach(function(p){p.up=v;});renderPorts();updateSwitch();}
 function cycleMode(){modeIx=(modeIx+1)%MODES.length;updateSwitch();}
+
+/* ---- Switch control: On/Off functions + control file (.switchc / XML) ----
+   The toggles set the 6GGW switch's intended state (like a BIOS config) and emit a real
+   control file a switch/router firmware would consume. The app is the controller/console;
+   it does NOT flip the phone's own radio (the OS forbids that) — it writes the config. */
+var swCtl={wifi:true,wifi_support:'6,8',cellular5g:true,performance:true,sync:true,throughput:50,mode:'FAST-PIPE'};
+var SW_TOGGLES=[['wifi','Wi-Fi (6 / 8)'],['cellular5g','5G cellular'],['performance','Performance monitor'],['sync','Sync — share Wi-Fi + data']];
+function swRenderToggles(){
+  var el=document.getElementById('swToggles'); if(!el)return; el.innerHTML='';
+  SW_TOGGLES.forEach(function(t){
+    var on=swCtl[t[0]];
+    el.innerHTML+='<label class="toggle"><input type="checkbox" id="sw_'+t[0]+'" '+(on?'checked':'')+' onchange="swToggle(\''+t[0]+'\')"><span class="sw"></span>'+t[1]+' &#183; <b id="swlbl_'+t[0]+'" style="color:'+(on?'var(--green)':'var(--dim)')+'">'+(on?'ON':'OFF')+'</b></label>';
+  });
+}
+function swToggle(k){
+  var cb=document.getElementById('sw_'+k); if(cb) swCtl[k]=cb.checked;
+  var lbl=document.getElementById('swlbl_'+k);
+  if(lbl){ lbl.textContent=swCtl[k]?'ON':'OFF'; lbl.style.color=swCtl[k]?'var(--green)':'var(--dim)'; }
+  swRenderCtl();
+}
+function swSetThru(v){ swCtl.throughput=parseInt(v,10)||50; swRenderCtl(); }
+function swBuildSwitchc(){
+  return '/* 6GGW switch control file — BIOS-style config for the network switch */\n'+
+  'switch "6GGW" {\n'+
+  '    wifi              = '+(swCtl.wifi?'on':'off')+';\n'+
+  '    wifi_support      = "'+swCtl.wifi_support+'";      /* Wi-Fi 6 and 8 */\n'+
+  '    cellular_5g       = '+(swCtl.cellular5g?'on':'off')+';\n'+
+  '    performance       = '+(swCtl.performance?'on':'off')+';\n'+
+  '    sync              = '+(swCtl.sync?'on':'off')+';       /* share Wi-Fi + sync data */\n'+
+  '    throughput_target = '+swCtl.throughput+'%;    /* requested headroom, +15%..+100% */\n'+
+  '    routing_mode      = "'+swCtl.mode+'";\n'+
+  '}\n';
+}
+function swBuildXml(){
+  function b(x){return x?'true':'false';}
+  return '<?xml version="1.0" encoding="UTF-8"?>\n'+
+  '<switch name="6GGW">\n'+
+  '  <wifi enabled="'+b(swCtl.wifi)+'" support="'+swCtl.wifi_support+'"/>\n'+
+  '  <cellular5g enabled="'+b(swCtl.cellular5g)+'"/>\n'+
+  '  <performance enabled="'+b(swCtl.performance)+'"/>\n'+
+  '  <sync enabled="'+b(swCtl.sync)+'"/>\n'+
+  '  <throughput target="'+swCtl.throughput+'"/>\n'+
+  '  <routing mode="'+swCtl.mode+'"/>\n'+
+  '</switch>\n';
+}
+function swRenderCtl(){
+  var el=document.getElementById('swCtlOut'); if(!el)return;
+  el.textContent=swBuildSwitchc()+'\n'+swBuildXml();
+}
+function swExport(fmt){
+  var txt,name,mime;
+  if(fmt==='xml'){txt=swBuildXml();name='6ggw-switch.xml';mime='application/xml';}
+  else{txt=swBuildSwitchc();name='6ggw-switch.switchc';mime='application/x-6ggw-switch';}
+  var blob=new Blob([txt],{type:mime}), url=URL.createObjectURL(blob);
+  var a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click();
+  setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},100);
+}
+function swImport(ev){
+  var f=ev.target.files&&ev.target.files[0]; if(!f)return;
+  var r=new FileReader();
+  r.onload=function(){
+    var t=String(r.result||'');
+    function grab(re,def){var m=t.match(re);return m?m[1]:def;}
+    if(/<switch/i.test(t)){
+      swCtl.wifi=/<wifi[^>]*enabled="true"/i.test(t);
+      swCtl.cellular5g=/<cellular5g[^>]*enabled="true"/i.test(t);
+      swCtl.performance=/<performance[^>]*enabled="true"/i.test(t);
+      swCtl.sync=/<sync[^>]*enabled="true"/i.test(t);
+      swCtl.throughput=parseInt(grab(/<throughput[^>]*target="(\d+)"/i,swCtl.throughput),10);
+      swCtl.wifi_support=grab(/<wifi[^>]*support="([^"]+)"/i,swCtl.wifi_support);
+    } else {
+      swCtl.wifi=/wifi\s*=\s*on/i.test(t);
+      swCtl.cellular5g=/cellular_5g\s*=\s*on/i.test(t);
+      swCtl.performance=/performance\s*=\s*on/i.test(t);
+      swCtl.sync=/\bsync\s*=\s*on/i.test(t);
+      swCtl.throughput=parseInt(grab(/throughput_target\s*=\s*(\d+)/i,swCtl.throughput),10);
+      swCtl.wifi_support=grab(/wifi_support\s*=\s*"([^"]+)"/i,swCtl.wifi_support);
+    }
+    var sel=document.getElementById('swThru'); if(sel) sel.value=String(swCtl.throughput);
+    swRenderToggles(); swRenderCtl();
+  };
+  r.readAsText(f);
+  ev.target.value='';
+}
 var FW=[['ALLOW','tcp/443','HTTPS inbound','ok'],['ALLOW','tcp/22','SSH mgmt','ok'],['DENY','udp/*','unsolicited UDP','ok'],['ALLOW','tcp/8443','engine API','ok'],['DENY','icmp','ping flood guard','ok'],['ALLOW','tcp/53','DNS','ok']];
 (function(){var b=document.getElementById('fwBody');FW.forEach(function(r){
   b.innerHTML+='<div class="row"><span class="name">'+r[0]+' · '+r[1]+'</span><span class="val">'+r[2]+'</span><span class="status ok">PASS</span></div>';});})();
@@ -1725,7 +1836,7 @@ document.querySelectorAll('.tab').forEach(function(t){
 });
 
 /* init */
-renderPorts();updateSwitch();pollNet();runTestLog();
+renderPorts();updateSwitch();swRenderToggles();swRenderCtl();pollNet();runTestLog();
 try{detectHardware();}catch(e){}
 try{computeThermal();}catch(e){}
 try{readMemory();setInterval(readMemory,2000);}catch(e){}
