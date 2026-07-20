@@ -146,7 +146,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
   <div class="header">
     <h1>NETSWITCH</h1>
     <div class="sub">ROUTER / SWITCH · BENCHMARK NET · CPU·GPU · AREA MAP · UK ROUTES · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · Engine v2.30.0 · serverless · installable app (PWA) — runs on Android 13 · Windows · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · Engine v2.31.0 · serverless · installable app (PWA) — runs on Android 13 · Windows · any browser</div>
   </div>
 
   <div class="tabs">
@@ -192,19 +192,19 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
       <div class="section-head"><h2>BENCHMARK NET — GPU / DRAM / CPU / SCREEN</h2><span class="badge run" id="benchBadge">IDLE</span></div>
       <div class="section-body">
         <div class="grid" id="benchStats">
-          <div class="stat"><div class="k">GPU Perf</div><div class="v" id="bGpu">—</div></div>
-          <div class="stat"><div class="k">DRAM Bandwidth</div><div class="v" id="bDram">—</div></div>
-          <div class="stat"><div class="k">CPU Fast-Pipe</div><div class="v" id="bCpu">—</div></div>
-          <div class="stat"><div class="k">Screen Update</div><div class="v" id="bScrn">—</div></div>
-          <div class="stat good"><div class="k">Battery Savings</div><div class="v" id="bBatt">—</div></div>
-          <div class="stat good"><div class="k">Up / Down Speed</div><div class="v" id="bLoad">—</div></div>
+          <div class="stat"><div class="k">GPU Fill Rate</div><div class="v" id="bGpu">—</div></div>
+          <div class="stat"><div class="k">Memory Bandwidth</div><div class="v" id="bDram">—</div></div>
+          <div class="stat"><div class="k">CPU Compute</div><div class="v" id="bCpu">—</div></div>
+          <div class="stat"><div class="k">Screen Refresh</div><div class="v" id="bScrn">—</div></div>
+          <div class="stat good"><div class="k">Battery</div><div class="v" id="bBatt">—</div></div>
+          <div class="stat good"><div class="k">Download Speed</div><div class="v" id="bLoad">—</div></div>
         </div>
         <div class="btn-row">
-          <button onclick="runBench()">RUN BENCHMARK</button>
+          <button onclick="runBench()">RUN REAL BENCHMARK</button>
           <button class="ghost" onclick="resetBench()">RESET</button>
         </div>
         <div id="benchBars"></div>
-        <div class="note">Priorities per spec: <span class="hl">GPU / DRAM / SCREEN fast performance</span>, <span class="hl">battery savings</span>, <span class="hl">fast data load</span>. Each metric is computed live from the fast-pipe model (448.998 CPU ratio + remainder model), not static text.</div>
+        <div class="note">Measured live on <span class="hl">this device and this connection</span> — CPU on real Web Worker threads, memory bandwidth from a real array read+write, GPU from a real WebGL fill test, screen refresh from the browser's frame clock, battery from the Battery API, and download speed + round-trip latency from a real file fetch. Nothing here is hardcoded; numbers will differ on every phone, PC and network. Works offline for the CPU / memory / GPU / screen tests (the connection tests need internet).</div>
       </div>
     </div>
   </div>
@@ -440,33 +440,112 @@ var FW=[['ALLOW','tcp/443','HTTPS inbound','ok'],['ALLOW','tcp/22','SSH mgmt','o
 (function(){var b=document.getElementById('fwBody');FW.forEach(function(r){
   b.innerHTML+='<div class="row"><span class="name">'+r[0]+' · '+r[1]+'</span><span class="val">'+r[2]+'</span><span class="status ok">PASS</span></div>';});})();
 
-/* ---------------- BENCHMARK (deterministic fast-pipe model) ---------------- */
-function fastPipe(base){ // 448.998 ratio boost, deterministic
-  return base*1.15;
-}
-function runBench(){
-  document.getElementById('benchBadge').textContent='RUNNING';
-  document.getElementById('benchBadge').className='badge run';
-  var m={GPU:{v:'3000',pct:92,lbl:'GPU perf'},
-         DRAM:{v:'+700 MB/s',pct:84,lbl:'DRAM bandwidth'},
-         CPU:{v:'+1400 MHz',pct:88,lbl:'CPU fast-pipe'},
-         SCRN:{v:'450 %',pct:90,lbl:'Screen update rate'},
-         BATT:{v:'-31 %',pct:69,lbl:'Battery draw saved'},
-         LOAD:{v:'+50% kbps',pct:75,lbl:'Up / download speed'}};
-  document.getElementById('bGpu').textContent=m.GPU.v;
-  document.getElementById('bDram').textContent=m.DRAM.v;
-  document.getElementById('bCpu').textContent=m.CPU.v;
-  document.getElementById('bScrn').textContent=m.SCRN.v;
-  document.getElementById('bBatt').textContent=m.BATT.v;
-  document.getElementById('bLoad').textContent=m.LOAD.v;
-  var bars=document.getElementById('benchBars');bars.innerHTML='';
-  ['GPU','DRAM','CPU','SCRN','BATT','LOAD'].forEach(function(k){
-    var x=m[k];
-    bars.innerHTML+='<div class="bar-wrap"><div class="bar"><span style="width:0%" data-w="'+x.pct+'"></span></div><div class="bar-lbl"><span>'+x.lbl+'</span><span>'+x.pct+' %</span></div></div>';
+/* ---------------- BENCHMARK (REAL on-device / on-connection measurement) ----------------
+   Every number below is measured live on the device running the app — nothing is hardcoded.
+   CPU: real Web Worker compute (same engine as the CPU·GPU tab). Memory: real array read+write
+   bandwidth. GPU: real WebGL fill test. Screen: real refresh rate from requestAnimationFrame.
+   Battery: real Battery API. Connection: a real file download + real round-trip latency. */
+function benchCpu(){
+  return new Promise(function(resolve){
+    var cores=navigator.hardwareConcurrency||4, iters=4000000;
+    runCpuUnits(cores,iters,function(res){
+      var agg=0,best=Infinity;
+      res.forEach(function(r){ if(r.ms>0){ agg+=iters/(r.ms/1000); if(r.ms<best)best=r.ms; } });
+      resolve({multiMops:agg/1e6, singleMops:best<Infinity?(iters/(best/1000))/1e6:0,
+               cores:cores, mode:(res[0]&&res[0].seq)?'1 thread':cores+' threads'});
+    });
   });
-  var spans=bars.querySelectorAll('.bar>span');
-  setTimeout(function(){spans.forEach(function(s){s.style.width=s.getAttribute('data-w')+'%';});},60);
-  setTimeout(function(){document.getElementById('benchBadge').textContent='DONE';document.getElementById('benchBadge').className='badge pass';},650);
+}
+function benchGpuMpix(){
+  try{
+    var c=document.createElement('canvas'); c.width=512; c.height=512;
+    var gl=c.getContext('webgl')||c.getContext('experimental-webgl'); if(!gl) return null;
+    gl.viewport(0,0,512,512);
+    var t0=performance.now(),frames=60;
+    for(var f=0;f<frames;f++){ gl.clearColor((f%60)/60,0.2,0.6,1); gl.clear(gl.COLOR_BUFFER_BIT); if(gl.finish)gl.finish(); }
+    var ms=performance.now()-t0; if(ms<=0) return null;
+    return (512*512*frames)/1e6/(ms/1000);   /* Mpix/s */
+  }catch(e){ return null; }
+}
+function benchDramGBs(){
+  var N=4*1024*1024, a=new Float64Array(N);   /* 32 MB working set */
+  var t0=performance.now();
+  for(var i=0;i<N;i++){ a[i]=i*1.0000001; }
+  var s=0; for(var j=0;j<N;j++){ s+=a[j]; }
+  var ms=performance.now()-t0; if(ms<=0) return {gbs:0,s:s};
+  return {gbs:(N*8*2)/(ms/1000)/1e9, s:s};    /* bytes written + read, GB/s */
+}
+function benchScreenHz(){
+  return new Promise(function(resolve){
+    var d=[],last=null,frames=0,max=40;
+    function step(ts){ if(last!=null) d.push(ts-last); last=ts; frames++;
+      if(frames<max){ requestAnimationFrame(step); }
+      else { d.sort(function(a,b){return a-b;}); resolve(1000/(d[Math.floor(d.length/2)]||16.7)); } }
+    requestAnimationFrame(step);
+  });
+}
+function benchLatency(){
+  return new Promise(function(resolve){
+    if(!navigator.onLine){ resolve(null); return; }
+    var samples=[],n=5,i=0;
+    function ping(){ var t0=performance.now();
+      fetch('manifest.webmanifest?cb='+t0+'_'+i,{cache:'no-store'})
+        .then(function(){ samples.push(performance.now()-t0); next(); })
+        .catch(function(){ next(); }); }
+    function next(){ i++; if(i<n){ ping(); }
+      else if(!samples.length){ resolve(null); }
+      else { samples.sort(function(a,b){return a-b;}); resolve({min:samples[0],med:samples[Math.floor(samples.length/2)]}); } }
+    ping();
+  });
+}
+function benchDownload(){
+  return new Promise(function(resolve){
+    if(!navigator.onLine){ resolve(null); return; }
+    var t0=performance.now();
+    fetch('speedtest.bin?cb='+t0,{cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw 0; return r.arrayBuffer(); })
+      .then(function(buf){ var s=(performance.now()-t0)/1000; if(s<=0){resolve(null);return;}
+        var bits=buf.byteLength*8; resolve({mbps:bits/s/1e6, kbps:bits/s/1e3, bytes:buf.byteLength, s:s}); })
+      .catch(function(){ resolve(null); });
+  });
+}
+function benchBattery(){
+  return new Promise(function(resolve){
+    if(navigator.getBattery){ navigator.getBattery().then(function(b){
+      resolve({level:Math.round(b.level*100), charging:b.charging}); }).catch(function(){resolve(null);}); }
+    else resolve(null);
+  });
+}
+function benchGrade(v,ref){ return Math.max(3,Math.min(100,Math.round(v/ref*100))); }
+function runBench(){
+  var badge=document.getElementById('benchBadge');
+  badge.textContent='MEASURING…'; badge.className='badge run';
+  ['bGpu','bDram','bCpu','bScrn','bBatt','bLoad'].forEach(function(id){document.getElementById(id).textContent='…';});
+  var gpu=benchGpuMpix(), dram=benchDramGBs();
+  Promise.all([benchCpu(),benchScreenHz(),benchLatency(),benchDownload(),benchBattery()]).then(function(r){
+    var cpu=r[0],hz=r[1],lat=r[2],dl=r[3],bat=r[4];
+    document.getElementById('bGpu').textContent = gpu!=null? gpu.toFixed(0)+' Mpix/s':'n/a';
+    document.getElementById('bDram').textContent = dram.gbs>0? dram.gbs.toFixed(1)+' GB/s':'n/a';
+    document.getElementById('bCpu').textContent = cpu.multiMops>0? cpu.multiMops.toFixed(0)+' MOPS':'n/a';
+    document.getElementById('bScrn').textContent = hz.toFixed(0)+' Hz';
+    document.getElementById('bBatt').textContent = bat? bat.level+'%'+(bat.charging?' ⚡':''):'n/a';
+    document.getElementById('bLoad').textContent = dl? (dl.mbps>=1? dl.mbps.toFixed(1)+' Mbps':Math.round(dl.kbps)+' kbps') : (navigator.onLine?'—':'offline');
+    var bars=document.getElementById('benchBars'); bars.innerHTML='';
+    var rows=[
+      {lbl:'CPU compute · '+cpu.mode, val:cpu.multiMops.toFixed(0)+' MOPS (1 core '+cpu.singleMops.toFixed(0)+')', pct:benchGrade(cpu.multiMops,2000)},
+      {lbl:'GPU fill rate', val:(gpu!=null?gpu.toFixed(0)+' Mpix/s':'n/a'), pct:gpu!=null?benchGrade(gpu,20000):0},
+      {lbl:'Memory bandwidth', val:(dram.gbs>0?dram.gbs.toFixed(1)+' GB/s':'n/a'), pct:benchGrade(dram.gbs,10)},
+      {lbl:'Screen refresh', val:hz.toFixed(0)+' Hz', pct:benchGrade(hz,120)},
+      {lbl:'Download speed', val:(dl?(dl.mbps>=1?dl.mbps.toFixed(1)+' Mbps':Math.round(dl.kbps)+' kbps')+' · '+(dl.bytes/1e6).toFixed(1)+' MB in '+dl.s.toFixed(2)+'s':(navigator.onLine?'not reachable':'offline')), pct:dl?benchGrade(dl.mbps,300):0},
+      {lbl:'Network latency (round-trip)', val:(lat?lat.med.toFixed(0)+' ms (best '+lat.min.toFixed(0)+')':(navigator.onLine?'not reachable':'offline')), pct:lat?Math.max(3,Math.min(100,Math.round(120-lat.med))):0}
+    ];
+    rows.forEach(function(x){
+      bars.innerHTML+='<div class="bar-wrap"><div class="bar"><span style="width:0%" data-w="'+x.pct+'"></span></div><div class="bar-lbl"><span>'+x.lbl+'</span><span>'+x.val+'</span></div></div>';
+    });
+    var spans=bars.querySelectorAll('.bar>span');
+    setTimeout(function(){spans.forEach(function(s){s.style.width=s.getAttribute('data-w')+'%';});},60);
+    badge.textContent='MEASURED'; badge.className='badge pass';
+  });
 }
 function resetBench(){
   ['bGpu','bDram','bCpu','bScrn','bBatt','bLoad'].forEach(function(id){document.getElementById(id).textContent='—';});
