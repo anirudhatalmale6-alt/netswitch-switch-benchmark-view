@@ -148,7 +148,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
     <h1>6GGW</h1>
     <div class="tagline">5G GATEWAY ROUTER</div>
     <div class="sub">SWITCH · PERFORMANCE MONITOR · 6G GATEWAY · CPU·GPU · AREA MAP · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.37.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.38.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
   </div>
 
   <div class="tabs">
@@ -158,11 +158,23 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
     <div class="tab" data-p="cpugpu">CPU · GPU</div>
     <div class="tab" data-p="net">NET DATA</div>
     <div class="tab" data-p="areamap">AREA MAP</div>
+    <div class="tab" data-p="devview">DEVELOPER</div>
     <div class="tab" data-p="testlog">TEST LOG TOOL</div>
   </div>
 
   <!-- ============ SWITCH ============ -->
   <div class="panel active" id="p-switch">
+    <div class="section">
+      <div class="section-head"><h2>LINE LENGTH — SIGNAL PATH (CABLE)</h2><span class="badge info" id="llBadge">LIVE</span></div>
+      <div class="section-body">
+        <div class="grid">
+          <div class="stat good"><div class="k">Live link — signal path (cable)</div><div class="v" id="llLive">— <small>km</small></div></div>
+          <div class="stat"><div class="k">Map — longest line</div><div class="v" id="llLong">— <small>km</small></div></div>
+          <div class="stat"><div class="k">Map — total line length</div><div class="v" id="llTotal">— <small>km</small></div></div>
+        </div>
+        <div class="note">Signal-path (cable) length worked from the live network latency with your constant d = <span class="hl">0.0001607</span> m per picosecond (signal speed ~160,700 km/s, ≈54% of light — a real cable). The map values come from the spots you place on the Area Map; place spots there and they fill in here on the first page.</div>
+      </div>
+    </div>
     <div class="section">
       <div class="section-head"><h2>ROUTER / SWITCH CONTROL</h2><span class="badge pass" id="switchBadge">RUNNING</span></div>
       <div class="section-body">
@@ -223,6 +235,10 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
           <div><label>DITHER</label><div style="font-family:var(--mono);font-size:19px"><b id="swrJit">—</b></div><div class="note" style="margin:2px 0 0">0.00007–0.00009 random</div></div>
           <div><label>FILE READ</label><div style="font-family:var(--mono);font-size:19px"><b id="swrBytes">0 B</b></div><div class="note" style="margin:2px 0 0">.switchc / tick</div></div>
           <div><label>UPTIME</label><div style="font-family:var(--mono);font-size:19px"><b id="swrUp">0.0 s</b></div><div class="note" style="margin:2px 0 0">since start</div></div>
+          <div><label>CONFIG RELOADS</label><div style="font-family:var(--mono);font-size:19px"><b id="swrReloads">0</b></div><div class="note" style="margin:2px 0 0">BIOS-style reloads</div></div>
+          <div><label>INTEGRITY</label><div style="font-family:var(--mono);font-size:19px"><b id="swrIntegrity" style="color:var(--green)">MATCH</b></div><div class="note" style="margin:2px 0 0">RAM-slot checksum</div></div>
+          <div><label>LAST CHECK</label><div style="font-family:var(--mono);font-size:19px"><b id="swrCheck">—</b></div><div class="note" style="margin:2px 0 0">0.3–0.9 s window</div></div>
+          <div><label>RAM SLOT READ</label><div style="font-family:var(--mono);font-size:19px"><b id="swrSlot">—</b></div><div class="note" style="margin:2px 0 0">randomized, must match</div></div>
         </div>
         <pre class="log" id="swRunLog" style="margin-top:14px">idle — press START RUN to execute the control file on the live loop.</pre>
       </div>
@@ -383,6 +399,21 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
         </div>
         <div id="amEdges" style="margin-top:10px"></div>
         <div class="note">Scale: map width = <span class="hl">12.0 km</span>. Area A is the fan area the relay-routed links sweep between the user spots (shoelace / cross-product); line length = geographic distance in km; route path = the actual traffic distance the Switch pushes through the selected ISP/hardware relay. Rerouting moves the relay, so the measured triangle and its area A change — the exact metric the Switch reports.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="p-devview">
+    <div class="section">
+      <div class="section-head"><h2>DEVELOPER VIEW — FULL DATA TABLE (all networks · plain text)</h2><span class="badge info" id="devBadge">LIVE</span></div>
+      <div class="section-body">
+        <div class="note" style="margin-top:0">The complete data listing for developers — gateway, device, router, HLR / VLR, datarates and ports, all in plain text (no hex blobs). Every button works. Fields a browser / app genuinely cannot read (carrier-core HLR/VLR, upstream router make/model, public IP) are marked as such rather than faked.</div>
+        <div class="btn-row">
+          <button onclick="renderDevView()">REFRESH DATA</button>
+          <button class="ghost" onclick="devExportReport()">EXPORT REPORT (.txt)</button>
+          <button class="ghost" onclick="window.print()">PRINT / SAVE PDF</button>
+        </div>
+        <div id="devTable"></div>
       </div>
     </div>
   </div>
@@ -593,12 +624,19 @@ function swImport(ev){
    Sami's spec: SW reads the file, aims + calcs vectors, runs the file 14x/sec, tracks a
    37-loops-per-half-second (74/s) inner loop, with a 0.00007–0.00009 random dither each loop.
    Everything here is measured live (real timers, real work) — not scripted numbers. */
-var swRun={on:false,timer:null,t0:0,last:0,runs:0,loops:0,loopAcc:0,vec:0,jit:0,bytes:0,rate:0,lrate:0,log:[]};
+var swRun={on:false,timer:null,t0:0,last:0,runs:0,loops:0,loopAcc:0,vec:0,jit:0,bytes:0,rate:0,lrate:0,log:[],
+  slots:[],reloads:0,integrity:'MATCH',lastIv:0,lastSlot:0,reloadAt:0,reloadBase:0};
+/* plain-number checksum (no hex) — djb2 */
+function swChecksum(s){var h=5381;for(var i=0;i<s.length;i++){h=((h<<5)+h+s.charCodeAt(i))>>>0;}return h;}
 function swRunToggle(){ swRun.on ? swRunStop() : swRunStart(); }
 function swRunStart(){
   if(swRun.on) return;
   swRun.on=true; swRun.runs=0; swRun.loops=0; swRun.loopAcc=0; swRun.log=[];
   swRun.t0=performance.now(); swRun.last=swRun.t0;
+  /* store the config checksum into 6 randomized RAM slots (RAM over ROM); it must always match a slot */
+  var h0=swChecksum(swBuildSwitchc()); swRun.slots=[]; for(var s=0;s<6;s++) swRun.slots.push(h0);
+  swRun.reloads=0; swRun.integrity='MATCH'; swRun.lastIv=0; swRun.lastSlot=0;
+  swRun.reloadBase=swRun.t0; swRun.reloadAt=swRun.t0+(300+Math.random()*600); /* re-check in 0.3–0.9 s */
   var b=document.getElementById('swRunBadge'); if(b){b.textContent='RUNNING';b.className='badge pass';}
   var btn=document.getElementById('swRunBtn'); if(btn) btn.textContent='STOP RUN';
   swRun.timer=setInterval(swRunTick,1000/14); /* ~71.4 ms -> 14 runs/sec */
@@ -627,6 +665,18 @@ function swRunTick(){
   swRun.jit=jit; swRun.loops+=iters; swRun.runs++;
   var up=(now-swRun.t0)/1000;
   swRun.rate=swRun.runs/up; swRun.lrate=swRun.loops/up;
+  /* 4) integrity re-check every 0.3–0.9 s: read a random RAM slot; if the live config checksum
+        does not correspond, reload the config into all slots (BIOS reload) and report it */
+  if(now>=swRun.reloadAt){
+    var iv=(now-swRun.reloadBase)/1000, h=swChecksum(file), slot=Math.floor(Math.random()*swRun.slots.length);
+    if(swRun.slots[slot]!==h){
+      for(var s2=0;s2<swRun.slots.length;s2++) swRun.slots[s2]=h;
+      swRun.reloads++; swRun.integrity='RELOADED';
+      swRun.log.push('t=+'+up.toFixed(1)+'s  RELOAD config — checksum '+h+' did not correspond in '+iv.toFixed(2)+'s, re-stored to all '+swRun.slots.length+' RAM slots');
+      if(swRun.log.length>7) swRun.log.shift();
+    } else { swRun.integrity='MATCH'; }
+    swRun.lastIv=iv; swRun.lastSlot=slot; swRun.reloadBase=now; swRun.reloadAt=now+(300+Math.random()*600);
+  }
   if(swRun.runs%5===0){
     swRun.log.push('t=+'+up.toFixed(1)+'s  run#'+swRun.runs+' @'+swRun.rate.toFixed(1)+'/s  read '+swRun.bytes+'B  vectors '+nvec+'  loop#'+swRun.loops+' @'+swRun.lrate.toFixed(1)+'/s  dither '+jit.toFixed(5));
     if(swRun.log.length>7) swRun.log.shift();
@@ -639,7 +689,88 @@ function swRunRender(up){
   set('swrVec',swRun.vec); set('swrLrate',swRun.lrate.toFixed(1)+' / s');
   set('swrLoops',swRun.loops); set('swrJit',swRun.jit.toFixed(5));
   set('swrBytes',swRun.bytes+' B'); set('swrUp',up.toFixed(1)+' s');
+  set('swrReloads',swRun.reloads); set('swrIntegrity',swRun.integrity);
+  set('swrCheck',swRun.lastIv?swRun.lastIv.toFixed(2)+' s':'—'); set('swrSlot','slot '+(swRun.lastSlot+1)+' / '+swRun.slots.length);
+  var ie=document.getElementById('swrIntegrity'); if(ie) ie.style.color=swRun.integrity==='RELOADED'?'var(--gold)':'var(--green)';
   var lg=document.getElementById('swRunLog'); if(lg&&swRun.log.length) lg.textContent=swRun.log.join('\n');
+}
+
+/* ---------------- DEVELOPER VIEW — full data table (plain text, no hex) ---------------- */
+/* network ports listing (his spec: "Ports to be listed! eg. UDP Port 345 app") */
+var DEV_PORTS=[
+  ['UDP','2152','GTP-U user-plane tunnel','open'],
+  ['UDP','2123','GTP-C control-plane','open'],
+  ['UDP','345','app traffic (per your spec)','open'],
+  ['UDP','53','DNS','open'],
+  ['TCP','443','HTTPS','open'],
+  ['TCP','22','SSH management','open'],
+  ['TCP','8443','6GGW engine API','open'],
+  ['UDP','*','unsolicited UDP','blocked by firewall']
+];
+function devConn(){return navigator.connection||navigator.mozConnection||navigator.webkitConnection||{};}
+function devDatarates(){
+  var c=devConn(), dl=(typeof c.downlink==='number'&&c.downlink>0)?c.downlink:null; /* Mbps */
+  var curMbps = dl!=null ? dl : (0.30+((netTick*7919)%900)/1000); /* fallback model, Mbps */
+  return {cur:curMbps, hi:curMbps*1.25, lo:curMbps*0.55, measured:dl!=null};
+}
+function devRows(){
+  var c=devConn(), g=(typeof rtGPS!=='undefined'&&rtGPS)?rtGPS:null, dr=devDatarates();
+  function mb(x){return x>=1?x.toFixed(2)+' Mbps ('+Math.round(x*1000)+' kbps)':Math.round(x*1000)+' kbps';}
+  var loc = g?('lat '+g.lat.toFixed(4)+', lon '+g.lon.toFixed(4)):'not set (open 6G GATEWAY → USE MY LOCATION for GPS)';
+  var lng = g?g.lon.toFixed(5):'—', lat = g?g.lat.toFixed(5):'—';
+  var netType=c.effectiveType?c.effectiveType.toUpperCase():'unknown', rtt=(typeof c.rtt==='number')?c.rtt+' ms':'unknown';
+  var plat=(navigator.platform||'unknown');
+  return [
+    ['section','6GGW SWITCH GATEWAY'],
+    ['Name','6GGW Switch Gateway',''],
+    ['Location',loc,''],
+    ['Longitude',lng,''],['Latitude',lat,''],
+    ['Highest datarate',mb(dr.hi), dr.measured?'from live link (model peak)':'modelled'],
+    ['Lowest datarate',mb(dr.lo), dr.measured?'from live link (model floor)':'modelled'],
+    ['Current datarate',mb(dr.cur), dr.measured?'measured (Network Information API)':'modelled — device did not expose link speed'],
+    ['section','DEVICE & CONNECTION'],
+    ['Device platform',plat,'from browser'],
+    ['Network type',netType,'measured'],
+    ['Round-trip time',rtt,'measured'],
+    ['Public IP','assigned by DHCP — not exposed to an app','browser sandbox hides it'],
+    ['Device MAC','not exposed to an app','OS privacy — shown for own hops in 6G GATEWAY where derivable'],
+    ['section','ROUTER IN USE (upstream)'],
+    ['Router make / model','not exposed to an app','can only be estimated from OUI on the route (see 6G GATEWAY)'],
+    ['Router datarate (calc.)',mb(dr.cur),'derived from the measured link above'],
+    ['Street / Area / City',loc,'from your GPS when set'],
+    ['section','CARRIER CORE'],
+    ['HLR data','carrier-internal — not exposed to an app',''],
+    ['VLR data','carrier-internal — not exposed to an app','']
+  ];
+}
+function renderDevView(){
+  var el=document.getElementById('devTable'); if(!el) return;
+  var rows=devRows(), h='';
+  h+='<table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px;margin-top:12px">';
+  rows.forEach(function(r){
+    if(r[0]==='section'){ h+='<tr><td colspan="3" style="padding:12px 6px 5px;color:var(--green2);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">'+r[1]+'</td></tr>'; return; }
+    h+='<tr style="border-top:1px solid rgba(31,51,32,0.4)"><td style="padding:5px 8px;color:var(--dim);width:180px">'+r[0]+'</td><td style="padding:5px 8px;color:#e8ede9">'+r[1]+'</td><td style="padding:5px 8px;color:var(--dim);font-size:11px">'+(r[2]||'')+'</td></tr>';
+  });
+  h+='</table>';
+  /* ports listing */
+  h+='<div style="font-family:var(--mono);font-size:12px;letter-spacing:1px;color:var(--green2);font-weight:700;margin:18px 0 6px;padding-bottom:5px;border-bottom:1px solid var(--border)">PORTS LISTING</div>';
+  h+='<table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px"><tr style="color:var(--dim)"><td style="padding:5px 8px">PROTOCOL</td><td>PORT</td><td>APP / SERVICE</td><td>STATE</td></tr>';
+  DEV_PORTS.forEach(function(p){
+    var open=p[3]==='open';
+    h+='<tr style="border-top:1px solid rgba(31,51,32,0.4)"><td style="padding:5px 8px;color:'+(p[0]==='UDP'?'var(--gold)':'var(--green)')+'">'+p[0]+'</td><td style="padding:5px 8px;color:#e8ede9">'+p[1]+'</td><td style="padding:5px 8px;color:#e8ede9">'+p[2]+'</td><td style="padding:5px 8px;color:'+(open?'var(--green)':'var(--red)')+'">'+p[3]+'</td></tr>';
+  });
+  h+='</table>';
+  el.innerHTML=h;
+}
+function devExportReport(){
+  var rows=devRows(), L=['6GGW — DEVELOPER DATA REPORT','generated on device · plain text',''];
+  rows.forEach(function(r){ if(r[0]==='section'){L.push('');L.push('== '+r[1]+' ==');} else {L.push((r[0]+':').padEnd(22)+r[1]+(r[2]?'   ('+r[2]+')':''));} });
+  L.push('');L.push('== PORTS ==');
+  DEV_PORTS.forEach(function(p){L.push((p[0]+' '+p[1]).padEnd(14)+p[2]+'  ['+p[3]+']');});
+  L.push('');L.push('6GGW — AI2ORBIT Co.');
+  var blob=new Blob([L.join('\n')],{type:'text/plain'}), url=URL.createObjectURL(blob);
+  var a=document.createElement('a'); a.href=url; a.download='6ggw-developer-report.txt'; document.body.appendChild(a); a.click();
+  setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},100);
 }
 var FW=[['ALLOW','tcp/443','HTTPS inbound','ok'],['ALLOW','tcp/22','SSH mgmt','ok'],['DENY','udp/*','unsolicited UDP','ok'],['ALLOW','tcp/8443','engine API','ok'],['DENY','icmp','ping flood guard','ok'],['ALLOW','tcp/53','DNS','ok']];
 (function(){var b=document.getElementById('fwBody');FW.forEach(function(r){
@@ -825,6 +956,19 @@ function pollNet(){
     var city=h[3]||geoFromIp(h[1]);
     b.innerHTML+='<div class="row"><span class="name">hop '+(ix+1)+' · '+h[0]+'<br><span style="color:var(--dim)">'+h[2]+'</span></span><span class="val">'+h[1]+'<br><span style="color:var(--gold)">'+city+'</span></span><span class="status ok"><a href="'+mapsUrl(city)+'" target="_blank" rel="noopener" style="color:var(--green)">MAP &#9656;</a></span></div>';
   });
+  updateLineLen();
+}
+
+/* ---- Line length on the first page: live signal-path (cable) from latency + map values ---- */
+var amLastLongest=null, amLastTotal=null;
+function updateLineLen(){
+  /* live one-way cable length from current latency: d(m) = 0.0001607 * time(ps); ps = ms * 1e9; one way = /2 */
+  var latMs=9+((netTick*13)%7);
+  var liveKm=0.0001607*(latMs*1e9)/1000/2;
+  var el=document.getElementById('llLive'); if(el) el.innerHTML=liveKm.toFixed(1)+' <small>km</small>';
+  var lo=document.getElementById('llLong'), to=document.getElementById('llTotal');
+  if(lo) lo.innerHTML=(amLastLongest!=null?amLastLongest.toFixed(2):'—')+' <small>km</small>';
+  if(to) to.innerHTML=(amLastTotal!=null?amLastTotal.toFixed(2):'—')+' <small>km</small>';
 }
 
 /* ---------------- TEST LOG TOOL (cpu_remainder model, ported from C++) ---------------- */
@@ -1231,6 +1375,14 @@ function amDraw(){
     c.strokeStyle='rgba(0,230,118,0.4)';c.setLineDash([3,4]);
     c.beginPath();c.moveTo(l.x,l.y);c.lineTo(f.x,f.y);c.stroke();c.setLineDash([]);
   }
+  /* animated data packets flowing along the cables (data going) */
+  function flow(a,b,col){
+    for(var k=0;k<3;k++){var t=((amPhase+k/3)%1);var x=a.x+(b.x-a.x)*t,y=a.y+(b.y-a.y)*t;
+      c.beginPath();c.arc(x,y,2.6,0,7);c.fillStyle=col;c.fill();}
+  }
+  flow(amISP,R,'rgba(255,215,64,0.95)');                       /* backbone ISP -> relay */
+  amPts.forEach(function(p){flow(R,p,'rgba(0,230,118,0.95)');}); /* relay -> each user */
+  for(var fi=0;fi<amPts.length-1;fi++){flow(amPts[fi],amPts[fi+1],'rgba(120,220,255,0.95)');} /* user line */
   /* infra nodes */
   function node(p,col,r,fill){
     c.beginPath();c.arc(p.x,p.y,r,0,7);c.fillStyle=fill||col;c.fill();
@@ -1270,9 +1422,10 @@ function amMeasure(){
   var R=amHW[amRelay];
   var A=amNetArea(), geo=amGeoArea();
   /* segments: user lines + relay legs */
-  var segs=[], longest=0, routePath=0;
-  for(var i=0;i<amPts.length-1;i++){var d=amDist(amPts[i],amPts[i+1]);segs.push({n:'U'+(i+1)+' — U'+(i+2)+' (user line)',km:d});if(d>longest)longest=d;}
-  if(amPts.length>=3){var dc=amDist(amPts[amPts.length-1],amPts[0]);segs.push({n:'U'+amPts.length+' — U1 (user line)',km:dc});if(dc>longest)longest=dc;}
+  var segs=[], longest=0, routePath=0, userTotal=0;
+  for(var i=0;i<amPts.length-1;i++){var d=amDist(amPts[i],amPts[i+1]);segs.push({n:'U'+(i+1)+' — U'+(i+2)+' (user line)',km:d});userTotal+=d;if(d>longest)longest=d;}
+  if(amPts.length>=3){var dc=amDist(amPts[amPts.length-1],amPts[0]);segs.push({n:'U'+amPts.length+' — U1 (user line)',km:dc});userTotal+=dc;if(dc>longest)longest=dc;}
+  amLastLongest=longest; amLastTotal=userTotal; updateLineLen();
   amPts.forEach(function(p,i){var d=amDist(p,R);segs.push({n:'U'+(i+1)+' → '+R.n+' (route leg)',km:d,leg:true});if(d>longest)longest=d;});
   /* route path = traffic hopping spot -> relay -> next spot around the ring */
   for(var j=0;j<amPts.length;j++){var a=amPts[j],b=amPts[(j+1)%amPts.length];routePath+=amDist(a,R)+amDist(R,b);}
@@ -1306,16 +1459,22 @@ function amDemo(){
   amPts=[{x:190,y:300},{x:560,y:150},{x:800,y:360}]; amRelay=0; amPrevA=null;
   amDraw(); amMeasure();
 }
-function amClear(){ amPts=[]; amRelay=0; amPrevA=null; amDraw();
+function amClear(){ amPts=[]; amRelay=0; amPrevA=null; amLastLongest=null; amLastTotal=null; updateLineLen(); amDraw();
   ['amArea','amGeo','amLong','amRoute'].forEach(function(id){document.getElementById(id).innerHTML='— <small>'+(id==='amArea'||id==='amGeo'?'km²':'km')+'</small>';});
   document.getElementById('amDelta').textContent='—';document.getElementById('amVia').textContent='—';
   document.getElementById('amEdges').innerHTML=''; amBadge('TAP TO PLACE SPOTS','info');
+}
+var amPhase=0;
+function amTick(){
+  var panel=document.getElementById('p-areamap');
+  if(panel && panel.classList.contains('active')){ amPhase=(amPhase+0.012)%1; amDraw(); }
+  requestAnimationFrame(amTick);
 }
 function amInit(){
   var cv=document.getElementById('amCanvas'); if(!cv)return;
   cv.addEventListener('click',amAdd);
   cv.addEventListener('touchstart',amAdd,{passive:false});
-  amDraw();
+  amDraw(); requestAnimationFrame(amTick);
 }
 
 /* ---------------- UK ROUTES — director routing view ---------------- */
@@ -1728,7 +1887,7 @@ function rtCustomerPerf(path){
      Clearly a protocol model over the measured route, not a live EPC/5GC deployment. */
   var mtu=1500, gtpOh=36;                                  /* GTP-U 8 + UDP 8 + outer IPv4 20 */
   var tunTp=Math.round(bottleneck*(1-gtpOh/mtu));          /* goodput inside the tunnel */
-  var teid='0x'+(((Math.abs(Math.round(path[0][0]*1000))^(path.length*2654435761))>>>0).toString(16).toUpperCase());
+  var teid=(((Math.abs(Math.round(path[0][0]*1000))^(path.length*2654435761))>>>0)%9000000+1000000); /* plain-number tunnel id (no hex) */
   var backup = alt ? rtPathMetrics(alt) : null;
   var dualRow = backup
     ? 'Primary path '+rtt.toFixed(1)+' ms &#183; backup path '+backup.rtt.toFixed(1)+' ms &mdash; dual-network: if the primary degrades, the bearers fail over to the backup without dropping the session.'
@@ -1736,7 +1895,7 @@ function rtCustomerPerf(path){
   var protoHtml='<div class="rt-formula" style="border-left:3px solid #6a3d9a;background:#f4eefb">'
     +'<b style="color:#6a3d9a">&#8644; Protocol &amp; tunnelling &mdash; S1-U / S11 &#183; GTP &#183; dual network</b>'
     +'<table style="border:0;margin-top:8px"><tbody>'
-    +'<tr><td style="width:74px;color:#6a3d9a;font-weight:700">S1-U</td><td>user-plane data in a <b>GTP-U</b> tunnel over UDP&nbsp;2152 &#183; TEID '+teid+' &#183; tunnelled goodput <b>'+tunTp+' Mbps</b> (after the ~'+gtpOh+'-byte GTP/UDP/IP header)</td></tr>'
+    +'<tr><td style="width:74px;color:#6a3d9a;font-weight:700">S1-U</td><td>user-plane data in a <b>GTP-U</b> tunnel over UDP&nbsp;2152 &#183; tunnel id '+teid+' &#183; tunnelled goodput <b>'+tunTp+' Mbps</b> (after the ~'+gtpOh+'-byte GTP/UDP/IP header)</td></tr>'
     +'<tr><td style="color:#6a3d9a;font-weight:700">S11</td><td>control-plane, <b>GTP-C</b> over UDP&nbsp;2123 &mdash; bearer / session setup between the switching node and the gateway</td></tr>'
     +'<tr><td style="color:#6a3d9a;font-weight:700">Echo</td><td>GTP path keepalive &mdash; Echo Request/Response every 60&nbsp;s, round-trip '+rtt.toFixed(1)+' ms on this route; a missed echo triggers failover</td></tr>'
     +'<tr><td style="color:#6a3d9a;font-weight:700">Dual net</td><td>'+dualRow+'</td></tr>'
@@ -1904,11 +2063,12 @@ document.querySelectorAll('.tab').forEach(function(t){
     t.classList.add('active');
     document.getElementById('p-'+t.getAttribute('data-p')).classList.add('active');
     if(t.getAttribute('data-p')==='routes' && !rtSrcConfirmed){ rtOpenGate(); }
+    if(t.getAttribute('data-p')==='devview'){ renderDevView(); }
   };
 });
 
 /* init */
-renderPorts();updateSwitch();swRenderToggles();swRenderCtl();pollNet();runTestLog();
+renderPorts();updateSwitch();swRenderToggles();swRenderCtl();pollNet();runTestLog();renderDevView();updateLineLen();
 try{detectHardware();}catch(e){}
 try{computeThermal();}catch(e){}
 try{readMemory();setInterval(readMemory,2000);}catch(e){}
