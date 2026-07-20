@@ -1,0 +1,13 @@
+{
+  "appId": "com.ai2orbit.ggw6",
+  "appName": "6GGW Router",
+  "webDir": "www",
+  "backgroundColor": "#0a0f0a",
+  "ios": {
+    "contentInset": "always",
+    "backgroundColor": "#0a0f0a"
+  },
+  "android": {
+    "backgroundColor": "#0a0f0a"
+  }
+}

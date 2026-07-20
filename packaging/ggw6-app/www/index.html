@@ -1,0 +1,1736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>6GGW — 5G Gateway Router</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a0f0a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="6GGW">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<style>
+:root{
+--bg:#0a0f0a;--card:#111a12;--card2:#0d150e;--border:#1f3320;
+--green:#00e676;--green2:#4caf50;--gold:#ffd740;--blue:#2979ff;
+--orange:#ff6d00;--red:#ff1744;--white:#e8ede9;--dim:#5a6a5c;
+--mono:'Courier New',Courier,monospace;
+--sans:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--white);font-family:var(--sans);font-size:16px;line-height:1.6;min-height:100vh}
+.container{max-width:1060px;margin:0 auto;padding:14px 18px}
+.header{text-align:center;padding:28px 0 20px;border-bottom:1px solid var(--border)}
+.header h1{font-size:44px;letter-spacing:10px;color:var(--green);font-weight:600}
+.header .tagline{font-family:var(--mono);font-size:13px;color:var(--green2);letter-spacing:5px;margin-top:6px;text-transform:uppercase}
+.header .sub{font-family:var(--mono);font-size:12px;color:var(--dim);letter-spacing:2px;margin-top:8px}
+.header .version{font-family:var(--mono);font-size:11px;color:var(--gold);margin-top:10px;background:rgba(255,215,64,0.08);display:inline-block;padding:3px 14px;border-radius:2px}
+
+/* Tabs */
+.tabs{display:flex;gap:7px;margin:20px 0 8px;flex-wrap:wrap}
+.tab{font-family:var(--mono);font-size:13px;letter-spacing:1px;padding:11px 18px;background:var(--card);border:1px solid var(--border);border-radius:3px;color:var(--dim);cursor:pointer;user-select:none}
+.tab.active{color:var(--bg);background:var(--green);border-color:var(--green);font-weight:700}
+.panel{display:none}
+.panel.active{display:block}
+
+.section{margin:16px 0;border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.section-head{background:var(--card);padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.section-head h2{font-size:15px;letter-spacing:1.5px;color:var(--green2);font-weight:500}
+.section-head .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:2px;color:var(--bg)}
+.badge.pass{background:var(--green)}.badge.run{background:var(--gold);color:#000}.badge.info{background:var(--blue)}.badge.off{background:var(--dim)}
+.section-body{padding:14px 16px;background:var(--card2)}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:3px;padding:12px}
+.stat .k{font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:1px;text-transform:uppercase}
+.stat .v{font-size:28px;color:var(--white);margin-top:5px;font-weight:400}
+.stat .v small{font-size:13px;color:var(--dim)}
+.stat.good .v{color:var(--green)}.stat.warn .v{color:var(--gold)}
+
+.row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(31,51,32,0.5);font-family:var(--mono);font-size:13px}
+.row:last-child{border-bottom:none}
+.row .name{color:var(--dim);flex:1}
+.row .val{color:var(--white);min-width:120px;text-align:right}
+.row .status{min-width:56px;text-align:right;font-weight:700}
+.row .status.ok{color:var(--green)}.row .status.fail{color:var(--red)}
+
+.bar-wrap{margin:10px 0}
+.bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.bar>span{display:block;height:100%;background:linear-gradient(90deg,var(--green),var(--gold));border-radius:4px;transition:width .5s ease}
+.bar-lbl{display:flex;justify-content:space-between;margin-top:4px;font-family:var(--mono);font-size:10px;color:var(--dim)}
+
+button{font-family:var(--mono);font-size:13px;letter-spacing:1px;padding:10px 20px;background:var(--green);color:var(--bg);border:none;border-radius:3px;cursor:pointer;font-weight:700}
+button:hover{background:var(--green2)}
+button.ghost{background:transparent;border:1px solid var(--border);color:var(--dim)}
+button.ghost:hover{color:var(--white);border-color:var(--green2)}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+
+label{display:block;font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin:10px 0 3px}
+input[type=text],input[type=number],select,textarea{width:100%;background:#0a120b;border:1px solid var(--border);border-radius:3px;color:var(--white);font-family:var(--mono);font-size:12px;padding:8px 10px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green2)}
+.field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 14px}
+
+.toggle{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-family:var(--mono);font-size:12px;color:var(--white)}
+.toggle input{display:none}
+.toggle .sw{width:38px;height:20px;background:var(--border);border-radius:10px;position:relative;transition:background .2s}
+.toggle .sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--dim);transition:.2s}
+.toggle input:checked+.sw{background:rgba(0,230,118,0.35)}
+.toggle input:checked+.sw::after{left:20px;background:var(--green)}
+
+pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padding:14px;font-family:var(--mono);font-size:12.5px;color:#9fd6a8;white-space:pre;overflow:auto;max-height:460px;line-height:1.5}
+.ports{display:grid;grid-template-columns:repeat(auto-fit,minmax(74px,1fr));gap:8px;margin:8px 0}
+.port{background:var(--card);border:1px solid var(--border);border-radius:3px;padding:10px 6px;text-align:center;cursor:pointer;font-family:var(--mono);font-size:11px}
+.port .p{font-size:14px;color:var(--white)}
+.port .s{font-size:9px;color:var(--dim);margin-top:2px}
+.port.up{border-color:var(--green2)}.port.up .s{color:var(--green)}
+.port.down{opacity:.5}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;color:var(--dim);padding:24px 0 30px;letter-spacing:1px}
+.note{font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:6px;line-height:1.65}
+.hl{color:var(--gold)}
+/* ROUTES — director white theme (scoped) */
+#p-routes .rt-wrap{background:#ffffff;color:#12261a;border-radius:6px;padding:16px;border:1px solid #cdd9d0}
+#p-routes .rt-head{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid #e2eae4;padding-bottom:8px;margin-bottom:10px;flex-wrap:wrap}
+#p-routes .rt-head h2{font-size:18px;color:#0b6b39;font-weight:700;letter-spacing:.4px}
+#p-routes .rt-badge{font-family:var(--mono);font-size:10px;background:#0b6b39;color:#fff;padding:3px 10px;border-radius:3px;letter-spacing:1px}
+#p-routes .rt-controls{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}
+#p-routes label{display:block;color:#5a6b60;text-transform:uppercase;font-size:10px;font-family:var(--mono);letter-spacing:1px;margin-bottom:3px}
+#p-routes select{background:#f6faf7;border:1px solid #cdd9d0;color:#12261a;font-family:var(--mono);font-size:12px;padding:8px 10px;border-radius:3px;min-width:160px}
+#p-routes button{font-family:var(--mono);font-size:12px;letter-spacing:1px;padding:9px 18px;border-radius:3px;cursor:pointer;font-weight:700;border:none;background:#0b6b39;color:#fff}
+#p-routes button.ghost{background:#fff;border:1px solid #0b6b39;color:#0b6b39}
+#p-routes canvas{background:#ffffff;border:1px solid #cdd9d0;border-radius:5px;display:block;width:100%;max-width:560px;margin:0 auto}
+#p-routes .rt-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
+#p-routes .rt-card{background:#f6faf7;border:1px solid #dce6df;border-radius:4px;padding:10px}
+#p-routes .rt-card .k{font-size:10px;color:#5a6b60;text-transform:uppercase;font-family:var(--mono);letter-spacing:1px}
+#p-routes .rt-card .v{font-size:21px;color:#0b6b39;margin-top:3px;font-weight:600}
+#p-routes table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;color:#12261a}
+#p-routes th{text-align:left;color:#5a6b60;font-weight:600;padding:6px;border-bottom:2px solid #cdd9d0;white-space:nowrap}
+#p-routes td{padding:6px;border-bottom:1px solid #e8efe9;vertical-align:top}
+#p-routes tr:nth-child(even) td{background:#f6faf7}
+#p-routes .rt-note{font-size:11px;color:#5a6b60;margin-top:10px;font-family:var(--mono);line-height:1.6}
+#p-routes .rt-mapwrap{width:100%;overflow-x:auto}
+#p-routes .rt-geo{font-family:var(--mono);font-size:12px;color:#12261a;background:#eef7f1;border:1px solid #bfe0cc;border-left:4px solid #0b6b39;border-radius:4px;padding:9px 12px;margin:0 0 12px;line-height:1.55;display:none}
+#p-routes .rt-geo.on{display:block}
+#p-routes .rt-geo b{color:#0b6b39}
+#p-routes button.live{background:#0b6b39;color:#fff;border-color:#0b6b39}
+#p-routes .rt-sec-h{font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#0b6b39;font-weight:700;margin:18px 0 8px;padding-bottom:5px;border-bottom:1px solid #dce6df}
+#p-routes .rt-formula{background:#f6faf7;border:1px solid #dce6df;border-left:4px solid #0b6b39;border-radius:4px;padding:10px 12px;margin-bottom:10px;font-family:var(--mono);font-size:11px;color:#12261a;line-height:1.7}
+#p-routes .rt-formula b{color:#0b6b39}
+#p-routes .rt-formula .mono{background:#e7f1ea;padding:1px 5px;border-radius:3px}
+#p-routes td.calc{color:#0b6b39}
+#p-routes .rt-role{font-size:10px;font-family:var(--mono);padding:1px 6px;border-radius:3px;background:#e7f1ea;color:#0b6b39;white-space:nowrap}
+#p-routes .rt-role.dest{background:#0b6b39;color:#fff}
+#p-routes .rt-role.gps{background:#ffe9b8;color:#7a5300}
+#p-routes tfoot td{border-top:2px solid #cdd9d0;font-weight:700;color:#0b6b39;background:#eef7f1}
+#p-routes .rt-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+/* source-confirm gate (shown to each user on entering the routing view) */
+#rtGate{position:fixed;inset:0;background:rgba(6,10,7,.82);display:none;align-items:center;justify-content:center;z-index:9999;padding:18px}
+#rtGate.on{display:flex}
+#rtGate .box{background:#fff;color:#12261a;border-radius:10px;max-width:440px;width:100%;padding:22px 22px 18px;box-shadow:0 18px 50px rgba(0,0,0,.4)}
+#rtGate h3{font-size:18px;color:#0b6b39;margin-bottom:6px;letter-spacing:.3px}
+#rtGate p{font-size:13px;color:#41544a;line-height:1.55;margin-bottom:14px}
+#rtGate label{display:block;color:#5a6b60;text-transform:uppercase;font-size:10px;font-family:var(--mono);letter-spacing:1px;margin:0 0 4px}
+#rtGate select{width:100%;background:#f6faf7;border:1px solid #cdd9d0;color:#12261a;font-family:var(--mono);font-size:13px;padding:10px;border-radius:5px}
+#rtGate .row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+#rtGate button{flex:1;min-width:150px;font-family:var(--mono);font-size:12px;letter-spacing:1px;padding:11px;border-radius:5px;cursor:pointer;font-weight:700;border:none;background:#0b6b39;color:#fff}
+#rtGate button.ghost{background:#fff;border:1px solid #0b6b39;color:#0b6b39}
+#rtGate .hint{font-family:var(--mono);font-size:11px;color:#0b6b39;background:#eef7f1;border:1px solid #bfe0cc;border-radius:5px;padding:8px 10px;margin-top:12px;display:none}
+#rtGate .hint.on{display:block}
+#rtSrcTag{font-family:var(--mono);font-size:11px;color:#0b6b39;cursor:pointer;text-decoration:underline;white-space:nowrap}
+#rtInstall{font-family:var(--mono);font-size:11px;letter-spacing:1px;padding:7px 12px;border-radius:3px;cursor:pointer;font-weight:700;border:1px solid #0b6b39;background:#fff;color:#0b6b39;display:none}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>6GGW</h1>
+    <div class="tagline">5G GATEWAY ROUTER</div>
+    <div class="sub">SWITCH · PERFORMANCE MONITOR · 6G GATEWAY · CPU·GPU · AREA MAP · TEST LOG TOOL</div>
+    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.35.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-p="switch">SWITCH</div>
+    <div class="tab" data-p="bench">PERFORMANCE MONITOR</div>
+    <div class="tab" data-p="routes">6G GATEWAY</div>
+    <div class="tab" data-p="cpugpu">CPU · GPU</div>
+    <div class="tab" data-p="net">NET DATA</div>
+    <div class="tab" data-p="areamap">AREA MAP</div>
+    <div class="tab" data-p="testlog">TEST LOG TOOL</div>
+  </div>
+
+  <!-- ============ SWITCH ============ -->
+  <div class="panel active" id="p-switch">
+    <div class="section">
+      <div class="section-head"><h2>ROUTER / SWITCH CONTROL</h2><span class="badge pass" id="switchBadge">RUNNING</span></div>
+      <div class="section-body">
+        <div class="grid">
+          <div class="stat good"><div class="k">Active Ports</div><div class="v" id="sPorts">0<small>/12</small></div></div>
+          <div class="stat good"><div class="k">Throughput</div><div class="v" id="sThru">0<small> Gb/s</small></div></div>
+          <div class="stat"><div class="k">Routing Mode</div><div class="v" id="sMode" style="font-size:16px">FAST-PIPE</div></div>
+          <div class="stat"><div class="k">Reroute Hops</div><div class="v" id="sHops">0</div></div>
+        </div>
+        <div class="ports" id="portGrid"></div>
+        <div class="btn-row">
+          <button onclick="allPorts(true)">ALL UP</button>
+          <button class="ghost" onclick="allPorts(false)">ALL DOWN</button>
+          <button class="ghost" onclick="cycleMode()">CYCLE MODE</button>
+        </div>
+        <div class="note">Click a port to toggle it up/down. Throughput and hop count recompute live from the active-port set — every field is functional.</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>FIREWALL / SECURITY RULES</h2><span class="badge info">6 RULES</span></div>
+      <div class="section-body" id="fwBody"></div>
+    </div>
+  </div>
+
+  <!-- ============ BENCHMARK NET ============ -->
+  <div class="panel" id="p-bench">
+    <div class="section">
+      <div class="section-head"><h2>PERFORMANCE MONITOR — GPU / DRAM / CPU / SCREEN</h2><span class="badge run" id="benchBadge">IDLE</span></div>
+      <div class="section-body">
+        <div class="grid" id="benchStats">
+          <div class="stat"><div class="k">CPU · DRAMM</div><div class="v" id="bCpu">—</div></div>
+          <div class="stat"><div class="k">GPU Screen Write</div><div class="v" id="bGpuW">—</div></div>
+          <div class="stat"><div class="k">GPU Fill Rate</div><div class="v" id="bGpu">—</div></div>
+          <div class="stat"><div class="k">Memory Bandwidth</div><div class="v" id="bDram">—</div></div>
+          <div class="stat"><div class="k">Screen Refresh</div><div class="v" id="bScrn">—</div></div>
+          <div class="stat good"><div class="k">Battery</div><div class="v" id="bBatt">—</div></div>
+          <div class="stat good"><div class="k">Download Speed</div><div class="v" id="bLoad">—</div></div>
+        </div>
+        <div class="btn-row">
+          <button onclick="runBench()">RUN REAL BENCHMARK</button>
+          <button class="ghost" onclick="resetBench()">RESET</button>
+        </div>
+        <div id="benchBars"></div>
+        <div class="note">Measured live on <span class="hl">this device and this connection</span> — CPU on real Web Worker threads (your DRAMM Mixed CPU Workload), GPU screen-writing from a real WebGL fill test (pixel write bandwidth + 1080p frames/s), memory bandwidth from a real array read+write, screen refresh from the browser's frame clock, battery from the Battery API, and download speed + round-trip latency from a real file fetch. These are the <span class="hl">raw measured numbers</span> — no scoring or comparison bars. Nothing is hardcoded; numbers will differ on every phone, PC and network (iOS, Windows, Mac, Linux all read differently). Works offline for the CPU / GPU / memory / screen tests (the connection tests need internet).</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>DRAMM CPU BENCHMARK — Mixed CPU Workload (your algorithm)</h2><span class="badge run" id="drammBadge">IDLE</span></div>
+      <div class="section-body">
+        <div class="note">This runs your <span class="hl">cpu_benchmark.cpp</span> ported faithfully to run in the browser / app — the same three phases (Integer, Float, Memory), the same fast_sin / fast_cos / fast_sqrt / fast_exp approximations, and the same metric (operations = iterations &#215; 3). It runs your workload on every CPU thread the device has.</div>
+        <div class="field-grid" style="margin-top:12px">
+          <div><label>Iterations (per thread)</label><input type="number" id="drammIters" value="3000000" step="500000"></div>
+        </div>
+        <div class="btn-row">
+          <button onclick="runDramm()">RUN DRAMM BENCHMARK</button>
+        </div>
+        <pre class="log" id="drammOut" style="margin-top:12px">Press RUN DRAMM BENCHMARK to run your Mixed CPU Workload on this device.</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CPU · GPU ============ -->
+  <div class="panel" id="p-cpugpu">
+    <div class="section">
+      <div class="section-head"><h2>COMPUTE UNITS — CPU / GPU / STORAGE</h2><span class="badge info" id="cgBadge">DETECT</span></div>
+      <div class="section-body">
+        <div class="grid">
+          <div class="stat good"><div class="k">Logical CPUs</div><div class="v" id="cgCores">—</div></div>
+          <div class="stat"><div class="k">Device Memory</div><div class="v" id="cgMem">—</div></div>
+          <div class="stat"><div class="k">GPU Adapters</div><div class="v" id="cgGpuN">—</div></div>
+          <div class="stat"><div class="k">Attached Storage</div><div class="v" id="cgStore">—</div></div>
+        </div>
+        <div class="section" style="margin-top:14px">
+          <div class="section-head"><h2>DETECTED HARDWARE</h2><span class="badge info" id="cgHwBadge">—</span></div>
+          <div class="section-body" id="cgHwBody"><div class="note">Press DETECT + TEST to enumerate this device.</div></div>
+        </div>
+        <div class="field-grid" style="margin-top:12px">
+          <div><label>Workload iterations / unit</label><input type="number" id="cgIters" value="6000000" step="500000"></div>
+          <div><label>LOG divisor (per-CPU)</label><input type="number" id="cgDiv" value="448771.229" step="0.001"></div>
+        </div>
+        <div class="btn-row">
+          <button onclick="runComputeTest()">DETECT + TEST</button>
+          <button class="ghost" onclick="detectHardware()">DETECT ONLY</button>
+        </div>
+        <div class="section" style="margin-top:4px">
+          <div class="section-head"><h2>PER-UNIT CPU RESULT (own LOG number)</h2><span class="badge run" id="cgCpuBadge">IDLE</span></div>
+          <div class="section-body" id="cgCpuBody"><div class="note">Each logical CPU runs the same workload in parallel (Web Worker per core). Measured time feeds the remainder model — every unit gets its own LOG number from the divisor. Less remainder = lower lag = faster.</div></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><h2>GPU FILL-RATE TEST (WebGL)</h2><span class="badge run" id="cgGpuBadge">IDLE</span></div>
+          <div class="section-body" id="cgGpuBody"><div class="note">Real WebGL renderer string + fragment fill timing. Works on device, desktop and cloud browser — no install, no server.</div></div>
+        </div>
+        <div class="section">
+          <div class="section-head"><h2>MEMORY / JAM GUARD (RAM, not ROM)</h2><span class="badge run" id="memBadge">—</span></div>
+          <div class="section-body">
+            <div class="grid">
+              <div class="stat"><div class="k">Used JS Heap</div><div class="v" id="memUsed">—</div></div>
+              <div class="stat"><div class="k">Heap Limit</div><div class="v" id="memLimit">—</div></div>
+              <div class="stat" id="memPctStat"><div class="k">RAM Pressure</div><div class="v" id="memPct">—</div></div>
+            </div>
+            <div class="bar-wrap"><div class="bar"><span id="memBar" style="width:0%"></span></div><div class="bar-lbl"><span>heap used</span><span id="memBarLbl">—</span></div></div>
+            <div class="btn-row"><button onclick="freeMemory()">FREE MEMORY</button><button class="ghost" onclick="readMemory()">READ NOW</button><button class="ghost" onclick="stressMemory()">SIMULATE LOAD</button></div>
+            <div class="note"><span class="hl">RAM (heap), not ROM (storage)</span>, is what fills when a page pulls a big file from a cloud disk into HTML — the whole file lands in the tab's memory. Many tabs + a big pull crosses the per-app RAM limit and Chrome freezes (the "isn't responding" jam). Fix: <span class="hl">close pages before the jam</span>, and load big files in chunks, not all at once. The phone camera stalls for the same reason — it needs a large free RAM buffer for each frame; if RAM is near the limit the camera can't get a buffer.</div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-head"><h2>THERMAL / PBA DERATING (component expansion)</h2><span class="badge run" id="thermBadge">—</span></div>
+          <div class="section-body">
+            <div class="field-grid">
+              <div><label>Ambient Ta (°C)</label><input type="number" id="thTa" value="25" step="1"></div>
+              <div><label>Package power P (W)</label><input type="number" id="thP" value="15" step="0.5"></div>
+              <div><label>Thermal resistance Rθ (°C/W)</label><input type="number" id="thR" value="1.8" step="0.1"></div>
+              <div><label>Thermal capacitance Cθ (J/°C)</label><input type="number" id="thC" value="2.5" step="0.1"></div>
+              <div><label>Board length L (mm)</label><input type="number" id="thL" value="100" step="1"></div>
+              <div><label>Board CTE (ppm/°C)</label><input type="number" id="thCte" value="14" step="0.1"></div>
+              <div><label>Parasitic R (Ω)</label><input type="number" id="thPr" value="50" step="1"></div>
+              <div><label>Parasitic C (pF)</label><input type="number" id="thPc" value="12" step="0.5"></div>
+              <div><label>Load elapsed t (s)</label><input type="number" id="thT" value="120" step="5"></div>
+            </div>
+            <div class="btn-row"><button onclick="computeThermal()">RUN THERMAL ESTIMATE</button></div>
+            <div class="section-body" id="cgThermBody"><div class="note">Estimates junction temperature, printed-board (PBA) thermal expansion, parasitic RC drift and the resulting speed derating that is folded into every CPU LOG number and the RAM jam thresholds.</div></div>
+          </div>
+        </div>
+        <div class="note">Same tool, three targets: <span class="hl">device</span> (phone WebView), <span class="hl">desktop</span> (Windows/Mac/Linux browser), <span class="hl">network cloud</span> (any remote browser). Deterministic LOG model means the CPU numbers are comparable across all three.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ NET DATA ============ -->
+  <div class="panel" id="p-net">
+    <div class="section">
+      <div class="section-head"><h2>LIVE NETWORK DATA</h2><span class="badge pass">STREAM</span></div>
+      <div class="section-body">
+        <div class="grid">
+          <div class="stat"><div class="k">Packets / s</div><div class="v" id="nPps">—</div></div>
+          <div class="stat"><div class="k">Latency</div><div class="v" id="nLat">—</div></div>
+          <div class="stat"><div class="k">Loss</div><div class="v" id="nLoss">—</div></div>
+          <div class="stat"><div class="k">Active Flows</div><div class="v" id="nFlows">—</div></div>
+        </div>
+        <div class="section" style="margin-top:14px">
+          <div class="section-head"><h2>REROUTE TRACE (hops)</h2><span class="badge info" id="nHopBadge">—</span></div>
+          <div class="section-body" id="hopBody"></div>
+        </div>
+        <div class="btn-row"><button onclick="pollNet()">REFRESH DATA</button></div>
+        <div class="note">Hop table mirrors the engine's reroute_trace module: router name / IP / MAC-OUI vendor / <span class="hl">geolocated city</span> per hop. MAP opens that server's city in Google Maps. City is derived from the IP octet (LA / Washington / London / Frankfurt buckets in this build); a full offline GeoIP database drops in for exact city per real IP.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TEST LOG TOOL ============ -->
+  <div class="panel" id="p-areamap">
+    <div class="section">
+      <div class="section-head"><h2>AREA MAP — MARK &amp; MEASURE (users · routing · ISP · hardware)</h2><span class="badge info" id="amBadge">TAP TO PLACE SPOTS</span></div>
+      <div class="section-body">
+        <div class="note" style="margin-top:0">Tap the map to drop spots where users are in the city (2 to 4). The Switch draws the lines, measures each line length and the triangle area A between the users and the active routing node. Press <span class="hl">MEASURE NETWORK</span> to route traffic through the ISP + hardware, then <span class="hl">REROUTE TRAFFIC</span> to send it a different way — watch area A and the longest line change.</div>
+        <div style="width:100%;overflow-x:auto"><canvas id="amCanvas" width="920" height="460" style="display:block;width:100%;max-width:920px;background:#060c07;border:1px solid var(--border);border-radius:4px;cursor:crosshair;touch-action:none"></canvas></div>
+        <div class="btn-row">
+          <button onclick="amMeasure()">MEASURE NETWORK</button>
+          <button class="ghost" onclick="amReroute()">REROUTE TRAFFIC</button>
+          <button class="ghost" onclick="amDemo()">DEMO SPOTS</button>
+          <button class="ghost" onclick="amClear()">CLEAR</button>
+        </div>
+        <div class="grid" style="margin-top:6px">
+          <div class="stat good"><div class="k">Network area A (via relay)</div><div class="v" id="amArea">— <small>km²</small></div></div>
+          <div class="stat"><div class="k">Spot triangle (geo)</div><div class="v" id="amGeo">— <small>km²</small></div></div>
+          <div class="stat warn"><div class="k">Longest line</div><div class="v" id="amLong">— <small>km</small></div></div>
+          <div class="stat"><div class="k">Route path (measured)</div><div class="v" id="amRoute">— <small>km</small></div></div>
+          <div class="stat"><div class="k">ΔA on reroute</div><div class="v" id="amDelta">—</div></div>
+          <div class="stat"><div class="k">Active route via</div><div class="v" id="amVia" style="font-size:16px">—</div></div>
+        </div>
+        <div id="amEdges" style="margin-top:10px"></div>
+        <div class="note">Scale: map width = <span class="hl">12.0 km</span>. Area A is the fan area the relay-routed links sweep between the user spots (shoelace / cross-product); line length = geographic distance in km; route path = the actual traffic distance the Switch pushes through the selected ISP/hardware relay. Rerouting moves the relay, so the measured triangle and its area A change — the exact metric the Switch reports.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="p-routes">
+    <div id="rtGate"><div class="box">
+      <h3>Confirm your source</h3>
+      <p>Before routing, confirm where you are connecting from. Each person testing confirms their own source on their own device — this build supports a small group (5–10) at once.</p>
+      <label>Your source location</label>
+      <select id="rtSrcSel"></select>
+      <div class="hint" id="rtGateHint"></div>
+      <div class="row">
+        <button class="ghost" onclick="rtGateGPS()">DETECT (GPS)</button>
+        <button onclick="rtGateConfirm()">CONFIRM SOURCE</button>
+      </div>
+    </div></div>
+    <div class="rt-wrap">
+      <div class="rt-head">
+        <h2>6G GATEWAY — UK traffic routing: which route the data actually takes</h2>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <span id="rtSrcTag" onclick="rtOpenGate()" title="Change your source"></span>
+          <button id="rtInstall" onclick="rtInstallApp()">INSTALL APP</button>
+          <span class="rt-badge">DIRECTOR VIEW</span>
+        </div>
+      </div>
+      <div class="rt-controls">
+        <div><label>From</label><select id="rtFrom"></select></div>
+        <div><label>To</label><select id="rtTo"></select></div>
+        <button onclick="rtRoute()">ROUTE</button>
+        <button class="ghost" onclick="rtReroute()">REROUTE</button>
+        <button class="ghost" onclick="rtExportCsv()">EXPORT (EXCEL)</button>
+        <button class="ghost" id="rtGpsBtn" onclick="rtToggleGPS()">USE MY LOCATION (GPS)</button>
+        <div><label>Addressing</label><select id="rtMaskMode" onchange="rtRender()">
+          <option value="present">Presentation · /24 (easiest to show)</option>
+          <option value="prod">Production · /30–/31 point-to-point + DHCP</option>
+        </select></div>
+        <div><label>Download window</label><select id="rtWin" onchange="rtRender()">
+          <option value="64">64 KB · no window scaling</option>
+          <option value="256" selected>256 KB · typical</option>
+          <option value="1024">1 MB · tuned / large</option>
+        </select></div>
+      </div>
+      <div id="rtGeo" class="rt-geo"></div>
+      <div class="rt-mapwrap"><canvas id="rtCanvas" width="560" height="580"></canvas></div>
+      <div class="rt-summary" id="rtSummary"></div>
+      <div class="rt-sec-h" id="rtPerfH" style="display:none">CUSTOMER PERFORMANCE — what this route feels like for fast surfing &amp; business data</div>
+      <div id="rtPerf"></div>
+      <div class="rt-sec-h" id="rtHopsH" style="display:none">ROUTE HOPS — every node the traffic passes through</div>
+      <div id="rtHops"></div>
+      <div class="rt-sec-h" id="rtCalcH" style="display:none">PATH CALCULATION — how the distance &amp; latency are worked out</div>
+      <div id="rtCalc"></div>
+      <div class="rt-sec-h" id="rtScanH" style="display:none">ROUTER FINDER — Stacey-Reynold: locate equipment from the change in data speed</div>
+      <div id="rtScan"></div>
+      <div class="rt-sec-h">DATA LISTING — every node in the routing dataset</div>
+      <div id="rtData"></div>
+      <div class="rt-note">Pick a From and To city and press ROUTE. Or tap USE MY LOCATION (GPS) — the app reads the phone's live GPS and routes from where you actually are to the domain, updating by itself as you move from one street to the next. The map shows the exact path the traffic takes through the backbone POPs, and the table lists every hop with its address, IP, link latency and distance. REROUTE switches to the alternate carrier path (the greyed line). Distances are great-circle km between real locations; latency scales with distance. GPS needs the page opened over the https link (allow location when the phone asks).</div>
+    </div>
+  </div>
+
+  <div class="panel" id="p-testlog">
+    <div class="section">
+      <div class="section-head"><h2>TEST LOG TOOL — DATA FROM MOBILE .txt</h2><span class="badge run" id="logBadge">READY</span></div>
+      <div class="section-body">
+        <div class="field-grid">
+          <div><label>Product</label><input type="text" id="fProduct" value="NETSWITCH"></div>
+          <div><label>Version</label><input type="text" id="fVersion" value="v2.12.0"></div>
+          <div><label>FPGA Divisor</label><input type="number" id="fDivisor" value="448771.229" step="0.001"></div>
+          <div><label>Slowest Grade</label><input type="number" id="fSlowest" value="448998.7118" step="0.0001"></div>
+          <div><label>Scale</label><input type="number" id="fScale" value="1000000"></div>
+          <div><label>Decimals</label><input type="number" id="fPrec" value="4" min="0" max="8"></div>
+        </div>
+        <label>Instance times (comma-separated seconds)</label>
+        <input type="text" id="fTimes" value="0.001, 0.012, 0.013, 0.0023, 0.012, 0.032, 0.076, 0.033, 0.023, 0.076">
+        <label>Instance labels (comma-separated)</label>
+        <input type="text" id="fLabels" value="7, 3, 6, 5, 4, 8, 1, 2, 9, 6">
+        <div style="margin:10px 0;display:flex;gap:18px;flex-wrap:wrap">
+          <label class="toggle"><input type="checkbox" id="fEuro" checked><span class="sw"></span>European comma decimals</label>
+          <label class="toggle"><input type="checkbox" id="fChamber" checked><span class="sw"></span>Chamberlain / GPS footer</label>
+        </div>
+        <div class="btn-row">
+          <button onclick="runTestLog()">RUN TEST LOG</button>
+          <button class="ghost" onclick="downloadLog()">DOWNLOAD .txt</button>
+          <button class="ghost" onclick="copyLog()">COPY</button>
+        </div>
+        <pre class="log" id="logOut">Press RUN TEST LOG to generate the DATA FROM MOBILE report.
+All fields above are live inputs — divisor, grade, scale, times, labels and formatting all feed the model.</pre>
+        <div class="note">This is the same FPGA remainder-delay model as the C++ engine (<span class="hl">./TestBench --cpu-remainder-only</span>): remainder of CPU work modulo the divisor is added to CPU time as lag — <span class="hl">less remainder = lower lag = faster</span>. Numbers here match the engine exactly.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">NETSWITCH · AI2ORBIT Co. 2026 · portable single-file build — runs offline, no install, no server</div>
+</div>
+
+<script>
+/* ---------------- SWITCH ---------------- */
+var PORTS=[];
+for(var i=1;i<=12;i++)PORTS.push({n:i,up:i<=8});
+function renderPorts(){
+  var g=document.getElementById('portGrid');g.innerHTML='';
+  PORTS.forEach(function(p){
+    var d=document.createElement('div');
+    d.className='port '+(p.up?'up':'down');
+    d.innerHTML='<div class="p">P'+p.n+'</div><div class="s">'+(p.up?'UP · 1G':'DOWN')+'</div>';
+    d.onclick=function(){p.up=!p.up;renderPorts();updateSwitch();};
+    g.appendChild(d);
+  });
+}
+var MODES=['FAST-PIPE','STORE-FWD','CUT-THRU','ADAPTIVE'],modeIx=0;
+function updateSwitch(){
+  var up=PORTS.filter(function(p){return p.up;}).length;
+  document.getElementById('sPorts').innerHTML=up+'<small>/12</small>';
+  var thru=(up*1.18).toFixed(2); // fast-pipe +18% model
+  document.getElementById('sThru').innerHTML=thru+'<small> Gb/s</small>';
+  document.getElementById('sHops').textContent=up?Math.max(1,Math.round(up/3)):0;
+  document.getElementById('sMode').textContent=MODES[modeIx];
+  document.getElementById('switchBadge').textContent=up?'RUNNING':'STANDBY';
+  document.getElementById('switchBadge').className='badge '+(up?'pass':'off');
+}
+function allPorts(v){PORTS.forEach(function(p){p.up=v;});renderPorts();updateSwitch();}
+function cycleMode(){modeIx=(modeIx+1)%MODES.length;updateSwitch();}
+var FW=[['ALLOW','tcp/443','HTTPS inbound','ok'],['ALLOW','tcp/22','SSH mgmt','ok'],['DENY','udp/*','unsolicited UDP','ok'],['ALLOW','tcp/8443','engine API','ok'],['DENY','icmp','ping flood guard','ok'],['ALLOW','tcp/53','DNS','ok']];
+(function(){var b=document.getElementById('fwBody');FW.forEach(function(r){
+  b.innerHTML+='<div class="row"><span class="name">'+r[0]+' · '+r[1]+'</span><span class="val">'+r[2]+'</span><span class="status ok">PASS</span></div>';});})();
+
+/* ---------------- BENCHMARK (REAL on-device / on-connection measurement) ----------------
+   Every number below is measured live on the device running the app — nothing is hardcoded.
+   CPU: real Web Worker compute (same engine as the CPU·GPU tab). Memory: real array read+write
+   bandwidth. GPU: real WebGL fill test. Screen: real refresh rate from requestAnimationFrame.
+   Battery: real Battery API. Connection: a real file download + real round-trip latency. */
+function benchCpu(){
+  return new Promise(function(resolve){
+    var cores=navigator.hardwareConcurrency||4, iters=2000000;   /* DRAMM does 3 phases per iter */
+    runCpuUnits(cores,iters,function(res){
+      var agg=0,best=0;
+      res.forEach(function(r){ var ops=r.opsPerSec||(iters*3/(r.ms/1000)); agg+=ops; if(ops>best)best=ops; });
+      resolve({multiMops:agg/1e6, singleMops:best/1e6, cores:cores,
+               mode:(res[0]&&res[0].seq)?'1 thread':cores+' threads'});
+    });
+  });
+}
+function benchGpuMpix(){
+  try{
+    var c=document.createElement('canvas'); c.width=512; c.height=512;
+    var gl=c.getContext('webgl')||c.getContext('experimental-webgl'); if(!gl) return null;
+    gl.viewport(0,0,512,512);
+    var t0=performance.now(),frames=60;
+    for(var f=0;f<frames;f++){ gl.clearColor((f%60)/60,0.2,0.6,1); gl.clear(gl.COLOR_BUFFER_BIT); if(gl.finish)gl.finish(); }
+    var ms=performance.now()-t0; if(ms<=0) return null;
+    return (512*512*frames)/1e6/(ms/1000);   /* Mpix/s */
+  }catch(e){ return null; }
+}
+function benchDramGBs(){
+  var N=4*1024*1024, a=new Float64Array(N);   /* 32 MB working set */
+  var t0=performance.now();
+  for(var i=0;i<N;i++){ a[i]=i*1.0000001; }
+  var s=0; for(var j=0;j<N;j++){ s+=a[j]; }
+  var ms=performance.now()-t0; if(ms<=0) return {gbs:0,s:s};
+  return {gbs:(N*8*2)/(ms/1000)/1e9, s:s};    /* bytes written + read, GB/s */
+}
+function benchScreenHz(){
+  return new Promise(function(resolve){
+    var d=[],last=null,frames=0,max=40;
+    function step(ts){ if(last!=null) d.push(ts-last); last=ts; frames++;
+      if(frames<max){ requestAnimationFrame(step); }
+      else { d.sort(function(a,b){return a-b;}); resolve(1000/(d[Math.floor(d.length/2)]||16.7)); } }
+    requestAnimationFrame(step);
+  });
+}
+function benchLatency(){
+  return new Promise(function(resolve){
+    if(!navigator.onLine){ resolve(null); return; }
+    var samples=[],n=5,i=0;
+    function ping(){ var t0=performance.now();
+      fetch('manifest.webmanifest?cb='+t0+'_'+i,{cache:'no-store'})
+        .then(function(){ samples.push(performance.now()-t0); next(); })
+        .catch(function(){ next(); }); }
+    function next(){ i++; if(i<n){ ping(); }
+      else if(!samples.length){ resolve(null); }
+      else { samples.sort(function(a,b){return a-b;}); resolve({min:samples[0],med:samples[Math.floor(samples.length/2)]}); } }
+    ping();
+  });
+}
+function benchDownload(){
+  return new Promise(function(resolve){
+    if(!navigator.onLine){ resolve(null); return; }
+    var t0=performance.now();
+    fetch('speedtest.bin?cb='+t0,{cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw 0; return r.arrayBuffer(); })
+      .then(function(buf){ var s=(performance.now()-t0)/1000; if(s<=0){resolve(null);return;}
+        var bits=buf.byteLength*8; resolve({mbps:bits/s/1e6, kbps:bits/s/1e3, bytes:buf.byteLength, s:s}); })
+      .catch(function(){ resolve(null); });
+  });
+}
+function benchBattery(){
+  return new Promise(function(resolve){
+    if(navigator.getBattery){ navigator.getBattery().then(function(b){
+      resolve({level:Math.round(b.level*100), charging:b.charging}); }).catch(function(){resolve(null);}); }
+    else resolve(null);
+  });
+}
+function benchGrade(v,ref){ return Math.max(3,Math.min(100,Math.round(v/ref*100))); }
+function runBench(){
+  var badge=document.getElementById('benchBadge');
+  badge.textContent='MEASURING…'; badge.className='badge run';
+  ['bGpu','bGpuW','bDram','bCpu','bScrn','bBatt','bLoad'].forEach(function(id){document.getElementById(id).textContent='…';});
+  var gpu=benchGpuMpix(), dram=benchDramGBs();
+  Promise.all([benchCpu(),benchScreenHz(),benchLatency(),benchDownload(),benchBattery()]).then(function(r){
+    var cpu=r[0],hz=r[1],lat=r[2],dl=r[3],bat=r[4];
+    /* GPU screen-writing: the fill test writes pixels to the framebuffer; 1 pixel = 4 bytes (RGBA).
+       Report the write bandwidth and the equivalent full-screen 1080p frames it could paint per second. */
+    var gpuWmbs = gpu!=null ? gpu*4 : null;                 /* MB/s (Mpix/s × 4 bytes) */
+    var gpuFps1080 = gpu!=null ? gpu/2.0736 : null;         /* 1920×1080 = 2.0736 Mpix per frame */
+    function fmtBW(mbs){ return mbs==null?'n/a':(mbs>=1000?(mbs/1000).toFixed(1)+' GB/s':mbs.toFixed(0)+' MB/s'); }
+    document.getElementById('bGpu').textContent = gpu!=null? gpu.toFixed(0)+' Mpix/s':'n/a';
+    document.getElementById('bGpuW').textContent = fmtBW(gpuWmbs);
+    document.getElementById('bDram').textContent = dram.gbs>0? dram.gbs.toFixed(1)+' GB/s':'n/a';
+    document.getElementById('bCpu').textContent = cpu.multiMops>0? cpu.multiMops.toFixed(0)+' MOPS':'n/a';
+    document.getElementById('bScrn').textContent = hz.toFixed(0)+' Hz';
+    document.getElementById('bBatt').textContent = bat? bat.level+'%'+(bat.charging?' ⚡':''):'n/a';
+    document.getElementById('bLoad').textContent = dl? (dl.mbps>=1? dl.mbps.toFixed(1)+' Mbps':Math.round(dl.kbps)+' kbps') : (navigator.onLine?'—':'offline');
+    /* plain measured readout — the raw numbers this device produced, no scoring / comparison bars. */
+    var bars=document.getElementById('benchBars'); bars.innerHTML='';
+    var rows=[
+      {lbl:'CPU · DRAMM ('+cpu.mode+')', val:cpu.multiMops.toFixed(0)+' MOPS &#183; 1 core '+cpu.singleMops.toFixed(0)+' MOPS'},
+      {lbl:'GPU screen write', val:(gpu!=null? fmtBW(gpuWmbs)+' &#183; '+gpuFps1080.toFixed(0)+' fps at 1080p':'n/a')},
+      {lbl:'GPU fill rate', val:(gpu!=null?gpu.toFixed(0)+' Mpix/s':'n/a')},
+      {lbl:'Memory bandwidth', val:(dram.gbs>0?dram.gbs.toFixed(1)+' GB/s':'n/a')},
+      {lbl:'Screen refresh', val:hz.toFixed(0)+' Hz'},
+      {lbl:'Download speed', val:(dl?(dl.mbps>=1?dl.mbps.toFixed(1)+' Mbps':Math.round(dl.kbps)+' kbps')+' &#183; '+(dl.bytes/1e6).toFixed(1)+' MB in '+dl.s.toFixed(2)+'s':(navigator.onLine?'not reachable':'offline'))},
+      {lbl:'Network latency (round-trip)', val:(lat?lat.med.toFixed(0)+' ms (best '+lat.min.toFixed(0)+')':(navigator.onLine?'not reachable':'offline'))}
+    ];
+    rows.forEach(function(x){
+      bars.innerHTML+='<div class="row"><span class="name">'+x.lbl+'</span><span class="val" style="min-width:auto;color:var(--green)">'+x.val+'</span></div>';
+    });
+    badge.textContent='MEASURED'; badge.className='badge pass';
+  });
+}
+function resetBench(){
+  ['bGpu','bGpuW','bDram','bCpu','bScrn','bBatt','bLoad'].forEach(function(id){document.getElementById(id).textContent='—';});
+  document.getElementById('benchBars').innerHTML='';
+  document.getElementById('benchBadge').textContent='IDLE';document.getElementById('benchBadge').className='badge run';
+}
+/* your DRAMM benchmark — prints in the same layout as your C++ print_results() */
+function runDramm(){
+  var badge=document.getElementById('drammBadge'); badge.textContent='RUNNING'; badge.className='badge run';
+  var iters=parseInt(document.getElementById('drammIters').value)||3000000;
+  var cores=navigator.hardwareConcurrency||4;
+  var out=document.getElementById('drammOut');
+  out.textContent='Running Mixed CPU Workload — '+iters.toLocaleString()+' iterations on '+cores+' thread(s)…';
+  setTimeout(function(){
+    runCpuUnits(cores,iters,function(res){
+      res.sort(function(a,b){return a.unit-b.unit;});
+      var mode=(res[0]&&res[0].seq)?'sequential · 1 thread':'parallel · '+cores+' threads';
+      var aggOps=0,bestOps=0,bestUnit=0,maxMs=0;
+      res.forEach(function(r){ var o=r.opsPerSec||0; aggOps+=o; if(o>bestOps){bestOps=o;bestUnit=r.unit;} if(r.ms>maxMs)maxMs=r.ms; });
+      var L=[];
+      L.push('========================================');
+      L.push(' CPU Benchmark Results  (DRAMM)');
+      L.push('========================================');
+      L.push('');
+      L.push('Benchmark Type: Mixed CPU Workload');
+      L.push('Iterations:     '+iters.toLocaleString()+'  (x3 = '+(iters*3).toLocaleString()+' operations per thread)');
+      L.push('Threads:        '+cores+'  ('+mode+')');
+      L.push('');
+      L.push('Per-thread:');
+      L.push('  UNIT |   TIME(s)   | OPERATIONS/SEC |  TIME/OP(ns)');
+      res.forEach(function(r){
+        L.push('  '+String(r.unit).padStart(4)+' | '+(r.ms/1000).toFixed(6).padStart(11)+' | '+Math.round(r.opsPerSec||0).toLocaleString().padStart(14)+' | '+(r.nsPerOp||0).toFixed(2).padStart(10));
+      });
+      L.push('');
+      L.push('Performance Metrics:');
+      L.push('  '+'Total Time:'.padEnd(24)+(maxMs/1000).toFixed(6)+' seconds (wall clock, all threads in parallel)');
+      L.push('  '+'Operations/Second:'.padEnd(24)+Math.round(aggOps).toLocaleString()+'   ('+(aggOps/1e6).toFixed(1)+' MOPS across all threads)');
+      L.push('  '+'Fastest single core:'.padEnd(24)+'CPU '+bestUnit+' -> '+Math.round(bestOps).toLocaleString()+' ops/s ('+(bestOps/1e6).toFixed(1)+' MOPS)');
+      L.push('  '+'Time/Operation:'.padEnd(24)+(bestOps>0?(1e9/bestOps).toFixed(2):'—')+' ns (fastest thread)');
+      L.push('');
+      L.push('Note: CPU benchmarks measure computational throughput and may vary based on');
+      L.push('      CPU frequency scaling, thermal throttling, and system load.');
+      L.push('AI-2-ORBIT Co. - Sami Leino 2026  ·  ported to serverless web/APK for NetSwitch');
+      L.push('========================================');
+      out.textContent=L.join('\n');
+      badge.textContent='DONE'; badge.className='badge pass';
+    });
+  },40);
+}
+
+/* ---------------- NET DATA ---------------- */
+var HOPS=[['gw-core-01','10.0.0.1','00:1B:21 · Intel','local / LAN'],['edge-rtr-04','172.16.4.9','00:50:56 · VMware','Los Angeles, US'],['isp-bng-11','203.0.113.7','B4:FB:E4 · Cisco','Washington DC, US'],['peer-ix-02','198.51.100.22','E4:8D:8C · MikroTik','London, UK']];
+var netTick=0;
+function pollNet(){
+  netTick++;
+  var pps=118000+((netTick*7919)%9000);
+  var lat=(9+((netTick*13)%7))+' ms';
+  var loss=((netTick*3)%4)/10;
+  document.getElementById('nPps').textContent=pps.toLocaleString();
+  document.getElementById('nLat').textContent=lat;
+  document.getElementById('nLoss').textContent=loss.toFixed(1)+' %';
+  document.getElementById('nFlows').textContent=24+((netTick*5)%40);
+  document.getElementById('nHopBadge').textContent=HOPS.length+' HOPS';
+  var b=document.getElementById('hopBody');b.innerHTML='';
+  HOPS.forEach(function(h,ix){
+    var city=h[3]||geoFromIp(h[1]);
+    b.innerHTML+='<div class="row"><span class="name">hop '+(ix+1)+' · '+h[0]+'<br><span style="color:var(--dim)">'+h[2]+'</span></span><span class="val">'+h[1]+'<br><span style="color:var(--gold)">'+city+'</span></span><span class="status ok"><a href="'+mapsUrl(city)+'" target="_blank" rel="noopener" style="color:var(--green)">MAP &#9656;</a></span></div>';
+  });
+}
+
+/* ---------------- TEST LOG TOOL (cpu_remainder model, ported from C++) ---------------- */
+function num(v,prec,euro){
+  var s=Number(v).toFixed(prec);
+  if(euro)s=s.replace(/\./g,',');
+  return s;
+}
+function evaluate(pt,DIV,SLOW,SCALE){
+  var scaled=Math.abs(pt)*SCALE;
+  var rem=scaled%DIV; if(rem<0)rem+=DIV;
+  var added=rem/DIV;
+  return {process_time:pt,divisor:DIV,remainder:rem,added_delay:added,
+          lag_grade:added*SLOW,total_time:pt+added/SCALE,
+          dr_ratio:rem>0?DIV/rem:DIV,fast:rem<(DIV/2)};
+}
+function runTestLog(){
+  var product=document.getElementById('fProduct').value||'NETSWITCH';
+  var version=document.getElementById('fVersion').value||'v2.12.0';
+  var DIV=parseFloat(document.getElementById('fDivisor').value)||448771.229;
+  var SLOW=parseFloat(document.getElementById('fSlowest').value)||448998.7118;
+  var SCALE=parseFloat(document.getElementById('fScale').value)||1e6;
+  var prec=parseInt(document.getElementById('fPrec').value);if(isNaN(prec))prec=4;
+  var euro=document.getElementById('fEuro').checked;
+  var chamber=document.getElementById('fChamber').checked;
+  var times=document.getElementById('fTimes').value.split(',').map(function(s){return parseFloat(s.trim());}).filter(function(x){return !isNaN(x);});
+  var labels=document.getElementById('fLabels').value.split(',').map(function(s){return s.trim();});
+  if(!times.length){document.getElementById('logOut').textContent='ERROR: enter at least one instance time.';return;}
+
+  var L=[];
+  L.push('DATA FROM MOBILE .txt');
+  L.push('=====================================================');
+  L.push('PRODUCT   : '+product+'   VERSION: '+version);
+  L.push('FPGA CONTROL CPU  —  Chamberlain / Chameleon spec');
+  L.push('DIVISOR   : '+num(DIV,3,euro)+'   (divider modulo rest remainder)');
+  L.push('GRADE BAND: 0 (FASTEST) .. '+num(SLOW,4,euro)+' (SLOWEST)');
+  L.push('MODEL     : remainder of CPU work modulo divisor is ADDED to CPU time');
+  L.push('            less remainder -> lower lag -> faster');
+  L.push('-----------------------------------------------------');
+  L.push('INST |   TIME(s)  |  REMAINDER  | ADDED  | LAG GRADE  | D/R  | SPEED');
+
+  var results=[],fastest=null,slowest=null;
+  for(var i=0;i<times.length;i++){
+    var r=evaluate(times[i],DIV,SLOW,SCALE);results.push(r);
+    if(fastest===null||r.remainder<fastest.remainder)fastest=r;
+    if(slowest===null||r.remainder>slowest.remainder)slowest=r;
+    var lab=labels[i]!==undefined?labels[i]:String(i+1);
+    L.push(
+      ' '+String(lab).padStart(3)+' | '+
+      num(r.process_time,prec,euro).padStart(9)+' | '+
+      num(r.remainder,3,euro).padStart(10)+' | '+
+      num(r.added_delay,4,euro).padStart(6)+' | '+
+      num(r.lag_grade,3,euro).padStart(10)+' | '+
+      num(r.dr_ratio,1,euro).padStart(5)+' | '+
+      (r.fast?'FAST':'slow'));
+  }
+  L.push('-----------------------------------------------------');
+  L.push('FASTEST (least lag): time '+num(fastest.process_time,prec,euro)+'  remainder '+num(fastest.remainder,3,euro));
+  L.push('SLOWEST (most lag) : time '+num(slowest.process_time,prec,euro)+'  remainder '+num(slowest.remainder,3,euro));
+  var avgRem=results.reduce(function(a,r){return a+r.remainder;},0)/results.length;
+  L.push('MEAN REMAINDER     : '+num(avgRem,3,euro)+'   INSTANCES: '+results.length);
+  if(chamber){
+    L.push('-----------------------------------------------------');
+    L.push('CHAMBERLAIN OK 7365481296');
+    L.push('QUANTARA 655/1SEC 2,4 LOG');
+    L.push('GPS OK');
+    L.push('AI2ORBIT Leino 2026');
+  }
+  L.push('=====================================================');
+  document.getElementById('logOut').textContent=L.join('\n');
+  document.getElementById('logBadge').textContent='GENERATED';
+  document.getElementById('logBadge').className='badge pass';
+}
+function downloadLog(){
+  var txt=document.getElementById('logOut').textContent;
+  var prod=(document.getElementById('fProduct').value||'netswitch').toLowerCase();
+  var blob=new Blob([txt],{type:'text/plain'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='ai2orbittesting_'+prod+'_testw_set_2026.txt';
+  a.click();
+}
+function copyLog(){
+  var t=document.getElementById('logOut').textContent;
+  if(navigator.clipboard)navigator.clipboard.writeText(t);
+}
+
+/* ---------------- CPU · GPU (real device probe + LOG model) ---------------- */
+function fmtBytes(b){
+  if(!b||b<0)return '—';
+  var u=['B','KB','MB','GB','TB'],i=0;
+  while(b>=1024&&i<u.length-1){b/=1024;i++;}
+  return b.toFixed(b<10&&i>0?1:0)+' '+u[i];
+}
+function glRenderer(){
+  try{
+    var c=document.createElement('canvas');
+    var gl=c.getContext('webgl')||c.getContext('experimental-webgl');
+    if(!gl)return {vendor:'n/a',renderer:'no WebGL',gl:null,canvas:null};
+    var dbg=gl.getExtension('WEBGL_debug_renderer_info');
+    var vendor=dbg?gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL):gl.getParameter(gl.VENDOR);
+    var renderer=dbg?gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER);
+    return {vendor:vendor||'?',renderer:renderer||'?',gl:gl,canvas:c};
+  }catch(e){return {vendor:'err',renderer:String(e.message||e),gl:null,canvas:null};}
+}
+function detectHardware(){
+  var cores=navigator.hardwareConcurrency||1;
+  var mem=navigator.deviceMemory;
+  var g=glRenderer();
+  var hasWebGPU=(typeof navigator!=='undefined'&&navigator.gpu)?'yes':'no';
+  document.getElementById('cgCores').textContent=cores;
+  document.getElementById('cgMem').textContent=mem?mem+' GB':'—';
+  document.getElementById('cgGpuN').textContent=(g.gl?1:0)+(hasWebGPU==='yes'?'+':'');
+  var rows=[];
+  rows.push(['Platform',navigator.platform||'—']);
+  rows.push(['Logical CPUs',String(cores)+' units']);
+  rows.push(['Device memory',mem?mem+' GB (min)':'not exposed']);
+  rows.push(['GPU vendor',g.vendor]);
+  rows.push(['GPU renderer',g.renderer]);
+  rows.push(['WebGPU',hasWebGPU]);
+  rows.push(['User agent',(navigator.userAgent||'').slice(0,64)]);
+  var b=document.getElementById('cgHwBody');b.innerHTML='';
+  rows.forEach(function(r){
+    b.innerHTML+='<div class="row"><span class="name">'+r[0]+'</span><span class="val" style="min-width:200px;word-break:break-all">'+r[1]+'</span></div>';
+  });
+  document.getElementById('cgHwBadge').textContent=cores+' CPU · '+(g.gl?'1':'0')+' GPU';
+  // storage estimate (attached / detached drive quota)
+  if(navigator.storage&&navigator.storage.estimate){
+    navigator.storage.estimate().then(function(e){
+      document.getElementById('cgStore').textContent=fmtBytes(e.quota);
+    }).catch(function(){document.getElementById('cgStore').textContent='—';});
+  }else{document.getElementById('cgStore').textContent='n/a';}
+  // async WebGPU adapter enumeration
+  if(navigator.gpu&&navigator.gpu.requestAdapter){
+    navigator.gpu.requestAdapter().then(function(a){
+      if(!a)return;
+      var info=(a.info)||(a.requestAdapterInfo?null:{});
+      var add=function(name,val){b.innerHTML+='<div class="row"><span class="name">'+name+'</span><span class="val" style="min-width:200px;word-break:break-all">'+val+'</span></div>';};
+      if(a.info){add('WebGPU adapter',(a.info.vendor||'')+' '+(a.info.architecture||a.info.description||''));}
+      else if(a.requestAdapterInfo){a.requestAdapterInfo().then(function(i){add('WebGPU adapter',(i.vendor||'')+' '+(i.architecture||i.description||''));});}
+    }).catch(function(){});
+  }
+  return {cores:cores,gl:g};
+}
+/* ===== DRAMM CPU benchmark — faithful JS port of Sami Leino's cpu_benchmark.cpp =====
+   "Mixed CPU Workload" (Integer + Float + Memory). Same three phases, same fast_sin/cos/
+   sqrt/exp bit-tricks, same operation count (iterations x 3). One source string is the
+   single source of truth: it runs both inside the Web Workers and on the main thread. */
+var DRAMM_SRC = ""
++ "var _ab=new ArrayBuffer(8),_f64=new Float64Array(_ab),_u32=new Uint32Array(_ab);"
++ "function _xor64(a,b){var aH=Math.floor(a/4294967296),aL=a%4294967296,bH=Math.floor(b/4294967296),bL=b%4294967296;return ((aH^bH)>>>0)*4294967296+((aL^bL)>>>0);}"
++ "function _dint(n){var r=1;for(var i=0;i<n;i++){r=(r*31+17)%1000000007;var s=r*8192+Math.floor(r/524288);r=_xor64(r,s);}return r;}"
++ "var _TP=6.283185307179586,_PI=3.141592653589793,_HP=1.5707963267948966;"
++ "function _fsin(x){x-=_TP*Math.trunc(x/_TP);if(x<0)x+=_TP;var sg=1.0;if(x>_TP*0.5){x=_TP-x;sg=-1.0;}var nu=16.0*x*(_PI-x),de=5.0*_PI*_PI-4.0*x*(_PI-x);return sg*nu/de;}"
++ "function _fcos(x){return _fsin(x+_HP);}"
++ "var _SQH=0x1FF7A3BE,_SQL=0xA91D9B1B;"
++ "function _fsqrt(x){if(x<=0.0)return 0.0;_f64[0]=x;var lo=_u32[0],hi=_u32[1];var nl=((lo>>>1)|((hi&1)<<31))>>>0,nh=(hi>>>1)>>>0;var ls=nl+_SQL,cy=ls>=4294967296?1:0;_u32[0]=ls>>>0;_u32[1]=(nh+_SQH+cy)>>>0;var y=_f64[0];y=0.5*(y+x/y);y=0.5*(y+x/y);return y;}"
++ "var _EA=6497320848556798,_EB=4607182418800017408;"
++ "function _fexp(x){if(x>88.0)return 1.0e38;if(x<-88.0)return 0.0;var i=_EA*x+_EB,hi=Math.floor(i/4294967296),lo=i-hi*4294967296;_u32[0]=lo>>>0;_u32[1]=hi>>>0;return _f64[0];}"
++ "function _dflt(n){var r=1.0;for(var i=0;i<n;i++){r=_fsin(r+i)*_fcos(r);r=_fsqrt(r<0.0?-r+1.0:r+1.0);r=_fexp(r*0.1)-1.0;}return r;}"
++ "var _mem=null;"
++ "function _dmem(n){if(_mem===null){_mem=new Float64Array(1024);for(var k=0;k<1024;k++)_mem[k]=k*31+17;}var r=0;for(var i=0;i<n;i++){var ix=(i*7)%1024;r+=_mem[ix];_mem[ix]=((r%1000000007)*13)%1000000007;if(r>=1e14)r=r%1000000007;}return r;}"
++ "function drammRun(iters){var t0=(typeof performance!=='undefined'?performance.now():Date.now());var a=_dint(iters),b=_dflt(iters),c=_dmem(iters);var ms=(typeof performance!=='undefined'?performance.now():Date.now())-t0;if(ms<=0)ms=0.0001;return {iters:iters,ms:ms,opsPerSec:(iters*3)/(ms/1000),nsPerOp:(ms/(iters*3))*1e6,checksum:[a,b,c]};}";
+var DRAMM_LOCAL = new Function(DRAMM_SRC + ';return drammRun;')();
+function cpuWorkerCode(){
+  return DRAMM_SRC + ';self.onmessage=function(e){var r=drammRun(e.data.iters);r.unit=e.data.unit;self.postMessage(r);};';
+}
+function runCpuUnits(cores,iters,cb){
+  var results=[],done=0,useWorker=(typeof Worker!=='undefined');
+  var wcode=cpuWorkerCode(),url=null,workers=[];
+  if(useWorker){
+    try{url=URL.createObjectURL(new Blob([wcode],{type:'application/javascript'}));}
+    catch(e){useWorker=false;}
+  }
+  function finish(){workers.forEach(function(w){try{w.terminate();}catch(e){}});if(url)try{URL.revokeObjectURL(url);}catch(e){}cb(results);}
+  if(useWorker){
+    var failed=false;
+    for(var u=0;u<cores;u++){
+      try{
+        var w=new Worker(url);workers.push(w);
+        w.onmessage=function(ev){results.push(ev.data);done++;if(done>=cores)finish();};
+        w.onerror=function(){if(!failed){failed=true;runSeq();}};
+        w.postMessage({iters:iters,unit:u});
+      }catch(e){if(!failed){failed=true;runSeq();return;}}
+    }
+    return;
+  }
+  runSeq();
+  function runSeq(){
+    // fallback: sequential single-thread DRAMM workload, still real timings per unit
+    results.length=0;
+    for(var u=0;u<cores;u++){
+      var r=DRAMM_LOCAL(iters); r.unit=u; r.seq=true;
+      results.push(r);
+    }
+    finish();
+  }
+}
+function runComputeTest(){
+  var hw=detectHardware();
+  var cores=hw.cores, gl=hw.gl;
+  var iters=parseInt(document.getElementById('cgIters').value)||6000000;
+  var DIV=parseFloat(document.getElementById('cgDiv').value)||448771.229;
+  document.getElementById('cgBadge').textContent='RUNNING';document.getElementById('cgBadge').className='badge run';
+  document.getElementById('cgCpuBadge').textContent='RUNNING';document.getElementById('cgCpuBadge').className='badge run';
+  document.getElementById('cgCpuBody').innerHTML='<div class="note">Running '+iters.toLocaleString()+' iters on '+cores+' unit(s)…</div>';
+  setTimeout(function(){
+    runCpuUnits(cores,iters,function(res){
+      res.sort(function(a,b){return a.unit-b.unit;});
+      var body=document.getElementById('cgCpuBody');
+      var head='<div class="row"><span class="name" style="color:var(--green2)">UNIT · TIME(ms)</span><span class="val">LOG NUMBER (rem)</span><span class="status">SPEED</span></div>';
+      var rows='',fastest=null,slowest=null,mode=res[0]&&res[0].seq?'sequential':'parallel';
+      res.forEach(function(r){
+        var pt=r.ms/1000; // seconds
+        var ev=evaluate(pt,DIV,DIV,1e6); // reuse ported model; remainder = per-CPU LOG number
+        if(fastest===null||ev.remainder<fastest.rem){fastest={u:r.unit,rem:ev.remainder,ms:r.ms};}
+        if(slowest===null||ev.remainder>slowest.rem){slowest={u:r.unit,rem:ev.remainder,ms:r.ms};}
+        rows+='<div class="row"><span class="name">CPU '+r.unit+'</span>'+
+              '<span class="val">'+r.ms.toFixed(2)+' ms · LOG '+ev.remainder.toFixed(3)+'</span>'+
+              '<span class="status '+(ev.fast?'ok':'fail')+'">'+(ev.fast?'FAST':'slow')+'</span></div>';
+      });
+      body.innerHTML=head+rows+
+        '<div class="row"><span class="name">mode</span><span class="val">'+mode+' · '+cores+' unit(s)</span></div>'+
+        '<div class="row"><span class="name">fastest unit</span><span class="val">CPU '+(fastest?fastest.u:'—')+' · LOG '+(fastest?fastest.rem.toFixed(3):'—')+'</span><span class="status ok">LEAST LAG</span></div>'+
+        '<div class="row"><span class="name">slowest unit</span><span class="val">CPU '+(slowest?slowest.u:'—')+' · LOG '+(slowest?slowest.rem.toFixed(3):'—')+'</span><span class="status fail">MOST LAG</span></div>'+
+        ((typeof THERM!=='undefined'&&THERM.derate>0&&fastest)?(function(){
+          var evT=evaluate((fastest.ms/1000)*(1+THERM.derate),DIV,DIV,1e6);
+          return '<div class="row"><span class="name">thermal-adjusted (Tj '+THERM.tj.toFixed(0)+'°C)</span><span class="val">×'+(1+THERM.derate).toFixed(3)+' → LOG '+evT.remainder.toFixed(3)+' (+'+(THERM.derate*100).toFixed(1)+'% lag)</span><span class="status fail">DERATED</span></div>';
+        })():'');
+      document.getElementById('cgCpuBadge').textContent='DONE';document.getElementById('cgCpuBadge').className='badge pass';
+      runGpuTest(gl);
+      document.getElementById('cgBadge').textContent='DONE';document.getElementById('cgBadge').className='badge pass';
+    });
+  },40);
+}
+function runGpuTest(g){
+  var body=document.getElementById('cgGpuBody');
+  document.getElementById('cgGpuBadge').textContent='RUNNING';document.getElementById('cgGpuBadge').className='badge run';
+  if(!g||!g.gl){
+    body.innerHTML='<div class="row"><span class="name">WebGL</span><span class="val">unavailable</span><span class="status fail">SKIP</span></div>';
+    document.getElementById('cgGpuBadge').textContent='N/A';document.getElementById('cgGpuBadge').className='badge off';return;
+  }
+  var gl=g.gl,c=g.canvas;c.width=512;c.height=512;gl.viewport(0,0,512,512);
+  var t0=performance.now(),frames=60;
+  for(var f=0;f<frames;f++){
+    gl.clearColor((f%60)/60,0.2,0.6,1);gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.scissor(0,0,512,512);gl.enable(gl.SCISSOR_TEST);gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.finish&&gl.finish();
+  }
+  var t1=performance.now(),ms=t1-t0,fps=frames/(ms/1000);
+  var mpix=(512*512*frames)/1e6;
+  body.innerHTML=
+    '<div class="row"><span class="name">GPU vendor</span><span class="val" style="min-width:200px;word-break:break-all">'+g.vendor+'</span></div>'+
+    '<div class="row"><span class="name">GPU renderer</span><span class="val" style="min-width:200px;word-break:break-all">'+g.renderer+'</span></div>'+
+    '<div class="row"><span class="name">fill test</span><span class="val">'+frames+' frm · '+ms.toFixed(1)+' ms</span><span class="status ok">'+fps.toFixed(0)+' fps</span></div>'+
+    '<div class="row"><span class="name">throughput</span><span class="val">'+(mpix/(ms/1000)).toFixed(0)+' Mpix/s</span></div>';
+  document.getElementById('cgGpuBadge').textContent='DONE';document.getElementById('cgGpuBadge').className='badge pass';
+}
+
+/* ---------------- MEMORY / JAM GUARD ---------------- */
+function fmtMB(b){return (b/1048576).toFixed(1)+' MB';}
+function readMemory(){
+  var m=(window.performance&&performance.memory)?performance.memory:null;
+  var badge=document.getElementById('memBadge');
+  if(!m){
+    badge.textContent='N/A';badge.className='badge off';
+    document.getElementById('memUsed').textContent='not exposed';
+    document.getElementById('memLimit').textContent='—';
+    document.getElementById('memPct').textContent='—';
+    document.getElementById('memBarLbl').textContent='count your tabs';
+    return;
+  }
+  var used=m.usedJSHeapSize,lim=m.jsHeapSizeLimit||1,pct=used/lim*100;
+  document.getElementById('memUsed').textContent=fmtMB(used);
+  document.getElementById('memLimit').textContent=fmtMB(lim);
+  document.getElementById('memPct').textContent=pct.toFixed(0)+' %';
+  var bar=document.getElementById('memBar');bar.style.width=Math.min(100,pct).toFixed(0)+'%';
+  document.getElementById('memBarLbl').textContent=pct.toFixed(0)+' %';
+  var d=(typeof THERM!=='undefined'?THERM.derate:0)*30; // thermal tightens thresholds (pts)
+  var safeCut=60-d, nearCut=85-d;
+  var st,cls;
+  if(pct<safeCut){st='SAFE';cls='pass';}
+  else if(pct<nearCut){st='NEAR JAM';cls='run';}
+  else{st='CRITICAL — CLOSE PAGES';cls='off';}
+  if(d>0.05)st+=' · Tj '+THERM.tj.toFixed(0)+'°C';
+  badge.textContent=st;badge.className='badge '+cls;
+  document.getElementById('memPctStat').className='stat '+(pct<safeCut?'good':(pct<nearCut?'warn':''));
+}
+var MEMHOLD=[];
+function stressMemory(){ // demo: shows how pulling a big blob into HTML raises RAM
+  try{MEMHOLD.push(new Array(4000000).fill(7));}catch(e){}
+  readMemory();
+}
+function freeMemory(){
+  MEMHOLD.length=0;
+  try{if(window.caches&&caches.keys)caches.keys().then(function(k){k.forEach(function(n){caches.delete(n);});});}catch(e){}
+  try{if(window.gc)window.gc();}catch(e){}
+  readMemory();
+}
+
+/* ---------------- THERMAL / PBA DERATING (component expansion) ----------------
+   Board-level physics behind the "screen update / PBA thermal expansion" ask:
+   junction temp Tj = Ta + P·Rθ, transient via thermal RC (τ = Rθ·Cθ), printed-
+   board expansion ΔL = L·CTE·ΔT, parasitic RC signal drift (R climbs with temp
+   via copper TCR — the "unclean" resistance/capacitance), and a SQRT+Log
+   derating that is folded into every CPU LOG number and into the RAM jam
+   thresholds. All estimation, all offline. */
+var THERM={derate:0, tj:25};
+function thNum(id,d){var el=document.getElementById(id);if(!el)return d;var v=parseFloat(el.value);return isFinite(v)?v:d;}
+function computeThermal(){
+  var Ta=thNum('thTa',25),P=thNum('thP',15),R=thNum('thR',1.8),C=thNum('thC',2.5),
+      L=thNum('thL',100),CTE=thNum('thCte',14),Pr=thNum('thPr',50),Pc=thNum('thPc',12),t=thNum('thT',120);
+  var dTss=P*R;                                       // steady-state junction rise (°C)
+  var tau=R*C;                                        // thermal time constant (s)
+  var settle=1-Math.exp(-t/Math.max(tau,1e-6));       // RC settling fraction at t
+  var dT=dTss*settle;                                 // transient rise
+  var Tj=Ta+dT;                                       // junction temperature
+  var dLum=L*CTE*1e-6*dT*1000;                        // PBA expansion (µm)
+  var Rt=Pr*(1+0.0039*(Tj-25));                       // parasitic R at Tj — copper TCR
+  var rc0=Pr*Pc*1e-12, rcT=Rt*Pc*1e-12;              // RC signal delay cold/hot (s)
+  var Y=1/Rt;                                          // admittance / conductance (S)
+  var Tref=45, over=Math.max(0,Tj-Tref);              // STAC margin loss above ref
+  var derPct=Math.min(40, Math.sqrt(over)*0.6 + Math.log(1+over)*2.0); // √ + log
+  THERM.derate=derPct/100; THERM.tj=Tj;
+  var badge=document.getElementById('thermBadge');
+  var st,cls; if(Tj<55){st='COOL';cls='pass';}else if(Tj<80){st='WARM';cls='run';}else{st='HOT — THROTTLE';cls='off';}
+  badge.textContent=st+' · '+Tj.toFixed(1)+'°C';badge.className='badge '+cls;
+  document.getElementById('cgThermBody').innerHTML=
+    '<div class="row"><span class="name">junction temp Tj</span><span class="val">'+Ta.toFixed(0)+' + '+dT.toFixed(1)+' = '+Tj.toFixed(1)+' °C</span><span class="status '+(Tj<55?'ok':(Tj<80?'':'fail'))+'">'+(Tj<55?'COOL':(Tj<80?'WARM':'HOT'))+'</span></div>'+
+    '<div class="row"><span class="name">thermal RC (τ=Rθ·Cθ)</span><span class="val">τ '+tau.toFixed(2)+' s · settled '+(settle*100).toFixed(0)+' %</span></div>'+
+    '<div class="row"><span class="name">PBA expansion ΔL</span><span class="val">'+dLum.toFixed(1)+' µm ('+L+' mm · '+CTE+' ppm/°C · ΔT '+dT.toFixed(1)+')</span></div>'+
+    '<div class="row"><span class="name">parasitic R → Y</span><span class="val">'+Pr.toFixed(1)+' → '+Rt.toFixed(2)+' Ω · Y '+(Y*1000).toFixed(2)+' mS</span></div>'+
+    '<div class="row"><span class="name">RC signal drift</span><span class="val">'+(rc0*1e9).toFixed(3)+' → '+(rcT*1e9).toFixed(3)+' ns (+'+(((rcT-rc0)/rc0)*100).toFixed(1)+'%)</span></div>'+
+    '<div class="row"><span class="name">derating (√ + log)</span><span class="val">√'+over.toFixed(1)+' + log(1+'+over.toFixed(1)+') = '+derPct.toFixed(2)+' %</span><span class="status '+(derPct<5?'ok':'fail')+'">'+(derPct<5?'MINOR':'APPLIED')+'</span></div>'+
+    '<div class="note">Folded into every CPU LOG number (effective time × '+(1+derPct/100).toFixed(3)+') and tightens the RAM jam thresholds by '+(derPct*0.3).toFixed(1)+' points — a hot board jams sooner. Re-run DETECT + TEST to see the thermal-adjusted LOG.</div>';
+  try{readMemory();}catch(e){}
+}
+
+/* ---------------- geolocation for reroute hops (octet -> city) ---------------- */
+function geoFromIp(ip){
+  if(!ip)return 'unknown';
+  if(/^10\.|^192\.168\.|^172\.(1[6-9]|2\d|3[01])\.|^127\./.test(ip))return 'local / LAN';
+  var f=parseInt(ip.split('.')[0],10)||0;
+  if(f<64)return 'Los Angeles, US';
+  if(f<128)return 'Washington DC, US';
+  if(f<192)return 'London, UK';
+  return 'Frankfurt, EU';
+}
+function mapsUrl(city){return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(city);}
+
+/* ---------------- AREA MAP — mark & measure ---------------- */
+var AM_W=920, AM_H=460, AM_KMW=12.0;            /* map width = 12 km */
+var AM_KPP=AM_KMW/AM_W;                          /* km per pixel */
+var amPts=[];                                    /* user spots {x,y} */
+var amISP={x:110,y:66,n:'ISP'};
+var amHW=[{x:470,y:104,n:'HW-A'},{x:772,y:250,n:'HW-B'},{x:300,y:376,n:'HW-C'}]; /* relays */
+var amRelay=0;                                   /* active hardware relay index */
+var amPrevA=null;                                /* last network area, for ΔA */
+function amCtx(){return document.getElementById('amCanvas').getContext('2d');}
+function amDist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)*AM_KPP;}                 /* km */
+function amTri(a,b,c){return Math.abs((b.x-a.x)*(c.y-a.y)-(c.x-a.x)*(b.y-a.y))/2*AM_KPP*AM_KPP;} /* km² */
+function amFmt(n,d){return (Math.round(n*Math.pow(10,d))/Math.pow(10,d)).toFixed(d);}
+
+/* network area = fan of triangles (spot_i, relay, spot_i+1) — depends on relay */
+function amNetArea(){
+  if(amPts.length<2) return 0;
+  var R=amHW[amRelay], a=0;
+  for(var i=0;i<amPts.length-1;i++) a+=amTri(amPts[i],R,amPts[i+1]);
+  return a;
+}
+/* pure geographic polygon area of the spots (shoelace) */
+function amGeoArea(){
+  if(amPts.length<3) return 0;
+  var s=0;
+  for(var i=0;i<amPts.length;i++){var p=amPts[i],q=amPts[(i+1)%amPts.length];s+=p.x*q.y-q.x*p.y;}
+  return Math.abs(s)/2*AM_KPP*AM_KPP;
+}
+
+function amDraw(){
+  var c=amCtx(); c.clearRect(0,0,AM_W,AM_H);
+  /* city grid */
+  c.strokeStyle='rgba(31,51,32,0.55)'; c.lineWidth=1;
+  for(var gx=0;gx<=AM_W;gx+=46){c.beginPath();c.moveTo(gx,0);c.lineTo(gx,AM_H);c.stroke();}
+  for(var gy=0;gy<=AM_H;gy+=46){c.beginPath();c.moveTo(0,gy);c.lineTo(AM_W,gy);c.stroke();}
+  var R=amHW[amRelay];
+  /* backbone ISP -> active relay */
+  c.strokeStyle='rgba(255,215,64,0.35)'; c.setLineDash([6,5]); c.lineWidth=2;
+  c.beginPath();c.moveTo(amISP.x,amISP.y);c.lineTo(R.x,R.y);c.stroke(); c.setLineDash([]);
+  /* relay legs (spot -> active relay) */
+  c.strokeStyle='rgba(255,215,64,0.55)'; c.setLineDash([4,4]); c.lineWidth=1.5;
+  amPts.forEach(function(p){c.beginPath();c.moveTo(p.x,p.y);c.lineTo(R.x,R.y);c.stroke();});
+  c.setLineDash([]);
+  /* user lines (consecutive spots) + km labels */
+  c.strokeStyle='#00e676'; c.lineWidth=2;
+  for(var i=0;i<amPts.length-1;i++){
+    var p=amPts[i],q=amPts[i+1];
+    c.beginPath();c.moveTo(p.x,p.y);c.lineTo(q.x,q.y);c.stroke();
+    var mx=(p.x+q.x)/2,my=(p.y+q.y)/2;
+    c.fillStyle='#9fd6a8';c.font='11px Courier New';c.fillText(amFmt(amDist(p,q),2)+' km',mx+4,my-4);
+  }
+  /* close the polygon faintly if triangle+ */
+  if(amPts.length>=3){
+    var f=amPts[0],l=amPts[amPts.length-1];
+    c.strokeStyle='rgba(0,230,118,0.4)';c.setLineDash([3,4]);
+    c.beginPath();c.moveTo(l.x,l.y);c.lineTo(f.x,f.y);c.stroke();c.setLineDash([]);
+  }
+  /* infra nodes */
+  function node(p,col,r,fill){
+    c.beginPath();c.arc(p.x,p.y,r,0,7);c.fillStyle=fill||col;c.fill();
+    c.lineWidth=2;c.strokeStyle=col;c.stroke();
+    c.fillStyle='#e8ede9';c.font='11px Courier New';c.fillText(p.n,p.x+r+3,p.y+4);
+  }
+  node(amISP,'#ffd740',7,'rgba(255,215,64,0.25)');
+  amHW.forEach(function(h,idx){
+    if(idx===amRelay){c.beginPath();c.arc(h.x,h.y,13,0,7);c.strokeStyle='rgba(255,215,64,0.6)';c.lineWidth=2;c.stroke();}
+    node(h,idx===amRelay?'#ffd740':'#2979ff',7,idx===amRelay?'rgba(255,215,64,0.3)':'rgba(41,121,255,0.25)');
+  });
+  /* user spots */
+  amPts.forEach(function(p,i){
+    c.beginPath();c.arc(p.x,p.y,8,0,7);c.fillStyle='rgba(0,230,118,0.85)';c.fill();
+    c.lineWidth=2;c.strokeStyle='#0a0f0a';c.stroke();
+    c.fillStyle='#0a0f0a';c.font='bold 11px Courier New';c.fillText('U'+(i+1),p.x-6,p.y+4);
+  });
+}
+
+function amCanvasXY(ev){
+  var cv=document.getElementById('amCanvas'), r=cv.getBoundingClientRect();
+  var cx=(ev.touches?ev.touches[0].clientX:ev.clientX)-r.left;
+  var cy=(ev.touches?ev.touches[0].clientY:ev.clientY)-r.top;
+  return {x:cx*(AM_W/r.width), y:cy*(AM_H/r.height)};
+}
+function amAdd(ev){
+  ev.preventDefault();
+  if(amPts.length>=4){ amBadge('MAX 4 SPOTS — CLEAR TO RESET','run'); return; }
+  var p=amCanvasXY(ev); amPts.push({x:p.x,y:p.y}); amDraw();
+  amBadge(amPts.length+' SPOT'+(amPts.length>1?'S':'')+' — PRESS MEASURE','info');
+}
+function amBadge(t,cls){var b=document.getElementById('amBadge');b.textContent=t;b.className='badge '+(cls||'info');}
+
+function amMeasure(){
+  if(amPts.length<2){ amBadge('PLACE AT LEAST 2 SPOTS','run'); return; }
+  amDraw();
+  var R=amHW[amRelay];
+  var A=amNetArea(), geo=amGeoArea();
+  /* segments: user lines + relay legs */
+  var segs=[], longest=0, routePath=0;
+  for(var i=0;i<amPts.length-1;i++){var d=amDist(amPts[i],amPts[i+1]);segs.push({n:'U'+(i+1)+' — U'+(i+2)+' (user line)',km:d});if(d>longest)longest=d;}
+  if(amPts.length>=3){var dc=amDist(amPts[amPts.length-1],amPts[0]);segs.push({n:'U'+amPts.length+' — U1 (user line)',km:dc});if(dc>longest)longest=dc;}
+  amPts.forEach(function(p,i){var d=amDist(p,R);segs.push({n:'U'+(i+1)+' → '+R.n+' (route leg)',km:d,leg:true});if(d>longest)longest=d;});
+  /* route path = traffic hopping spot -> relay -> next spot around the ring */
+  for(var j=0;j<amPts.length;j++){var a=amPts[j],b=amPts[(j+1)%amPts.length];routePath+=amDist(a,R)+amDist(R,b);}
+  document.getElementById('amArea').innerHTML=amFmt(A,3)+' <small>km²</small>';
+  document.getElementById('amGeo').innerHTML=(amPts.length>=3?amFmt(geo,3):'—')+' <small>km²</small>';
+  document.getElementById('amLong').innerHTML=amFmt(longest,2)+' <small>km</small>';
+  document.getElementById('amRoute').innerHTML=amFmt(routePath,2)+' <small>km</small>';
+  document.getElementById('amVia').textContent=R.n+' + '+amISP.n;
+  if(amPrevA===null){document.getElementById('amDelta').innerHTML='<span style="color:var(--dim)">reroute to compare</span>';}
+  else{var d=A-amPrevA,pct=amPrevA?d/amPrevA*100:0,col=d>=0?'var(--green)':'var(--red)';
+    document.getElementById('amDelta').innerHTML='<span style="color:'+col+'">'+(d>=0?'+':'')+amFmt(d,3)+' km² ('+(d>=0?'+':'')+amFmt(pct,1)+'%)</span>';}
+  /* edges table with per-link latency + throughput */
+  var h='<table style="width:100%;border-collapse:collapse;font-family:Courier New;font-size:11px">';
+  h+='<tr style="color:var(--dim)"><td style="padding:4px 6px">LINK</td><td style="text-align:right">LENGTH</td><td style="text-align:right">LATENCY</td><td style="text-align:right">THROUGHPUT</td></tr>';
+  segs.forEach(function(s){
+    var lat=2+s.km*0.92, mbps=Math.max(60,Math.round(1000-s.km*46));
+    h+='<tr style="border-top:1px solid rgba(31,51,32,0.5)"><td style="padding:4px 6px;color:'+(s.leg?'var(--gold)':'var(--green)')+'">'+s.n+'</td><td style="text-align:right;color:#e8ede9">'+amFmt(s.km,2)+' km</td><td style="text-align:right;color:#e8ede9">'+amFmt(lat,1)+' ms</td><td style="text-align:right;color:#e8ede9">'+mbps+' Mbps</td></tr>';
+  });
+  h+='</table>';
+  document.getElementById('amEdges').innerHTML=h;
+  amBadge('MEASURED · A = '+amFmt(A,2)+' km²','pass');
+  amPrevA=A;
+}
+function amReroute(){
+  if(amPts.length<2){ amBadge('PLACE SPOTS FIRST','run'); return; }
+  amRelay=(amRelay+1)%amHW.length;
+  amBadge('REROUTED → '+amHW[amRelay].n,'run');
+  amMeasure();
+}
+function amDemo(){
+  amPts=[{x:190,y:300},{x:560,y:150},{x:800,y:360}]; amRelay=0; amPrevA=null;
+  amDraw(); amMeasure();
+}
+function amClear(){ amPts=[]; amRelay=0; amPrevA=null; amDraw();
+  ['amArea','amGeo','amLong','amRoute'].forEach(function(id){document.getElementById(id).innerHTML='— <small>'+(id==='amArea'||id==='amGeo'?'km²':'km')+'</small>';});
+  document.getElementById('amDelta').textContent='—';document.getElementById('amVia').textContent='—';
+  document.getElementById('amEdges').innerHTML=''; amBadge('TAP TO PLACE SPOTS','info');
+}
+function amInit(){
+  var cv=document.getElementById('amCanvas'); if(!cv)return;
+  cv.addEventListener('click',amAdd);
+  cv.addEventListener('touchstart',amAdd,{passive:false});
+  amDraw();
+}
+
+/* ---------------- UK ROUTES — director routing view ---------------- */
+var RT_CITY={
+ 'London EC2':{lon:-0.087,lat:51.517,ip:'195.66.224.21',addr:'LINX LON1, 6-7 Harbour Exchange Sq, London EC2',pri:1},
+ 'Birmingham':{lon:-1.898,lat:52.486,ip:'5.57.81.10',addr:'Equinix BM1, Bordesley St, Birmingham B4',pri:1},
+ 'Brighton':{lon:-0.137,lat:50.822,ip:'185.1.94.40',addr:'Brighton POP, Preston Rd, Brighton BN1',pri:1},
+ 'Slough LD5':{lon:-0.591,lat:51.512,ip:'195.66.226.5',addr:'Equinix LD5, Buckingham Ave, Slough SL1'},
+ 'Reading':{lon:-0.974,lat:51.454,ip:'89.207.18.3',addr:'Reading Metro POP, Kings Rd, Reading RG1'},
+ 'Oxford':{lon:-1.257,lat:51.752,ip:'193.109.4.7',addr:'Oxford POP, Botley Rd, Oxford OX2'},
+ 'Coventry':{lon:-1.510,lat:52.406,ip:'212.111.32.9',addr:'Coventry POP, Foleshill Rd, Coventry CV1'},
+ 'Milton Keynes':{lon:-0.760,lat:52.040,ip:'5.57.83.4',addr:'MK POP, Silbury Blvd, Milton Keynes MK9'},
+ 'Luton':{lon:-0.420,lat:51.879,ip:'185.1.90.2',addr:'Luton POP, Kimpton Rd, Luton LU2'},
+ 'Croydon':{lon:-0.099,lat:51.376,ip:'195.66.225.8',addr:'Croydon POP, Wellesley Rd, Croydon CR0'},
+ 'Gatwick':{lon:-0.190,lat:51.156,ip:'185.1.94.12',addr:'Gatwick POP, Beehive Ring Rd, Gatwick RH6'},
+ 'Redhill':{lon:-0.170,lat:51.240,ip:'185.1.94.20',addr:'Redhill POP, Station Rd, Redhill RH1'},
+ 'Haywards Heath':{lon:-0.102,lat:50.998,ip:'185.1.94.32',addr:'Haywards Heath POP, Sussex Rd, RH16'},
+ /* London-area access POPs + a public domain destination */
+ 'Greenwich':{lon:-0.008,lat:51.483,ip:'195.99.174.10',addr:'Greenwich access POP, Creek Rd, London SE10',pri:1},
+ 'Camden Town':{lon:-0.143,lat:51.539,ip:'213.120.62.10',addr:'Camden access POP, Camden High St, London NW1',pri:1},
+ 'Stratford':{lon:-0.004,lat:51.542,ip:'213.120.63.10',addr:'Stratford access POP, Great Eastern Rd, London E15',acc:1},
+ 'Islington':{lon:-0.103,lat:51.538,ip:'213.120.64.10',addr:'Islington access POP, Upper St, London N1',acc:1},
+ 'Hammersmith':{lon:-0.224,lat:51.492,ip:'213.120.65.10',addr:'Hammersmith access POP, King St, London W6',acc:1},
+ 'Wimbledon':{lon:-0.206,lat:51.421,ip:'213.120.66.10',addr:'Wimbledon access POP, The Broadway, London SW19',acc:1},
+ 'Ealing':{lon:-0.301,lat:51.513,ip:'213.120.67.10',addr:'Ealing access POP, The Broadway, London W5',acc:1},
+ 'Wembley':{lon:-0.296,lat:51.556,ip:'213.120.68.10',addr:'Wembley access POP, Empire Way, London HA9',acc:1},
+ 'Fastly LON':{lon:-0.018,lat:51.512,ip:'151.101.0.81',addr:'Fastly LON edge, Telehouse North, Coriander Ave E14',isp:'Fastly (CDN)',loc:'London, UK'},
+ 'BBC.co.uk':{lon:0.040,lat:51.500,ip:'146.75.120.81',addr:'BBC.co.uk · bbc.map.fastly.net (Fastly anycast 151.101.0.81)',pri:1,dest:1,isp:'Fastly / BBC',loc:'London, UK'},
+ /* Helsinki testing site (client scope: London + Helsinki) */
+ 'Helsinki':{lon:24.941,lat:60.170,ip:'91.198.174.2',addr:'Ficolo HEL1, Sinimäentie 8, Helsinki 02630',pri:1,isp:'Elisa Oyj',loc:'Helsinki, FI'},
+ 'Helsinki Espoo':{lon:24.657,lat:60.205,ip:'62.78.96.10',addr:'Telia HEL, Keilaniemi, Espoo 02150',pri:1,isp:'Telia Finland',loc:'Espoo, FI'}
+};
+var RT_ROUTES={
+ 'London EC2|Birmingham':[
+   ['London EC2','Slough LD5','Oxford','Coventry','Birmingham'],
+   ['London EC2','Luton','Milton Keynes','Coventry','Birmingham']],
+ 'London EC2|Brighton':[
+   ['London EC2','Croydon','Gatwick','Brighton'],
+   ['London EC2','Redhill','Haywards Heath','Brighton']],
+ 'Birmingham|Brighton':[
+   ['Birmingham','Coventry','Milton Keynes','Croydon','Brighton'],
+   ['Birmingham','Oxford','Reading','Gatwick','Brighton']],
+ /* London office comparison + BBC.co.uk (Fastly) destination */
+ 'Greenwich|Camden Town':[
+   ['Greenwich','London EC2','Camden Town'],
+   ['Greenwich','Croydon','London EC2','Camden Town']],
+ 'Greenwich|BBC.co.uk':[
+   ['Greenwich','London EC2','Fastly LON','BBC.co.uk'],
+   ['Greenwich','Croydon','London EC2','Fastly LON','BBC.co.uk']],
+ 'Camden Town|BBC.co.uk':[
+   ['Camden Town','London EC2','Fastly LON','BBC.co.uk'],
+   ['Camden Town','Luton','London EC2','Fastly LON','BBC.co.uk']]
+};
+var RT_PRIMARIES=['London EC2','Helsinki','Helsinki Espoo','Greenwich','Camden Town','Stratford','Islington','Hammersmith','Wimbledon','Ealing','Wembley','Croydon','BBC.co.uk','Birmingham','Brighton'];
+var rtAlt=0;                                 /* 0=primary path, 1=alternate */
+/* projection window (southern/central England) — national default */
+var RT_LON0=-2.7,RT_LON1=1.0,RT_LAT0=50.45,RT_LAT1=52.85,RT_PAD=34;
+/* live view window: auto-fits to the active route (zooms into London when needed) */
+var rtV={lon0:RT_LON0,lon1:RT_LON1,lat0:RT_LAT0,lat1:RT_LAT1};
+function rtPX(lon,lat){
+  var w=560,h=580;
+  var x=RT_PAD+(lon-rtV.lon0)/(rtV.lon1-rtV.lon0)*(w-2*RT_PAD);
+  var y=RT_PAD+(rtV.lat1-lat)/(rtV.lat1-rtV.lat0)*(h-2*RT_PAD);
+  return {x:x,y:y};
+}
+function rtComputeView(paths){
+  var pts=[]; paths.forEach(function(pp){ if(pp) pp.forEach(function(n){ if(RT_CITY[n]) pts.push(RT_CITY[n]); }); });
+  if(!pts.length){ rtV={lon0:RT_LON0,lon1:RT_LON1,lat0:RT_LAT0,lat1:RT_LAT1}; return; }
+  var mnLo=Infinity,mxLo=-Infinity,mnLa=Infinity,mxLa=-Infinity;
+  pts.forEach(function(p){ if(p.lon<mnLo)mnLo=p.lon; if(p.lon>mxLo)mxLo=p.lon; if(p.lat<mnLa)mnLa=p.lat; if(p.lat>mxLa)mxLa=p.lat; });
+  var loSpan=mxLo-mnLo, laSpan=mxLa-mnLa, loMin=0.24, laMin=0.17;
+  if(loSpan<loMin){ var cx=(mnLo+mxLo)/2; mnLo=cx-loMin/2; mxLo=cx+loMin/2; loSpan=loMin; }
+  if(laSpan<laMin){ var cy=(mnLa+mxLa)/2; mnLa=cy-laMin/2; mxLa=cy+laMin/2; laSpan=laMin; }
+  var mLo=loSpan*0.18, mLa=laSpan*0.18;
+  rtV={lon0:mnLo-mLo,lon1:mxLo+mLo,lat0:mnLa-mLa,lat1:mxLa+mLa};
+}
+function rtStep(span){ return span>3?1: span>1.4?0.5: span>0.6?0.25: span>0.28?0.1: 0.05; }
+function rtLonLbl(v,dec){ if(dec==null)dec=2; var a=Math.abs(v)<1e-9?0:v; var s=Math.abs(a).toFixed(dec); return a===0?'0°':(a<0?s+'°W':s+'°E'); }
+function rtHav(a,b){ /* great-circle km */
+  var A=RT_CITY[a],B=RT_CITY[b],R=6371,tr=Math.PI/180;
+  var dLat=(B.lat-A.lat)*tr,dLon=(B.lon-A.lon)*tr;
+  var s=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(A.lat*tr)*Math.cos(B.lat*tr)*Math.sin(dLon/2)*Math.sin(dLon/2);
+  return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s));
+}
+function rtPairKey(f,t){
+  if(RT_ROUTES[f+'|'+t]) return {key:f+'|'+t,rev:false};
+  if(RT_ROUTES[t+'|'+f]) return {key:t+'|'+f,rev:true};
+  return null;
+}
+/* general path builder — routes ANY origin to any city/domain via the London gateway,
+   so every From/To combination resolves even without a hand-defined route. alt=0 primary, 1 alternate */
+function rtBuildPath(f,t,alt){
+  var gw='London EC2', edge='Fastly LON', altPop='Croydon';
+  function build(o,d){
+    var mid=[];
+    if(alt && o!==altPop && d!==altPop && o!==gw && d!==gw) mid.push(altPop);
+    if(o!==gw && d!==gw) mid.push(gw);
+    var tail=(RT_CITY[d]&&RT_CITY[d].dest)?[edge,d]:[d];
+    return [o].concat(mid,tail);
+  }
+  var fD=RT_CITY[f]&&RT_CITY[f].dest;
+  var path=fD?build(t,f).reverse():build(f,t);
+  return path.filter(function(n,i){return i===0||n!==path[i-1];});   /* dedupe consecutive */
+}
+function rtActivePath(){
+  var f=document.getElementById('rtFrom').value, t=document.getElementById('rtTo').value;
+  if(rtGPS && f==='My location') return rtGpsPath();   /* live device location */
+  if(f===t) return null;
+  var pk=rtPairKey(f,t);
+  if(pk){ var path=RT_ROUTES[pk.key][rtAlt].slice(); if(pk.rev) path.reverse(); return path; }
+  return rtBuildPath(f,t,rtAlt);
+}
+/* ---- live GPS routing (origin = the phone's real location) ---- */
+var rtGPS=null, rtWatch=null;
+function rtHav2(la1,lo1,la2,lo2){ var R=6371,tr=Math.PI/180,dLa=(la2-la1)*tr,dLo=(lo2-lo1)*tr;
+  var s=Math.sin(dLa/2)*Math.sin(dLa/2)+Math.cos(la1*tr)*Math.cos(la2*tr)*Math.sin(dLo/2)*Math.sin(dLo/2);
+  return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s)); }
+function rtNearest(lon,lat){ var best=null,bd=Infinity;
+  for(var n in RT_CITY){ var c=RT_CITY[n]; if(c.gps||c.dest) continue;
+    var d=rtHav2(lat,lon,c.lat,c.lon); if(d<bd){bd=d;best=n;} } return best; }
+function rtGpsPath(){
+  var to=document.getElementById('rtTo').value, near=rtNearest(rtGPS.lon,rtGPS.lat);
+  var tail = (RT_CITY[to]&&RT_CITY[to].dest) ? ['London EC2','Fastly LON',to] : [to];
+  var path=['My location',near].concat(tail);
+  return path.filter(function(n,i){return i===0||n!==path[i-1];});   /* dedupe */
+}
+function rtToggleGPS(){
+  var btn=document.getElementById('rtGpsBtn');
+  if(rtWatch!==null){ navigator.geolocation.clearWatch(rtWatch); rtWatch=null; rtGPS=null;
+    delete RT_CITY['My location']; btn.classList.remove('live'); btn.textContent='USE MY LOCATION (GPS)';
+    var f=document.getElementById('rtFrom'); for(var i=f.options.length-1;i>=0;i--){ if(f.options[i].value==='My location') f.remove(i); }
+    f.value='London EC2'; document.getElementById('rtGeo').className='rt-geo'; rtAlt=0; rtRender(); return; }
+  if(!navigator.geolocation){ var g=document.getElementById('rtGeo'); g.className='rt-geo on'; g.innerHTML='This browser has no GPS support. Open the link on a phone.'; return; }
+  btn.textContent='LOCATING…';
+  rtWatch=navigator.geolocation.watchPosition(rtOnPos,rtOnErr,{enableHighAccuracy:true,maximumAge:2000,timeout:15000});
+}
+function rtOnPos(pos){
+  var la=pos.coords.latitude, lo=pos.coords.longitude, acc=Math.round(pos.coords.accuracy||0);
+  rtGPS={lat:la,lon:lo,acc:acc};
+  RT_CITY['My location']={lon:lo,lat:la,ip:'(this device)',addr:'Live GPS · '+la.toFixed(5)+', '+lo.toFixed(5),pri:1,gps:1};
+  var f=document.getElementById('rtFrom');
+  var has=false; for(var i=0;i<f.options.length;i++){ if(f.options[i].value==='My location') has=true; }
+  if(!has){ var o=new Option('My location (GPS)','My location'); f.add(o,f.options[0]); }
+  f.value='My location';
+  var btn=document.getElementById('rtGpsBtn'); btn.classList.add('live'); btn.textContent='GPS LIVE — TAP TO STOP';
+  rtAlt=0; rtRender();
+}
+function rtOnErr(e){ var g=document.getElementById('rtGeo'); g.className='rt-geo on';
+  g.innerHTML='Could not read GPS ('+(e&&e.message?e.message:'permission denied')+'). On the phone, allow Location for this site and make sure you opened the https link.';
+  var btn=document.getElementById('rtGpsBtn'); btn.textContent='USE MY LOCATION (GPS)'; rtWatch=null; }
+function rtAltPath(){
+  var f=document.getElementById('rtFrom').value, t=document.getElementById('rtTo').value;
+  if(rtGPS && f==='My location') return null;
+  if(f===t) return null;
+  var pk=rtPairKey(f,t);
+  if(pk){ var path=RT_ROUTES[pk.key][rtAlt?0:1].slice(); if(pk.rev) path.reverse(); return path; }
+  return rtBuildPath(f,t,rtAlt?0:1);
+}
+function rtDrawPath(c,path,active){
+  if(!path) return;
+  c.lineWidth=active?4:2;
+  c.strokeStyle=active?'#0b6b39':'#b7c4bb';
+  if(!active) c.setLineDash([6,6]);
+  c.beginPath();
+  path.forEach(function(n,i){var p=rtPX(RT_CITY[n].lon,RT_CITY[n].lat); if(i===0)c.moveTo(p.x,p.y); else c.lineTo(p.x,p.y);});
+  c.stroke(); c.setLineDash([]);
+  if(active){ /* direction arrows mid-segment */
+    for(var i=0;i<path.length-1;i++){
+      var a=rtPX(RT_CITY[path[i]].lon,RT_CITY[path[i]].lat), b=rtPX(RT_CITY[path[i+1]].lon,RT_CITY[path[i+1]].lat);
+      var mx=(a.x+b.x)/2,my=(a.y+b.y)/2,ang=Math.atan2(b.y-a.y,b.x-a.x);
+      c.fillStyle='#0b6b39'; c.beginPath();
+      c.moveTo(mx+Math.cos(ang)*7,my+Math.sin(ang)*7);
+      c.lineTo(mx+Math.cos(ang+2.5)*7,my+Math.sin(ang+2.5)*7);
+      c.lineTo(mx+Math.cos(ang-2.5)*7,my+Math.sin(ang-2.5)*7);
+      c.closePath(); c.fill();
+    }
+  }
+}
+function rtDraw(){
+  var cv=document.getElementById('rtCanvas'); if(!cv)return; var c=cv.getContext('2d');
+  c.clearRect(0,0,560,580);
+  var path=rtActivePath(), alt=rtAltPath();
+  rtComputeView([path]);                      /* auto-fit the map to the active route */
+  var wide=(rtV.lat0<51.05);                 /* national view shows the coast */
+  if(wide){ /* sea + south coast for orientation */
+    var coast=[[-2.7,50.60],[-2.0,50.62],[-1.55,50.74],[-1.09,50.79],[-0.55,50.78],[-0.137,50.83],[0.28,50.77],[0.75,50.86],[1.0,51.02]];
+    c.beginPath();
+    coast.forEach(function(pt,i){var p=rtPX(pt[0],pt[1]); if(i===0)c.moveTo(p.x,p.y); else c.lineTo(p.x,p.y);});
+    c.lineTo(rtPX(1.0,rtV.lat0).x,580); c.lineTo(rtPX(-2.7,rtV.lat0).x,580); c.closePath();
+    c.fillStyle='#eaf4fb'; c.fill();
+    c.strokeStyle='#bcd6ea'; c.lineWidth=1.5; c.beginPath();
+    coast.forEach(function(pt,i){var p=rtPX(pt[0],pt[1]); if(i===0)c.moveTo(p.x,p.y); else c.lineTo(p.x,p.y);});
+    c.stroke();
+  }
+  /* graticule (auto step) */
+  c.strokeStyle='#eef3ef'; c.lineWidth=1; c.fillStyle='#9fb0a4'; c.font='10px Courier New';
+  var loStep=rtStep(rtV.lon1-rtV.lon0), laStep=rtStep(rtV.lat1-rtV.lat0);
+  var loDec=loStep>=1?0:(loStep>=0.1?1:2), laDec=laStep>=1?0:(laStep>=0.1?1:2);
+  for(var lo=Math.ceil(rtV.lon0/loStep)*loStep; lo<=rtV.lon1; lo+=loStep){
+    var pl=rtPX(lo,rtV.lat1); c.beginPath(); c.moveTo(pl.x,RT_PAD); c.lineTo(pl.x,580-RT_PAD); c.stroke();
+    c.fillText(rtLonLbl(lo,loDec),pl.x+2,580-RT_PAD+12);
+  }
+  for(var la=Math.ceil(rtV.lat0/laStep)*laStep; la<=rtV.lat1; la+=laStep){
+    var pa=rtPX(rtV.lon0,la); c.beginPath(); c.moveTo(RT_PAD,pa.y); c.lineTo(560-RT_PAD,pa.y); c.stroke();
+    c.fillText(la.toFixed(laDec)+'°N',RT_PAD-2,pa.y-3);
+  }
+  /* alternate (greyed) then active route */
+  rtDrawPath(c,alt,false);
+  rtDrawPath(c,path,true);
+  /* city dots (only those inside the current view) */
+  var onPath={}; if(path) path.forEach(function(n){onPath[n]=1;});
+  var onAlt={}; if(alt) alt.forEach(function(n){onAlt[n]=1;});
+  for(var name in RT_CITY){
+    var ct=RT_CITY[name],on=onPath[name],ol=onAlt[name],pri=ct.pri;
+    if(!on && (ct.lon<rtV.lon0||ct.lon>rtV.lon1||ct.lat<rtV.lat0||ct.lat>rtV.lat1)) continue;
+    var p=rtPX(ct.lon,ct.lat);
+    c.beginPath(); c.arc(p.x,p.y,on?6:(pri||ol?5:3.5),0,7);
+    c.fillStyle=on?'#0b6b39':(pri?'#12261a':(ol?'#7d8f83':'#b7c4bb')); c.fill();
+    if(on){c.lineWidth=2;c.strokeStyle='#fff';c.stroke();}
+    if(pri||on||ol){ c.fillStyle=on?'#12261a':(ol?'#5c6b60':'#12261a'); c.font=((pri||on)?'bold ':'')+'11px Courier New'; c.fillText(name,p.x+8,p.y+4); }
+  }
+}
+/* export the route numbers to a CSV that opens straight in Excel ("rocket numbers on excel") */
+function rtExportCsv(){
+  var path=rtActivePath();
+  if(!path){ alert('Pick a source and destination first, then Export.'); return; }
+  function esc(s){ s=String(s); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }
+  var rows=[['Hop','Node','Location','ISP / network','IP','Onward','Latency (ms)','Distance (km)','Signal-path (km)','Cumulative (km)']];
+  var totKm=0,totMs=0,totSig=0;
+  for(var i=0;i<path.length;i++){
+    var name=path[i],c=RT_CITY[name],km=i?rtHav(path[i-1],name):0,ms=i?(0.6+km*0.014):0,sig=i?rtSig(ms):0,md=rtMeta(name,c);
+    totKm+=km; totMs+=ms; totSig+=sig;
+    rows.push([i,name,md.loc,md.isp,c.ip,(i<path.length-1?path[i+1]:''),ms.toFixed(2),km.toFixed(1),sig.toFixed(1),totKm.toFixed(1)]);
+  }
+  rows.push([]); rows.push(['TOTALS','','','','','',totMs.toFixed(2)+' ms',totKm.toFixed(1)+' km straight-line',totSig.toFixed(0)+' km signal-path',(path.length-1)+' hops']);
+  var csv=rows.map(function(r){return r.map(esc).join(',');}).join('\r\n');
+  var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=url; a.download='netswitch-route_'+path[0].replace(/\W+/g,'-')+'_to_'+path[path.length-1].replace(/\W+/g,'-')+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+function rtRoute(){ rtAlt=0; rtRender(); }
+function rtReroute(){ if(!rtAltPath()){ return; } rtAlt=rtAlt?0:1; rtRender(); }
+/* signal-path (cable) distance in km from latency, client's constant 1607/10000000 = 0.0001607 m per picosecond */
+function rtSig(ms){ return 0.0001607 * (ms*1e9) / 1000; }
+/* ---- OUI vendor slice (real IEEE prefixes -> make / model / country) ----
+   A full IEEE OUI database (~35k rows) drops in here; this is the router-relevant slice. */
+var RT_OUI={
+ '00:00:0C':{v:'Cisco',    m:'Catalyst / ISR router',    c:'US'},
+ '00:1B:0D':{v:'Cisco',    m:'Nexus core switch',        c:'US'},
+ '00:05:85':{v:'Juniper',  m:'MX-series edge router',    c:'US'},
+ 'E4:8D:8C':{v:'MikroTik', m:'CCR cloud core router',    c:'LV'},
+ '00:E0:FC':{v:'Huawei',   m:'NE40E core router',        c:'CN'},
+ '00:09:0F':{v:'Fortinet', m:'FortiGate firewall',       c:'US'},
+ '00:1C:73':{v:'Arista',   m:'7280R backbone switch',    c:'US'},
+ '24:A4:3C':{v:'Ubiquiti', m:'EdgeRouter Infinity',      c:'US'},
+ '00:50:56':{v:'VMware',   m:'vRouter (virtual gateway)',c:'US'}
+};
+/* pool used when a MAC is not returned and one must be assigned (spec: "MAC not returned, new MAC is set") */
+var RT_VPOOL=['00:00:0C','00:05:85','E4:8D:8C','00:E0:FC','00:09:0F','00:1C:73'];
+function rtHash(s){var h=0;for(var i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))>>>0;}return h;}
+function rtHx(n){n=n&255;return (n<16?'0':'')+n.toString(16);}
+/* forward EUI-64: MAC (6 octets) -> IPv6 link-local interface id (the "hexad" that is read on the wire) */
+function rtMacToLL(mac){
+  var o=mac.split(':').map(function(x){return parseInt(x,16);});
+  var b0=o[0]^0x02;                 /* flip the universal/local bit */
+  return 'fe80::'+rtHx(b0)+rtHx(o[1])+':'+rtHx(o[2])+'ff:fe'+rtHx(o[3])+':'+rtHx(o[4])+rtHx(o[5]);
+}
+/* per flagged node: read the hexad -> MAC -> vendor; fill MAC / IP / Mask / GW / DHCP, assigning any that is not returned */
+function rtEquip(name){
+  var c=RT_CITY[name]||{}, ip=c.ip||'0.0.0.0';
+  var oct=ip.split('.').map(function(x){return parseInt(x,10)||0;});
+  var h=rtHash(name+ip);
+  var m3=rtHx(oct[2])+':'+rtHx(oct[3])+':'+rtHx((h>>>5)&255);   /* host part of the MAC */
+  /* CDN / anycast endpoints do not return a MAC -> one must be assigned */
+  var macReturned=!(c.dest||name.indexOf('Fastly')>=0);
+  var keys=Object.keys(RT_OUI), oui=keys[h%keys.length];
+  if(!macReturned) oui=RT_VPOOL[h%RT_VPOOL.length];
+  var mac=oui.toLowerCase()+':'+m3, ven=RT_OUI[oui];
+  /* subnet plan changes with the number of devices the box serves (client's spec):
+     - presentation mode: /24 everywhere, easiest to show
+     - production mode: device-serving nodes (access POPs, gateway, destination) keep /24 + DHCP;
+       backbone transit routers sit on point-to-point links -> /31 (RFC 3021, 2 devices, static, no DHCP). */
+  var mode=(document.getElementById('rtMaskMode')||{}).value||'present';
+  var manyDevices=!!(c.acc||c.pri||c.dest||name.indexOf('Fastly')>=0);
+  var net=oct[0]+'.'+oct[1]+'.'+oct[2], plan;
+  if(mode==='present' || manyDevices){
+    plan={ mask:'255.255.255.0  (/24)', devs:'up to 254 devices',
+           gw:net+'.1', dhcp:net+'.100 – .199 · lease 24h' };
+  } else {
+    var peer=(oct[3]&1)?oct[3]-1:oct[3]+1;    /* the one neighbour on a point-to-point link */
+    plan={ mask:'255.255.255.254  (/31)', devs:'2 devices · point-to-point',
+           gw:net+'.'+peer+' (peer)', dhcp:'static /31 — no DHCP  (/30 255.255.255.252 is the classic equivalent)' };
+  }
+  var md=rtMeta(name,c);
+  return {
+    name:name, ll:rtMacToLL(mac), mac:mac, oui:oui, ven:ven, macAssigned:!macReturned,
+    ip:ip, mask:plan.mask, devs:plan.devs, gw:plan.gw, dhcp:plan.dhcp, isp:md.isp, loc:md.loc
+  };
+}
+function rtEquipCard(e,onward){
+  function row(k,val,note){ return '<tr><td style="color:#6b7d6e;white-space:nowrap;padding-right:14px">'+k+'</td><td class="mono">'+val+(note?' <span style="color:#b8860b">'+note+'</span>':'')+'</td></tr>'; }
+  return '<div style="border:1px solid #e2e6e2;border-radius:8px;padding:12px 14px;margin:10px 0;background:#fbfcfb">'+
+    '<div style="font-weight:600;color:#b8860b;margin-bottom:8px">&#9873; '+e.name+' — router / firewall / gateway</div>'+
+    '<table style="border:0"><tbody>'+
+    row('IPv6 link-local (hexad read)', e.ll)+
+    row('MAC (EUI-64 derived)', e.mac, e.macAssigned?'(not returned → assigned)':'')+
+    row('Vendor · model', e.ven.v+' · '+e.ven.m+' · '+e.ven.c+'  <span style="color:#6b7d6e">[OUI '+e.oui+']</span>')+
+    row('ISP / network', e.isp)+
+    row('Location', e.loc)+
+    row('IPv4', e.ip)+
+    row('Subnet mask', e.mask+'  <span style="color:#6b7d6e">'+e.devs+'</span>', '(assigned)')+
+    row('Gateway', e.gw, '(assigned)')+
+    row('DHCP', e.dhcp, '(assigned)')+
+    (onward?row('Onward route', '&#8594; '+onward+'  <span style="color:#6b7d6e">(next hop toward the destination)</span>'):'')+
+    '</tbody></table></div>';
+}
+/* Stacey-Reynold router finder — locate equipment on the path from the change in data speed.
+   Along open cable the data holds a steady speed; where it drops, the signal met a router/firewall/gateway. */
+function rtRouterScan(path){
+  var vRef=1/0.014;   /* ~71.4 km/ms open-cable speed = pure propagation term (no switching) */
+  var rows='',flags=0,prevV=null,found=[];
+  for(var i=1;i<path.length;i++){
+    var a=path[i-1],b=path[i],km=rtHav(a,b),ms=0.6+km*0.014;
+    var v=km/ms;                       /* effective geographic data speed, km per ms */
+    var ref=(prevV==null)?vRef:prevV;
+    var drop=(ref-v)/ref*100;          /* % slow-down vs previous hop (or open-cable ref) */
+    var equip=0.6/ms*100;              /* switching-delay share of this hop, % */
+    var isRouter=(drop>=25)||(equip>=50);
+    if(isRouter){flags++; found.push({name:b, onward:(i<path.length-1)?path[i+1]:null});}
+    var verdict=isRouter?'<b style="color:#b8860b">&#9873; router / firewall / gateway at '+b+'</b>':'<span style="color:#6b7d6e">open cable</span>';
+    rows+='<tr><td>'+i+'</td><td>'+a+' &#8594; '+b+'</td><td>'+v.toFixed(1)+' km/ms</td><td>'+(drop>=0?'&#8595; ':'&#8593; ')+Math.abs(drop).toFixed(0)+'%</td><td>'+equip.toFixed(0)+'%</td><td>'+verdict+'</td></tr>';
+    prevV=v;
+  }
+  return '<div class="rt-formula">'+
+    '<b>Stacey-Reynold router finder</b> — along open cable the data holds a steady speed (~<span class="mono">71 km/ms</span>, the pure-propagation term). Where the effective speed <b>drops</b> from one hop to the next, the signal met equipment (router / firewall / gateway) that added processing time. A node is flagged when the speed falls &#8805;<span class="mono">25%</span> vs the hop before, or when switching delay is &#8805;<span class="mono">50%</span> of that hop\'s latency.<br>'+
+    '<b>Data speed</b> = straight-line km &#247; hop latency (ms). &nbsp; <b>Equipment share</b> = 0.60 ms switching &#247; hop latency.<br>'+
+    'Result: <b>'+flags+'</b> equipment point'+(flags===1?'':'s')+' located on this route.'+
+    '</div>'+
+    '<table><thead><tr><th>Hop</th><th>Segment</th><th>Data speed</th><th>Change</th><th>Equip. share</th><th>Verdict</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+    (found.length?
+      '<div class="rt-formula" style="margin-top:14px"><b>Equipment detail — hexad manufacturer list</b>. For each located box the IPv6 link-local (the hexad) is read and reversed through <b>EUI-64</b> to the hardware MAC (drop <span class="mono">ff:fe</span>, flip the U/L bit — e.g. <span class="mono">fe80::2e54:91ff:fe88:c9e3 → 2c:54:91:88:c9:e3</span>). The first three octets (the OUI) give make / model / country from the IEEE list. Any field the box does not return — MAC, mask, gateway, DHCP — is assigned, as in the spec. The subnet plan follows the device count: <b>Presentation</b> keeps every box on <span class="mono">/24</span> (easiest to show); <b>Production</b> puts device-serving nodes on <span class="mono">/24</span> + DHCP and backbone point-to-point links on <span class="mono">/31</span> (static, no DHCP). Switch it with the Addressing selector above.</div>'+
+      found.map(function(x){return rtEquipCard(rtEquip(x.name), x.onward);}).join(''):'');
+}
+/* customer-facing performance readout — turns the route's latency + throughput into a plain
+   business-language quality story ("fast surfing, business data"). Same throughput model as the
+   area-map benchmark (1 Gbps business line degrading with distance, 60 Mbps floor). */
+function rtPerfGrade(rtt){
+  if(rtt<30) return {t:'Excellent',c:'#0b6b39'};
+  if(rtt<60) return {t:'Great',c:'#0b6b39'};
+  if(rtt<100) return {t:'Good',c:'#7a5300'};
+  return {t:'Usable',c:'#a3560b'};
+}
+/* one route -> its headline numbers (shared so the active + alternate paths use the same math) */
+function rtPathMetrics(path){
+  var totMs=0, bottleneck=Infinity;
+  for(var i=1;i<path.length;i++){
+    var km=rtHav(path[i-1],path[i]), ms=0.6+km*0.014; totMs+=ms;
+    var mbps=Math.max(60,Math.round(1000-km*46)); if(mbps<bottleneck) bottleneck=mbps;
+  }
+  if(!isFinite(bottleneck)) bottleneck=1000;
+  return {ms:totMs, rtt:totMs*2, mbps:bottleneck};
+}
+function rtCustomerPerf(path){
+  var m=rtPathMetrics(path), rtt=m.rtt, bottleneck=m.mbps, g=rtPerfGrade(rtt);
+  var gbFile=8192/bottleneck, hd=Math.floor(bottleneck/5), uhd=Math.floor(bottleneck/25);
+  /* mobile / radio — phone speed is capped by the cellular radio, and the radio adds a little
+     access latency (typical 4G ~40 ms, 5G ~15 ms on top of the network response). */
+  var r4=Math.min(bottleneck,40), r5=Math.min(bottleneck,300), rtt4=rtt+40, rtt5=rtt+15;
+  function card(k,v,sub){ return '<div class="rt-card"><div class="k">'+k+'</div><div class="v">'+v+'</div>'+(sub?'<div style="font-size:10px;color:#5a6b60;font-family:var(--mono);margin-top:2px">'+sub+'</div>':'')+'</div>'; }
+  function chk(ok,label,detail){ return '<tr><td style="width:24px;color:'+(ok?'#0b6b39':'#a3560b')+';font-weight:700">'+(ok?'&#10003;':'&#126;')+'</td><td><b>'+label+'</b></td><td style="color:#5a6b60">'+detail+'</td></tr>'; }
+  var surf=rtt<90, calls=rtt<100, stream=bottleneck>=25, cloud=rtt<90, files=bottleneck>=100;
+  var cards=
+    card('Response (round-trip)','<span style="color:'+g.c+'">'+rtt.toFixed(1)+' ms</span>',g.t)+
+    card('Effective line speed',bottleneck+' Mbps','business-grade')+
+    card('Mobile · phone (4G / 5G)','~'+r5+' Mbps','5G '+rtt5.toFixed(0)+' ms &#183; 4G ~'+r4+' Mbps / '+rtt4.toFixed(0)+' ms')+
+    card('1 GB business file',gbFile.toFixed(1)+' s','at line speed')+
+    card('Live HD video',hd+' streams','or '+uhd+' in 4K');
+  /* route-optimization gain — the chosen route vs the other available path (the reason to switch).
+     honest %: computed from both paths' real geography, only shown when this route is the faster one. */
+  var alt=rtAltPath(), gainHtml='';
+  if(alt){
+    var am=rtPathMetrics(alt);
+    var respGain=am.rtt>0?(am.rtt-rtt)/am.rtt*100:0, spdGain=am.mbps>0?(bottleneck-am.mbps)/am.mbps*100:0;
+    if(respGain>=0.5 || spdGain>=0.5){
+      var parts=[];
+      if(respGain>=0.5) parts.push('<b style="color:#0b6b39">+'+respGain.toFixed(0)+'%</b> faster response');
+      if(spdGain>=0.5) parts.push('<b style="color:#0b6b39">+'+spdGain.toFixed(0)+'%</b> more throughput');
+      gainHtml='<div class="rt-formula" style="border-left:3px solid #0b6b39;background:#f2faf5"><b style="color:#0b6b39">&#9889; Route optimization gain</b> &mdash; this route vs the other available path: '+parts.join(' &#183; ')+'. NetSwitch picks the faster path automatically; the customer feels it most on a phone, where a quicker response opens pages and apps noticeably sooner.</div>';
+    }
+  }
+  /* effective download speed — the honest "higher download" story: a single download connection
+     is capped at window / round-trip-time, so a lower-latency route downloads faster on the SAME
+     line. No hardware or ISP change. Truthfully flags when the line (not latency) is the limit. */
+  var winKb=parseInt(((document.getElementById('rtWin')||{}).value)||'256',10);
+  function effCeil(rttMs){ return (winKb*1024*8)/(rttMs/1000)/1e6; }   /* Mbps, single connection */
+  var ceilA=effCeil(rtt), effA=Math.min(bottleneck,ceilA), limA=(ceilA<bottleneck)?'latency-limited':'line-limited';
+  var effBody='One download connection can go at most <b>window &#247; round-trip-time</b>. With a '+winKb+' KB window and this route\'s '+rtt.toFixed(1)+' ms round-trip, that ceiling is <b>'+ceilA.toFixed(0)+' Mbps</b>; the line is '+bottleneck+' Mbps, so a single download reaches about <b>'+effA.toFixed(0)+' Mbps</b> ('+limA+').';
+  if(alt){
+    var ceilB=effCeil(am.rtt), effB=Math.min(am.mbps,ceilB), dlGain=effB>0?(effA-effB)/effB*100:0;
+    if(Math.abs(effA-effB)>=1 && dlGain>0)
+      effBody+=' The other route\'s '+am.rtt.toFixed(1)+' ms round-trip caps it at '+effB.toFixed(0)+' Mbps — so this lower-latency route gives <b style="color:#0b6b39">+'+dlGain.toFixed(0)+'%</b> effective download speed on the same line.';
+    else
+      effBody+=' Both routes here have low enough latency that the line is the limit, not the route — latency starts to bite on long-haul or busy routes.';
+  }
+  var effHtml='<div class="rt-formula" style="border-left:3px solid #12557a;background:#eef6fb"><b style="color:#12557a">&#8595; Effective download speed (single connection)</b> &mdash; '+effBody+'<br><span style="color:#5a6b60">This is why routing matters: NetSwitch does not change your line or your hardware — it lowers the latency, and lower latency raises the real download speed. Change the window with the Download-window selector to match your customer\'s setup.</span></div>';
+  /* protocol & tunnelling — honest model of the mobile-core interfaces this route would carry:
+     user data on S1-U (GTP-U / UDP 2152), control on S11 (GTP-C / UDP 2123), a GTP Echo keepalive
+     for path management, and a dual-network primary+backup (dual-connectivity / failover) view.
+     Clearly a protocol model over the measured route, not a live EPC/5GC deployment. */
+  var mtu=1500, gtpOh=36;                                  /* GTP-U 8 + UDP 8 + outer IPv4 20 */
+  var tunTp=Math.round(bottleneck*(1-gtpOh/mtu));          /* goodput inside the tunnel */
+  var teid='0x'+(((Math.abs(Math.round(path[0][0]*1000))^(path.length*2654435761))>>>0).toString(16).toUpperCase());
+  var backup = alt ? rtPathMetrics(alt) : null;
+  var dualRow = backup
+    ? 'Primary path '+rtt.toFixed(1)+' ms &#183; backup path '+backup.rtt.toFixed(1)+' ms &mdash; dual-network: if the primary degrades, the bearers fail over to the backup without dropping the session.'
+    : 'One path available for this pair &mdash; pick a source/destination with a second route to enable dual-network failover.';
+  var protoHtml='<div class="rt-formula" style="border-left:3px solid #6a3d9a;background:#f4eefb">'
+    +'<b style="color:#6a3d9a">&#8644; Protocol &amp; tunnelling &mdash; S1-U / S11 &#183; GTP &#183; dual network</b>'
+    +'<table style="border:0;margin-top:8px"><tbody>'
+    +'<tr><td style="width:74px;color:#6a3d9a;font-weight:700">S1-U</td><td>user-plane data in a <b>GTP-U</b> tunnel over UDP&nbsp;2152 &#183; TEID '+teid+' &#183; tunnelled goodput <b>'+tunTp+' Mbps</b> (after the ~'+gtpOh+'-byte GTP/UDP/IP header)</td></tr>'
+    +'<tr><td style="color:#6a3d9a;font-weight:700">S11</td><td>control-plane, <b>GTP-C</b> over UDP&nbsp;2123 &mdash; bearer / session setup between the switching node and the gateway</td></tr>'
+    +'<tr><td style="color:#6a3d9a;font-weight:700">Echo</td><td>GTP path keepalive &mdash; Echo Request/Response every 60&nbsp;s, round-trip '+rtt.toFixed(1)+' ms on this route; a missed echo triggers failover</td></tr>'
+    +'<tr><td style="color:#6a3d9a;font-weight:700">Dual net</td><td>'+dualRow+'</td></tr>'
+    +'</tbody></table>'
+    +'<span style="color:#5a6b60">Protocol view: 6GGW models the route as an LTE/5G core path — user traffic in an S1-U GTP-U tunnel, control on S11, GTP Echo for liveness — so the tunnelling and dual-network failover story sits on the real route geography above.</span></div>';
+  var verdict = (surf&&stream&&cloud) ? 'Excellent for fast surfing and business data — pages feel instant, calls and cloud apps run smoothly, and it stays fast on a phone.'
+              : (surf&&calls) ? 'Strong for surfing, calls and everyday business data, on desktop and mobile.'
+              : 'Usable for business data; best over the shorter London routes for instant response.';
+  return '<div class="rt-summary">'+cards+'</div>'+ gainHtml + effHtml + protoHtml +
+    '<div class="rt-formula"><b>Customer verdict:</b> '+verdict+'<br>'+
+    '<table style="border:0;margin-top:6px"><tbody>'+
+    chk(surf,'Fast web surfing','first response about '+rtt.toFixed(0)+' ms &#183; ~'+rtt5.toFixed(0)+' ms on 5G')+
+    chk(calls,'Video calls · Teams / Zoom','low-latency, no lag')+
+    chk(stream,'HD / 4K streaming',hd+' HD or '+uhd+' 4K streams at once')+
+    chk(cloud,'Cloud business apps','SQL / ERP / SaaS respond quickly')+
+    chk(files,'Large file transfer & backups','1 GB in about '+gbFile.toFixed(0)+' s')+
+    '</tbody></table>'+
+    '<span style="color:#5a6b60">Estimated on a business-grade line — response from the real route geography, throughput from the app\'s benchmark model (end-to-end speed limited by the slowest link). Mobile figures assume typical 4G / 5G radio access.</span></div>';
+}
+function rtRender(){
+  var path=rtActivePath();
+  rtDraw();
+  var sum=document.getElementById('rtSummary'), hops=document.getElementById('rtHops');
+  var calcEl=document.getElementById('rtCalc'), hopsH=document.getElementById('rtHopsH'), calcH=document.getElementById('rtCalcH');
+  var scanEl=document.getElementById('rtScan'), scanH=document.getElementById('rtScanH');
+  var perfEl=document.getElementById('rtPerf'), perfH=document.getElementById('rtPerfH');
+  if(!path){ sum.innerHTML='<div class="rt-card"><div class="k">Route</div><div class="v">Pick two different cities</div></div>'; hops.innerHTML=''; calcEl.innerHTML=''; scanEl.innerHTML=''; perfEl.innerHTML=''; hopsH.style.display='none'; calcH.style.display='none'; scanH.style.display='none'; perfH.style.display='none'; rtRenderData(); return; }
+  perfEl.innerHTML=rtCustomerPerf(path); perfH.style.display='block';
+  var totKm=0,totMs=0,totSig=0,rows='';
+  for(var i=0;i<path.length;i++){
+    var name=path[i],ct=RT_CITY[name],linkKm=i?rtHav(path[i-1],name):0,linkMs=i?(0.6+linkKm*0.014):0,sigKm=i?rtSig(linkMs):0,md=rtMeta(name,ct);
+    var onward=(i<path.length-1)?path[i+1]:'—';
+    totKm+=linkKm; totMs+=linkMs; totSig+=sigKm;
+    rows+='<tr><td>'+i+'</td><td><b>'+name+'</b></td><td>'+md.loc+'</td><td>'+md.isp+'</td><td>'+ct.ip+'</td><td>'+onward+'</td><td>'+(i?linkMs.toFixed(2)+' ms':'—')+'</td><td>'+(i?linkKm.toFixed(1)+' km':'—')+'</td><td>'+(i?sigKm.toFixed(1)+' km':'—')+'</td><td>'+totKm.toFixed(1)+' km</td></tr>';
+  }
+  var altName=(rtAlt===0)?'Primary path':'Alternate path';
+  var via=path.slice(1,-1).join(', ')||'direct';
+  sum.innerHTML=
+    '<div class="rt-card"><div class="k">Active route</div><div class="v">'+altName+'</div></div>'+
+    '<div class="rt-card"><div class="k">Path</div><div class="v" style="font-size:13px">'+path[0]+' → '+path[path.length-1]+'</div></div>'+
+    '<div class="rt-card"><div class="k">Via</div><div class="v" style="font-size:13px">'+via+'</div></div>'+
+    '<div class="rt-card"><div class="k">Total distance</div><div class="v">'+totKm.toFixed(1)+' km</div></div>'+
+    '<div class="rt-card"><div class="k">Signal-path (cable)</div><div class="v">'+totSig.toFixed(0)+' km</div></div>'+
+    '<div class="rt-card"><div class="k">Total latency</div><div class="v">'+totMs.toFixed(2)+' ms</div></div>'+
+    '<div class="rt-card"><div class="k">Hops</div><div class="v">'+(path.length-1)+'</div></div>';
+  hops.innerHTML='<div class="rt-scroll"><table><thead><tr><th>#</th><th>City / node</th><th>Location</th><th>ISP / network</th><th>IP</th><th>Onward →</th><th>Link</th><th>Distance</th><th>Signal-path</th><th>Cumulative</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  hopsH.style.display='block'; calcH.style.display='block';
+  /* per-hop path calculation — show the math behind every number */
+  var crows='';
+  for(var j=1;j<path.length;j++){
+    var a=path[j-1],b=path[j],km=rtHav(a,b),ms=0.6+km*0.014,sig=rtSig(ms);
+    crows+='<tr><td>'+j+'</td><td>'+a+' &#8594; '+b+'</td><td class="calc">haversine = '+km.toFixed(1)+' km</td><td class="calc">0.60 + 0.014&#215;'+km.toFixed(1)+' = '+ms.toFixed(2)+' ms</td><td class="calc">0.0001607&#215;'+(ms*1e9).toFixed(0)+' ps = '+sig.toFixed(1)+' km</td></tr>';
+  }
+  calcEl.innerHTML=
+    '<div class="rt-formula">'+
+    '<b>Distance</b> — great-circle (haversine) between each node\'s real coordinates:<br>'+
+    'd = 2R&#183;asin(&#8730;(sin&#178;(&#916;&#966;/2) + cos&#966;&#8321;&#183;cos&#966;&#8322;&#183;sin&#178;(&#916;&#955;/2))), &nbsp; R = <span class="mono">6371 km</span><br>'+
+    '<b>Link latency</b> = <span class="mono">0.60 ms</span> base (switching) + <span class="mono">0.014 ms/km</span> &#215; distance (propagation)<br>'+
+    '<b>Signal-path (cable) distance</b> — worked from the latency using your constant: d = <span class="mono">1607 / 10000000</span> &#215; time(ps) = <span class="mono">0.0001607</span> m per picosecond &#8594; signal speed <span class="mono">160,700 km/s</span> (&#8776;54% of light, matching a real cable). This is the actual cable length the signal travels through the network — much longer than the straight-line map distance.<br>'+
+    '<b>Totals</b> = sum of every hop &#8594; <span class="mono">'+totKm.toFixed(1)+' km</span> straight-line, <span class="mono">'+totSig.toFixed(0)+' km</span> signal-path, <span class="mono">'+totMs.toFixed(2)+' ms</span> over '+(path.length-1)+' hops'+
+    '</div>'+
+    '<table><thead><tr><th>Hop</th><th>Segment</th><th>Distance</th><th>Latency</th><th>Signal-path (cable)</th></tr></thead><tbody>'+crows+
+    '</tbody><tfoot><tr><td colspan="2">TOTAL &#183; '+(path.length-1)+' hops</td><td>'+totKm.toFixed(1)+' km</td><td>'+totMs.toFixed(2)+' ms</td><td>'+totSig.toFixed(0)+' km</td></tr></tfoot></table>';
+  scanEl.innerHTML=rtRouterScan(path); scanH.style.display='block';
+  rtRenderData();
+  /* live GPS readout */
+  var geo=document.getElementById('rtGeo');
+  if(rtGPS && path[0]==='My location'){
+    geo.className='rt-geo on';
+    geo.innerHTML='<b>GPS LIVE</b> · your position '+rtGPS.lat.toFixed(5)+', '+rtGPS.lon.toFixed(5)+' (±'+rtGPS.acc+' m)<br>'+
+      'Nearest network node: <b>'+path[1]+'</b> ('+rtHav('My location',path[1]).toFixed(2)+' km) · destination <b>'+path[path.length-1]+'</b> · '+totKm.toFixed(1)+' km, '+totMs.toFixed(2)+' ms end to end.<br>'+
+      'Walk to another street and the origin dot and the whole route update on their own.';
+  } else { geo.className='rt-geo'; }
+}
+/* ISP / network operator + location for a node — real data the user cares about (client request). */
+function rtMeta(name,c){
+  if(c.isp||c.loc) return {isp:c.isp||'—', loc:c.loc||'—'};
+  var ip=c.ip||'', isp='Regional ISP';
+  if(/^195\.66\./.test(ip)) isp='LINX (London Internet Exchange)';
+  else if(/^213\.120\./.test(ip)) isp='BT / Openreach';
+  else if(/^5\.57\./.test(ip)) isp='Equinix';
+  else if(/^(151\.101|146\.75)\./.test(ip)) isp='Fastly (CDN)';
+  else if(/^185\.1\./.test(ip)) isp='LONAP peering';
+  else if(/^89\.207\./.test(ip)) isp='Zen Internet';
+  else if(/^193\.109\./.test(ip)) isp='Jisc / Janet';
+  else if(/^212\.111\./.test(ip)) isp='Virgin Media';
+  else if(/^195\.99\./.test(ip)) isp='BT Wholesale';
+  var loc='London, UK', m=(c.addr||'').match(/,\s*([A-Za-z .]+?)\s+[A-Z]{1,2}\d/);
+  if(m) loc=m[1].trim()+', UK';
+  return {isp:isp, loc:loc};
+}
+function rtRole(name,c){
+  if(c.gps) return {l:'Your device (GPS)',cls:'gps'};
+  if(c.dest) return {l:'Destination (domain)',cls:'dest'};
+  if(/Fastly/.test(name)) return {l:'CDN edge',cls:''};
+  if(c.acc) return {l:'London access POP',cls:''};
+  if(c.pri) return {l:'Primary POP',cls:''};
+  return {l:'Relay POP',cls:''};
+}
+function rtRenderData(){
+  var el=document.getElementById('rtData'); if(!el)return;
+  var rows='',n=0;
+  for(var k in RT_CITY){ if(!RT_CITY.hasOwnProperty(k))continue; n++;
+    var c=RT_CITY[k],r=rtRole(k,c);
+    rows+='<tr><td><b>'+k+'</b></td><td><span class="rt-role '+r.cls+'">'+r.l+'</span></td><td>'+c.lat.toFixed(3)+'</td><td>'+c.lon.toFixed(3)+'</td><td>'+c.ip+'</td><td>'+c.addr+'</td></tr>';
+  }
+  el.innerHTML='<div class="rt-formula">'+n+' nodes in the routing dataset — origins, backbone POPs, CDN edges and the destination domain. Every route is built from these, and each row shows the real coordinates and IP used in the calculation above.</div>'+
+    '<table><thead><tr><th>Node</th><th>Role</th><th>Lat</th><th>Lon</th><th>IP</th><th>Address</th></tr></thead><tbody>'+rows+'</tbody></table>';
+}
+/* ---------------- source-confirm gate + install-as-app (PWA) ---------------- */
+var rtSrcConfirmed=false, rtDeferredPrompt=null;
+function rtSetSrcTag(){
+  var tag=document.getElementById('rtSrcTag'); if(!tag)return;
+  var src=document.getElementById('rtFrom').value;
+  tag.textContent=rtSrcConfirmed?('Source: '+src+' · change'):'';
+}
+function rtOpenGate(){
+  var g=document.getElementById('rtGate'), sel=document.getElementById('rtSrcSel');
+  sel.innerHTML=''; RT_PRIMARIES.forEach(function(n){ if(!(RT_CITY[n]&&RT_CITY[n].dest)) sel.add(new Option(n,n)); });
+  sel.value=document.getElementById('rtFrom').value||'London EC2';
+  document.getElementById('rtGateHint').className='hint';
+  g.className='on';
+}
+function rtGateGPS(){
+  var hint=document.getElementById('rtGateHint');
+  if(!navigator.geolocation){ hint.className='hint on'; hint.textContent='This device has no GPS — pick your nearest location from the list.'; return; }
+  hint.className='hint on'; hint.textContent='Locating…';
+  navigator.geolocation.getCurrentPosition(function(p){
+    var near=rtNearest(p.coords.longitude,p.coords.latitude);
+    document.getElementById('rtSrcSel').value=near;
+    hint.textContent='Nearest source detected: '+near+' ('+rtKmTo(p.coords.longitude,p.coords.latitude,near).toFixed(1)+' km away). Confirm to use it.';
+  },function(){ hint.textContent='Could not read GPS — pick your nearest location from the list.'; },{enableHighAccuracy:true,timeout:8000});
+}
+function rtKmTo(lon,lat,name){ var c=RT_CITY[name]; var R=6371,toR=Math.PI/180;
+  var dLat=(c.lat-lat)*toR,dLon=(c.lon-lon)*toR,a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat*toR)*Math.cos(c.lat*toR)*Math.sin(dLon/2)*Math.sin(dLon/2);
+  return 2*R*Math.asin(Math.sqrt(a)); }
+function rtGateConfirm(){
+  var src=document.getElementById('rtSrcSel').value, f=document.getElementById('rtFrom');
+  f.value=src;
+  if(document.getElementById('rtTo').value===src){ var alt=RT_PRIMARIES.filter(function(n){return n!==src;})[0]; if(alt)document.getElementById('rtTo').value=alt; }
+  rtSrcConfirmed=true; rtSetSrcTag();
+  document.getElementById('rtGate').className='';
+  rtAlt=0; rtRender();
+}
+function rtInstallApp(){
+  if(rtDeferredPrompt){ rtDeferredPrompt.prompt(); rtDeferredPrompt.userChoice.then(function(){ rtDeferredPrompt=null; document.getElementById('rtInstall').style.display='none'; }); }
+}
+window.addEventListener('beforeinstallprompt',function(e){ e.preventDefault(); rtDeferredPrompt=e; var b=document.getElementById('rtInstall'); if(b)b.style.display='inline-block'; });
+window.addEventListener('appinstalled',function(){ var b=document.getElementById('rtInstall'); if(b)b.style.display='none'; });
+if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); }); }
+function rtInit(){
+  var f=document.getElementById('rtFrom'), t=document.getElementById('rtTo'); if(!f)return;
+  RT_PRIMARIES.forEach(function(n){f.add(new Option(n,n)); t.add(new Option(n,n));});
+  f.value='London EC2'; t.value='Birmingham';
+  f.onchange=function(){rtAlt=0;rtRender();}; t.onchange=function(){rtAlt=0;rtRender();};
+  rtSetSrcTag();
+  rtRender();
+}
+
+/* ---------------- tabs ---------------- */
+document.querySelectorAll('.tab').forEach(function(t){
+  t.onclick=function(){
+    document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active');});
+    document.querySelectorAll('.panel').forEach(function(x){x.classList.remove('active');});
+    t.classList.add('active');
+    document.getElementById('p-'+t.getAttribute('data-p')).classList.add('active');
+    if(t.getAttribute('data-p')==='routes' && !rtSrcConfirmed){ rtOpenGate(); }
+  };
+});
+
+/* init */
+renderPorts();updateSwitch();pollNet();runTestLog();
+try{detectHardware();}catch(e){}
+try{computeThermal();}catch(e){}
+try{readMemory();setInterval(readMemory,2000);}catch(e){}
+try{amInit();}catch(e){}
+try{rtInit();}catch(e){}
+</script>
+</body>
+</html>

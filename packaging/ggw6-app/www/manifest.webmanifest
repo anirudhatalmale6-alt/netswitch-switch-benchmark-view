@@ -1,0 +1,16 @@
+{
+  "name": "6GGW — 5G Gateway Router",
+  "short_name": "6GGW",
+  "description": "6GGW — 5G gateway & routing app. Pick a source, see the fastest route, real measured speed/latency, S1-U / S11 tunnelling and the equipment on the path. Installable on Android & iOS. Runs offline.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0f0a",
+  "theme_color": "#0a0f0a",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
