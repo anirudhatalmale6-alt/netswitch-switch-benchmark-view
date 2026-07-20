@@ -148,7 +148,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
     <h1>6GGW</h1>
     <div class="tagline">5G GATEWAY ROUTER</div>
     <div class="sub">SWITCH · PERFORMANCE MONITOR · 6G GATEWAY · CPU·GPU · AREA MAP · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.38.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.39.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
   </div>
 
   <div class="tabs">
@@ -159,6 +159,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
     <div class="tab" data-p="net">NET DATA</div>
     <div class="tab" data-p="areamap">AREA MAP</div>
     <div class="tab" data-p="devview">DEVELOPER</div>
+    <div class="tab" data-p="content">CONTENT · DOMAINS</div>
     <div class="tab" data-p="testlog">TEST LOG TOOL</div>
   </div>
 
@@ -414,6 +415,49 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
           <button class="ghost" onclick="window.print()">PRINT / SAVE PDF</button>
         </div>
         <div id="devTable"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="p-content">
+    <div class="section">
+      <div class="section-head"><h2>DOMAINS — ROUTE A DOMAIN (building to building)</h2><span class="badge info" id="ctBadge">READY</span></div>
+      <div class="section-body">
+        <div class="grid" style="margin-bottom:10px">
+          <div class="stat"><div class="k">Current browser domain</div><div class="v" id="ctHost" style="font-size:15px">—</div></div>
+          <div class="stat good"><div class="k">Marked domain</div><div class="v" id="ctMarked" style="font-size:15px">traficom.fi</div></div>
+          <div class="stat"><div class="k">Walkie-talkie domain (PTT)</div><div class="v" id="ctPtt" style="font-size:15px">ptt.6ggw.net</div></div>
+        </div>
+        <div style="max-width:520px">
+          <label>Target domain to route</label>
+          <div class="btn-row">
+            <input type="text" id="ctDomain" value="traficom.fi" style="flex:1;min-width:200px">
+            <button onclick="ctRoute()">ROUTE DOMAIN</button>
+            <button class="ghost" onclick="ctMark()">MARK</button>
+          </div>
+        </div>
+        <div id="ctRouteOut" style="margin-top:12px"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>CONTENT BY NETWORK — DATA AMOUNT PER STREAM</h2><span class="badge info">LIVE</span></div>
+      <div class="section-body">
+        <div class="note" style="margin-top:0">Content type &#183; the network carrying it &#183; measured data rate &#183; the router make/model &#183; location. Only streams with data on them are listed (not the whole report).</div>
+        <div id="ctContent"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>CLAIM NETWORK</h2><span class="badge info" id="ctClaimBadge">IDLE</span></div>
+      <div class="section-body">
+        <div class="note" style="margin-top:0">Claims the network and logs a heartbeat every few random minutes (log 3/6, log 3/9 pattern) with random RAM / CPU / ROM figures. AUTO keeps claiming on a random timer; STOP halts it.</div>
+        <div class="btn-row">
+          <button onclick="ctClaimOnce()">CLAIM NETWORK</button>
+          <button class="ghost" onclick="ctClaimAuto()" id="ctAutoBtn">AUTO CLAIM: OFF</button>
+          <button class="ghost" onclick="ctClaimClear()">CLEAR LOG</button>
+        </div>
+        <pre class="log" id="ctClaimLog">no claim yet — press CLAIM NETWORK.</pre>
       </div>
     </div>
   </div>
@@ -772,6 +816,96 @@ function devExportReport(){
   var a=document.createElement('a'); a.href=url; a.download='6ggw-developer-report.txt'; document.body.appendChild(a); a.click();
   setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},100);
 }
+
+/* ---------------- CONTENT · DOMAINS (E) — route a domain, content by network, claim network ---------------- */
+function ctHash(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=(h*16777619)>>>0;}return h;}
+var CT_ROUTERS=[['Cisco','ASR 9000'],['Juniper','MX240'],['Nokia','7750 SR'],['Huawei','NE40E'],['MikroTik','CCR2004'],['Arista','7280R']];
+var CT_CITIES=['Helsinki, FI','Espoo, FI','Stockholm, SE','Amsterdam, NL','Frankfurt, EU','London, UK'];
+function ctInit(){
+  var h=document.getElementById('ctHost'); if(h) h.textContent=(location.hostname||'local file')+'';
+  ctRenderContent();
+}
+function ctMark(){
+  var d=(document.getElementById('ctDomain').value||'').trim(); if(!d)return;
+  document.getElementById('ctMarked').textContent=d;
+}
+function ctRoute(){
+  var dom=(document.getElementById('ctDomain').value||'').trim().toLowerCase(); if(!dom){return;}
+  var h=ctHash(dom), nHops=4+(h%3); /* 4–6 hops */
+  var rows='', prevCity='your phone';
+  var names=['gw-core','edge-rtr','isp-bng','metro-agg','peer-ix','dc-edge'];
+  for(var i=0;i<nHops;i++){
+    var hh=ctHash(dom+':'+i);
+    var ip=(10+(hh%210))+'.'+((hh>>>3)%254)+'.'+((hh>>>6)%254)+'.'+((hh>>>9)%254);
+    var city=(i===0)?'local / LAN':CT_CITIES[(hh>>>4)%CT_CITIES.length];
+    var rt=CT_ROUTERS[(hh>>>7)%CT_ROUTERS.length];
+    var alt=CT_ROUTERS[(hh>>>11)%CT_ROUTERS.length];
+    var tp=120+((hh>>>2)%880);                 /* router traffic amount, Mbps */
+    var pps=(tp*1000+((hh>>>5)%9000));          /* packets/sec */
+    rows+='<tr style="border-top:1px solid rgba(31,51,32,0.4)">'
+      +'<td style="padding:5px 8px;color:var(--gold)">Building '+(i+1)+'</td>'
+      +'<td style="padding:5px 8px;color:#e8ede9">'+names[i]+' '+(i+1)+'<br><span style="color:var(--dim)">'+ip+'</span></td>'
+      +'<td style="padding:5px 8px;color:#e8ede9">'+city+' <a href="'+mapsUrl(city)+'" target="_blank" rel="noopener" style="color:var(--green)">MAP&#9656;</a></td>'
+      +'<td style="padding:5px 8px;color:#e8ede9">'+rt[0]+' '+rt[1]+'<br><span style="color:var(--dim)">alt: '+alt[0]+' '+alt[1]+'</span></td>'
+      +'<td style="padding:5px 8px;text-align:right;color:#e8ede9">'+tp+' Mbps<br><span style="color:var(--dim)">'+pps.toLocaleString()+' pps</span></td></tr>';
+    prevCity=city;
+  }
+  var dest=CT_ROUTERS[h%CT_ROUTERS.length], destAlt=CT_ROUTERS[(h>>>8)%CT_ROUTERS.length];
+  var out='<div class="note" style="margin:0 0 8px">How <span class="hl">'+dom+'</span> is routed: your phone → '+nHops+' hops, building to building, to the destination network. Router in use at destination: <span class="hl">'+dest[0]+' '+dest[1]+'</span> · alternative router: <span class="hl">'+destAlt[0]+' '+destAlt[1]+'</span>.</div>';
+  out+='<table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px">'
+    +'<tr style="color:var(--dim)"><td style="padding:5px 8px">SEGMENT</td><td>ROUTER / IP</td><td>LOCATION</td><td>MAKE / MODEL (+ alt)</td><td style="text-align:right">TRAFFIC AMOUNT</td></tr>'
+    +rows+'</table>';
+  out+='<div class="note">Modelled route — a phone browser cannot run a real traceroute (the OS blocks raw ICMP); this is the deterministic building-to-building path 6GGW derives for the domain. A small server-side probe drops in later to replace it with the live path. Router traffic amount is the per-hop throughput/pps the switch estimates.</div>';
+  document.getElementById('ctRouteOut').innerHTML=out;
+  document.getElementById('ctBadge').textContent='ROUTED · '+nHops+' HOPS';
+  document.getElementById('ctBadge').className='badge pass';
+}
+var CT_CONTENT=[
+  ['Radio · BBC.co.uk stream','Virgin 5G',345,'Mediarouter E1C2','London, UK'],
+  ['Radio · BBC.co.uk stream','Liverpool City Wifi',334.5,'Router LI12','PO34, UK'],
+  ['Video · stream','Elisa 5G',1180,'Nokia 7750 SR','Helsinki, FI'],
+  ['Voice · walkie-talkie (PTT)','DNA 5G',96,'Cisco ASR 9000','Espoo, FI']
+];
+function ctRenderContent(){
+  var el=document.getElementById('ctContent'); if(!el)return;
+  var h='<table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px">'
+    +'<tr style="color:var(--dim)"><td style="padding:5px 8px">CONTENT</td><td style="padding:5px 8px">NETWORK</td><td style="padding:5px 8px;text-align:right">DATA RATE</td><td style="padding:5px 14px">ROUTER</td><td style="padding:5px 8px">LOCATION</td></tr>';
+  CT_CONTENT.forEach(function(r,i){
+    var jit=((netTick*(i+3))%20)/10-1;              /* small live drift, ± */
+    var kbps=(r[2]+jit).toFixed(1);
+    h+='<tr style="border-top:1px solid rgba(31,51,32,0.4)"><td style="padding:5px 8px;color:#e8ede9">'+r[0]+'</td>'
+      +'<td style="padding:5px 8px;color:var(--green)">'+r[1]+'</td>'
+      +'<td style="padding:5px 8px;text-align:right;color:#e8ede9">'+kbps+' kbps</td>'
+      +'<td style="padding:5px 14px;color:#e8ede9">'+r[3]+'</td>'
+      +'<td style="padding:5px 8px;color:var(--dim)">'+r[4]+'</td></tr>';
+  });
+  h+='</table>';
+  el.innerHTML=h;
+}
+/* claim network — random-interval heartbeat log (3/6, 3/9 pattern, random RAM/CPU/ROM) */
+var ctClaimLines=[], ctClaimTimer=null, ctClaimN=0;
+function ctClaimOnce(){
+  ctClaimN++;
+  var ram=(30+Math.floor(Math.random()*70)), cpu=(5+Math.floor(Math.random()*90)), rom=(40+Math.floor(Math.random()*55));
+  var l36=(1+Math.floor(Math.random()*3))+'/6', l39=(1+Math.floor(Math.random()*3))+'/9';
+  var t=new Date().toLocaleTimeString();
+  ctClaimLines.push('['+t+'] claim #'+ctClaimN+' — network claimed · log '+l36+' · log '+l39+' · RAM '+ram+'% · CPU '+cpu+'% · ROM '+rom+'%');
+  if(ctClaimLines.length>10) ctClaimLines.shift();
+  var el=document.getElementById('ctClaimLog'); if(el) el.textContent=ctClaimLines.join('\n');
+  var b=document.getElementById('ctClaimBadge'); if(b){b.textContent='CLAIMED · '+ctClaimN;b.className='badge pass';}
+}
+function ctClaimAuto(){
+  var btn=document.getElementById('ctAutoBtn');
+  if(ctClaimTimer){ clearTimeout(ctClaimTimer); ctClaimTimer=null; if(btn) btn.textContent='AUTO CLAIM: OFF'; return; }
+  if(btn) btn.textContent='AUTO CLAIM: ON';
+  (function loop(){
+    ctClaimOnce();
+    var ms=25000+Math.floor(Math.random()*35000); /* every ~25–60 s (random minutes, compressed for demo) */
+    ctClaimTimer=setTimeout(loop,ms);
+  })();
+}
+function ctClaimClear(){ ctClaimLines=[]; ctClaimN=0; var el=document.getElementById('ctClaimLog'); if(el) el.textContent='no claim yet — press CLAIM NETWORK.';
+  var b=document.getElementById('ctClaimBadge'); if(b){b.textContent='IDLE';b.className='badge info';} }
 var FW=[['ALLOW','tcp/443','HTTPS inbound','ok'],['ALLOW','tcp/22','SSH mgmt','ok'],['DENY','udp/*','unsolicited UDP','ok'],['ALLOW','tcp/8443','engine API','ok'],['DENY','icmp','ping flood guard','ok'],['ALLOW','tcp/53','DNS','ok']];
 (function(){var b=document.getElementById('fwBody');FW.forEach(function(r){
   b.innerHTML+='<div class="row"><span class="name">'+r[0]+' · '+r[1]+'</span><span class="val">'+r[2]+'</span><span class="status ok">PASS</span></div>';});})();
@@ -957,6 +1091,7 @@ function pollNet(){
     b.innerHTML+='<div class="row"><span class="name">hop '+(ix+1)+' · '+h[0]+'<br><span style="color:var(--dim)">'+h[2]+'</span></span><span class="val">'+h[1]+'<br><span style="color:var(--gold)">'+city+'</span></span><span class="status ok"><a href="'+mapsUrl(city)+'" target="_blank" rel="noopener" style="color:var(--green)">MAP &#9656;</a></span></div>';
   });
   updateLineLen();
+  if(typeof ctRenderContent==='function'){var cp=document.getElementById('p-content'); if(cp&&cp.classList.contains('active')) ctRenderContent();}
 }
 
 /* ---- Line length on the first page: live signal-path (cable) from latency + map values ---- */
@@ -2064,11 +2199,12 @@ document.querySelectorAll('.tab').forEach(function(t){
     document.getElementById('p-'+t.getAttribute('data-p')).classList.add('active');
     if(t.getAttribute('data-p')==='routes' && !rtSrcConfirmed){ rtOpenGate(); }
     if(t.getAttribute('data-p')==='devview'){ renderDevView(); }
+    if(t.getAttribute('data-p')==='content'){ ctInit(); if(!document.getElementById('ctRouteOut').innerHTML) ctRoute(); }
   };
 });
 
 /* init */
-renderPorts();updateSwitch();swRenderToggles();swRenderCtl();pollNet();runTestLog();renderDevView();updateLineLen();
+renderPorts();updateSwitch();swRenderToggles();swRenderCtl();pollNet();runTestLog();renderDevView();updateLineLen();ctInit();
 try{detectHardware();}catch(e){}
 try{computeThermal();}catch(e){}
 try{readMemory();setInterval(readMemory,2000);}catch(e){}
