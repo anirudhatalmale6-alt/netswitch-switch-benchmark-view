@@ -155,7 +155,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
     <h1>6GGW</h1>
     <div class="tagline">5G GATEWAY ROUTER</div>
     <div class="sub">SWITCH · PERFORMANCE MONITOR · 6G GATEWAY · CPU·GPU · AREA MAP · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.40.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.41.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
   </div>
 
   <div class="tabs">
@@ -834,7 +834,7 @@ function devDatarates(){
 function devRows(){
   var c=devConn(), g=(typeof rtGPS!=='undefined'&&rtGPS)?rtGPS:null, dr=devDatarates();
   function mb(x){return x>=1?x.toFixed(2)+' Mbps ('+Math.round(x*1000)+' kbps)':Math.round(x*1000)+' kbps';}
-  var loc = g?('lat '+g.lat.toFixed(4)+', lon '+g.lon.toFixed(4)):'not set (open 6G GATEWAY → USE MY LOCATION for GPS)';
+  var loc = g?('lat '+g.lat.toFixed(4)+', lon '+g.lon.toFixed(4)+' &#183; <a href="'+mapsPt(g.lat,g.lon)+'" target="_blank" rel="noopener" style="color:var(--green)">OPEN EXACT LOCATION IN GOOGLE MAPS &#9656;</a>'):'not set (open 6G GATEWAY → USE MY LOCATION for GPS)';
   var lng = g?g.lon.toFixed(5):'—', lat = g?g.lat.toFixed(5):'—';
   var netType=c.effectiveType?c.effectiveType.toUpperCase():'unknown', rtt=(typeof c.rtt==='number')?c.rtt+' ms':'unknown';
   var plat=(navigator.platform||'unknown');
@@ -1677,6 +1677,8 @@ function geoFromIp(ip){
   return 'Frankfurt, EU';
 }
 function mapsUrl(city){return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(city);}
+/* exact-coordinate link on the official Google Maps domain — drops a pin at lat,lon and loads that location */
+function mapsPt(lat,lon){return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(lat.toFixed(6)+','+lon.toFixed(6));}
 
 /* ---------------- AREA MAP — mark & measure ---------------- */
 var AM_W=920, AM_H=460, AM_KMW=12.0;            /* map width = 12 km */
@@ -2324,9 +2326,9 @@ function rtRender(){
   var geo=document.getElementById('rtGeo');
   if(rtGPS && path[0]==='My location'){
     geo.className='rt-geo on';
-    geo.innerHTML='<b>GPS LIVE</b> · your position '+rtGPS.lat.toFixed(5)+', '+rtGPS.lon.toFixed(5)+' (±'+rtGPS.acc+' m)<br>'+
+    geo.innerHTML='<b>GPS LIVE</b> · your position '+rtGPS.lat.toFixed(5)+', '+rtGPS.lon.toFixed(5)+' (±'+rtGPS.acc+' m) · <a href="'+mapsPt(rtGPS.lat,rtGPS.lon)+'" target="_blank" rel="noopener" style="color:#0b6b39;font-weight:700">VERIFY ON GOOGLE MAPS &#9656;</a><br>'+
       'Nearest network node: <b>'+path[1]+'</b> ('+rtHav('My location',path[1]).toFixed(2)+' km) · destination <b>'+path[path.length-1]+'</b> · '+totKm.toFixed(1)+' km, '+totMs.toFixed(2)+' ms end to end.<br>'+
-      'Walk to another street and the origin dot and the whole route update on their own.';
+      'The link opens the official Google Maps at these exact coordinates. Walk to another street and the origin dot and the whole route update on their own.';
   } else { geo.className='rt-geo'; }
 }
 /* ISP / network operator + location for a node — real data the user cares about (client request). */
