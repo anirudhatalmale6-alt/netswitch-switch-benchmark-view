@@ -146,7 +146,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
   <div class="header">
     <h1>NETSWITCH</h1>
     <div class="sub">ROUTER / SWITCH · BENCHMARK NET · CPU·GPU · AREA MAP · UK ROUTES · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · Engine v2.32.0 · serverless · installable app (PWA) — runs on Android 13 · Windows · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · Engine v2.33.0 · serverless · installable app (PWA) — runs on Android 13 · Windows · any browser</div>
   </div>
 
   <div class="tabs">
@@ -369,6 +369,11 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
         <div><label>Addressing</label><select id="rtMaskMode" onchange="rtRender()">
           <option value="present">Presentation · /24 (easiest to show)</option>
           <option value="prod">Production · /30–/31 point-to-point + DHCP</option>
+        </select></div>
+        <div><label>Download window</label><select id="rtWin" onchange="rtRender()">
+          <option value="64">64 KB · no window scaling</option>
+          <option value="256" selected>256 KB · typical</option>
+          <option value="1024">1 MB · tuned / large</option>
         </select></div>
       </div>
       <div id="rtGeo" class="rt-geo"></div>
@@ -1510,10 +1515,25 @@ function rtCustomerPerf(path){
       gainHtml='<div class="rt-formula" style="border-left:3px solid #0b6b39;background:#f2faf5"><b style="color:#0b6b39">&#9889; Route optimization gain</b> &mdash; this route vs the other available path: '+parts.join(' &#183; ')+'. NetSwitch picks the faster path automatically; the customer feels it most on a phone, where a quicker response opens pages and apps noticeably sooner.</div>';
     }
   }
+  /* effective download speed — the honest "higher download" story: a single download connection
+     is capped at window / round-trip-time, so a lower-latency route downloads faster on the SAME
+     line. No hardware or ISP change. Truthfully flags when the line (not latency) is the limit. */
+  var winKb=parseInt(((document.getElementById('rtWin')||{}).value)||'256',10);
+  function effCeil(rttMs){ return (winKb*1024*8)/(rttMs/1000)/1e6; }   /* Mbps, single connection */
+  var ceilA=effCeil(rtt), effA=Math.min(bottleneck,ceilA), limA=(ceilA<bottleneck)?'latency-limited':'line-limited';
+  var effBody='One download connection can go at most <b>window &#247; round-trip-time</b>. With a '+winKb+' KB window and this route\'s '+rtt.toFixed(1)+' ms round-trip, that ceiling is <b>'+ceilA.toFixed(0)+' Mbps</b>; the line is '+bottleneck+' Mbps, so a single download reaches about <b>'+effA.toFixed(0)+' Mbps</b> ('+limA+').';
+  if(alt){
+    var ceilB=effCeil(am.rtt), effB=Math.min(am.mbps,ceilB), dlGain=effB>0?(effA-effB)/effB*100:0;
+    if(Math.abs(effA-effB)>=1 && dlGain>0)
+      effBody+=' The other route\'s '+am.rtt.toFixed(1)+' ms round-trip caps it at '+effB.toFixed(0)+' Mbps — so this lower-latency route gives <b style="color:#0b6b39">+'+dlGain.toFixed(0)+'%</b> effective download speed on the same line.';
+    else
+      effBody+=' Both routes here have low enough latency that the line is the limit, not the route — latency starts to bite on long-haul or busy routes.';
+  }
+  var effHtml='<div class="rt-formula" style="border-left:3px solid #12557a;background:#eef6fb"><b style="color:#12557a">&#8595; Effective download speed (single connection)</b> &mdash; '+effBody+'<br><span style="color:#5a6b60">This is why routing matters: NetSwitch does not change your line or your hardware — it lowers the latency, and lower latency raises the real download speed. Change the window with the Download-window selector to match your customer\'s setup.</span></div>';
   var verdict = (surf&&stream&&cloud) ? 'Excellent for fast surfing and business data — pages feel instant, calls and cloud apps run smoothly, and it stays fast on a phone.'
               : (surf&&calls) ? 'Strong for surfing, calls and everyday business data, on desktop and mobile.'
               : 'Usable for business data; best over the shorter London routes for instant response.';
-  return '<div class="rt-summary">'+cards+'</div>'+ gainHtml +
+  return '<div class="rt-summary">'+cards+'</div>'+ gainHtml + effHtml +
     '<div class="rt-formula"><b>Customer verdict:</b> '+verdict+'<br>'+
     '<table style="border:0;margin-top:6px"><tbody>'+
     chk(surf,'Fast web surfing','first response about '+rtt.toFixed(0)+' ms &#183; ~'+rtt5.toFixed(0)+' ms on 5G')+
