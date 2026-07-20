@@ -16,14 +16,20 @@
 :root{
 --bg:#0a0f0a;--card:#111a12;--card2:#0d150e;--border:#1f3320;
 --green:#00e676;--green2:#4caf50;--gold:#ffd740;--blue:#2979ff;
---orange:#ff6d00;--red:#ff1744;--white:#e8ede9;--dim:#5a6a5c;
+--orange:#ff6d00;--red:#ff1744;--white:var(--white);--dim:#5a6a5c;
 --mono:'Courier New',Courier,monospace;
 --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--white);font-family:var(--sans);font-size:16px;line-height:1.6;min-height:100vh}
 .container{max-width:1060px;margin:0 auto;padding:14px 18px}
-.header{text-align:center;padding:28px 0 20px;border-bottom:1px solid var(--border)}
+.header{text-align:center;padding:28px 0 20px;border-bottom:1px solid var(--border);position:relative}
+/* ---- CONSUMER light theme (B): white background, same data. Toggle in header. ---- */
+body.light{--bg:#ffffff;--card:#eef2ee;--card2:#f7faf7;--border:#c9d4ca;--white:#12251a;--dim:#5a6a5c;--green2:#1e7a3c;--gold:#a06b00}
+body.light input[type=text],body.light input[type=number],body.light select,body.light textarea{background:#ffffff;color:#12251a}
+body.light .tab{background:#eef2ee}
+body.light pre.log,body.light .log{background:#f2f5f2;color:#12251a}
+body.light .section-head .badge.info{color:#fff}
 .header h1{font-size:44px;letter-spacing:10px;color:var(--green);font-weight:600}
 .header .tagline{font-family:var(--mono);font-size:13px;color:var(--green2);letter-spacing:5px;margin-top:6px;text-transform:uppercase}
 .header .sub{font-family:var(--mono);font-size:12px;color:var(--dim);letter-spacing:2px;margin-top:8px}
@@ -145,10 +151,11 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
 <body>
 <div class="container">
   <div class="header">
+    <button class="ghost" id="themeBtn" onclick="toggleTheme()" style="position:absolute;right:14px;top:14px;padding:7px 14px">☾ DARK</button>
     <h1>6GGW</h1>
     <div class="tagline">5G GATEWAY ROUTER</div>
     <div class="sub">SWITCH · PERFORMANCE MONITOR · 6G GATEWAY · CPU·GPU · AREA MAP · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.39.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.40.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
   </div>
 
   <div class="tabs">
@@ -160,6 +167,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
     <div class="tab" data-p="areamap">AREA MAP</div>
     <div class="tab" data-p="devview">DEVELOPER</div>
     <div class="tab" data-p="content">CONTENT · DOMAINS</div>
+    <div class="tab" data-p="fair">FAIR VIEW</div>
     <div class="tab" data-p="testlog">TEST LOG TOOL</div>
   </div>
 
@@ -375,6 +383,45 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
         <div class="note">Hop table mirrors the engine's reroute_trace module: router name / IP / MAC-OUI vendor / <span class="hl">geolocated city</span> per hop. MAP opens that server's city in Google Maps. City is derived from the IP octet (LA / Washington / London / Frankfurt buckets in this build); a full offline GeoIP database drops in for exact city per real IP.</div>
       </div>
     </div>
+
+    <div class="section">
+      <div class="section-head"><h2>REACH OF NETWORK — BURST TEST (C)</h2><span class="badge info" id="rnBadge">IDLE</span></div>
+      <div class="section-body">
+        <div class="note" style="margin-top:0">Your burst pattern with real network requests: send a large package, pause, continue, send 15×2, then receive 31. Averages bytes per reach over rolling 3 s / 5 s / 180 s / 60 min windows. SCHEDULE fires it every 4th minute.</div>
+        <div class="btn-row">
+          <button onclick="rnRun()" id="rnRunBtn">RUN REACH TEST</button>
+          <button class="ghost" onclick="rnSchedule()" id="rnSchedBtn">SCHEDULE: OFF (every 4 min)</button>
+        </div>
+        <div class="grid" style="margin-top:8px">
+          <div class="stat good"><div class="k">Last reach — bytes</div><div class="v" id="rnBytes">—</div></div>
+          <div class="stat"><div class="k">Send / receive</div><div class="v" id="rnSR" style="font-size:16px">—</div></div>
+          <div class="stat"><div class="k">Reach time</div><div class="v" id="rnTime">—</div></div>
+          <div class="stat"><div class="k">Reaches done</div><div class="v" id="rnCount">0</div></div>
+        </div>
+        <div class="grid" style="margin-top:8px">
+          <div class="stat"><div class="k">Avg bytes / 3 s</div><div class="v" id="rnA3" style="font-size:18px">—</div></div>
+          <div class="stat"><div class="k">Avg bytes / 5 s</div><div class="v" id="rnA5" style="font-size:18px">—</div></div>
+          <div class="stat"><div class="k">Avg bytes / 180 s</div><div class="v" id="rnA180" style="font-size:18px">—</div></div>
+          <div class="stat"><div class="k">Avg bytes / 60 min</div><div class="v" id="rnA60" style="font-size:18px">—</div></div>
+        </div>
+        <pre class="log" id="rnLog">no reach test yet.</pre>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>BATTERY — MILLIWATTS · 25 REACH ATTEMPTS (D)</h2><span class="badge info" id="batBadge">—</span></div>
+      <div class="section-body">
+        <div class="note" style="margin-top:0">Real battery level + charging from the device (where the browser exposes it). Estimated milliwatt draw uses your curve over 25 network-reach attempts — full first, less along the day. The battery % is real; the watt figure is an estimate (browsers do not expose actual power draw).</div>
+        <div class="btn-row"><button onclick="batRun()">MEASURE BATTERY</button></div>
+        <div class="grid" style="margin-top:8px">
+          <div class="stat good"><div class="k">Battery level</div><div class="v" id="batLvl">—</div></div>
+          <div class="stat"><div class="k">Charging</div><div class="v" id="batChg" style="font-size:18px">—</div></div>
+          <div class="stat warn"><div class="k">Est. draw (now)</div><div class="v" id="batNow">—</div></div>
+          <div class="stat"><div class="k">Attempts</div><div class="v" id="batAtt">— / 25</div></div>
+        </div>
+        <pre class="log" id="batLog">press MEASURE BATTERY.</pre>
+      </div>
+    </div>
   </div>
 
   <!-- ============ TEST LOG TOOL ============ -->
@@ -423,17 +470,19 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
     <div class="section">
       <div class="section-head"><h2>DOMAINS — ROUTE A DOMAIN (building to building)</h2><span class="badge info" id="ctBadge">READY</span></div>
       <div class="section-body">
+        <div class="note" style="margin-top:0">No domains are preloaded — net neutrality. You type the domain; nothing is favoured or shipped in.</div>
         <div class="grid" style="margin-bottom:10px">
           <div class="stat"><div class="k">Current browser domain</div><div class="v" id="ctHost" style="font-size:15px">—</div></div>
-          <div class="stat good"><div class="k">Marked domain</div><div class="v" id="ctMarked" style="font-size:15px">traficom.fi</div></div>
-          <div class="stat"><div class="k">Walkie-talkie domain (PTT)</div><div class="v" id="ctPtt" style="font-size:15px">ptt.6ggw.net</div></div>
+          <div class="stat good"><div class="k">Marked domain</div><div class="v" id="ctMarked" style="font-size:15px">none</div></div>
+          <div class="stat"><div class="k">Walkie-talkie domain (PTT)</div><div class="v" id="ctPtt" style="font-size:15px">none</div></div>
         </div>
-        <div style="max-width:520px">
+        <div style="max-width:560px">
           <label>Target domain to route</label>
           <div class="btn-row">
-            <input type="text" id="ctDomain" value="traficom.fi" style="flex:1;min-width:200px">
+            <input type="text" id="ctDomain" placeholder="type a domain, e.g. example.com" style="flex:1;min-width:200px">
             <button onclick="ctRoute()">ROUTE DOMAIN</button>
             <button class="ghost" onclick="ctMark()">MARK</button>
+            <button class="ghost" onclick="ctSetPtt()">SET AS WALKIE-TALKIE</button>
           </div>
         </div>
         <div id="ctRouteOut" style="margin-top:12px"></div>
@@ -443,7 +492,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
     <div class="section">
       <div class="section-head"><h2>CONTENT BY NETWORK — DATA AMOUNT PER STREAM</h2><span class="badge info">LIVE</span></div>
       <div class="section-body">
-        <div class="note" style="margin-top:0">Content type &#183; the network carrying it &#183; measured data rate &#183; the router make/model &#183; location. Only streams with data on them are listed (not the whole report).</div>
+        <div class="note" style="margin-top:0">Each domain you route is added here with the network carrying it, the measured data rate on your link, the router make/model and location. Nothing is preloaded — the list is built only from domains you actually route.</div>
         <div id="ctContent"></div>
       </div>
     </div>
@@ -459,6 +508,31 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
         </div>
         <pre class="log" id="ctClaimLog">no claim yet — press CLAIM NETWORK.</pre>
       </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>RESET — RE-RUN ALL ROUTES</h2><span class="badge info" id="ctResetBadge">IDLE</span></div>
+      <div class="section-body">
+        <div class="note" style="margin-top:0">Reroutes and reruns every domain you have routed. A progress bar + timer show how long it takes; press CANCEL any time to stop.</div>
+        <div class="btn-row">
+          <button onclick="ctReset()" id="ctResetBtn">RESET (RE-RUN ALL ROUTES)</button>
+          <button class="ghost" onclick="ctResetCancel()" id="ctResetCancelBtn" style="display:none">CANCEL</button>
+        </div>
+        <div style="margin-top:12px">
+          <div class="bar"><span id="ctResetBar" style="width:0%"></span></div>
+          <div class="bar-lbl"><span id="ctResetStep">idle</span><span id="ctResetTimer">0.0 s</span></div>
+        </div>
+        <pre class="log" id="ctResetLog">no reset run yet.</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="p-fair">
+    <div style="background:#ffffff;color:#111111;border-radius:6px;padding:36px 32px;min-height:360px">
+      <div style="font-family:'Courier New',monospace;font-size:16px;letter-spacing:4px;color:#1e7a3c;text-transform:uppercase">6GGW — FAIR VIEW</div>
+      <div style="font-size:22px;color:#444;margin:8px 0 30px">Latest router &#183; data throughput &#183; ratio vs previous</div>
+      <div id="fairBody"></div>
+      <div style="font-size:15px;color:#888;margin-top:34px">White background, large font, latest data only. Route a domain in the CONTENT tab to update this.</div>
     </div>
   </div>
 
@@ -793,7 +867,7 @@ function renderDevView(){
   h+='<table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px;margin-top:12px">';
   rows.forEach(function(r){
     if(r[0]==='section'){ h+='<tr><td colspan="3" style="padding:12px 6px 5px;color:var(--green2);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">'+r[1]+'</td></tr>'; return; }
-    h+='<tr style="border-top:1px solid rgba(31,51,32,0.4)"><td style="padding:5px 8px;color:var(--dim);width:180px">'+r[0]+'</td><td style="padding:5px 8px;color:#e8ede9">'+r[1]+'</td><td style="padding:5px 8px;color:var(--dim);font-size:11px">'+(r[2]||'')+'</td></tr>';
+    h+='<tr style="border-top:1px solid rgba(31,51,32,0.4)"><td style="padding:5px 8px;color:var(--dim);width:180px">'+r[0]+'</td><td style="padding:5px 8px;color:var(--white)">'+r[1]+'</td><td style="padding:5px 8px;color:var(--dim);font-size:11px">'+(r[2]||'')+'</td></tr>';
   });
   h+='</table>';
   /* ports listing */
@@ -801,7 +875,7 @@ function renderDevView(){
   h+='<table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px"><tr style="color:var(--dim)"><td style="padding:5px 8px">PROTOCOL</td><td>PORT</td><td>APP / SERVICE</td><td>STATE</td></tr>';
   DEV_PORTS.forEach(function(p){
     var open=p[3]==='open';
-    h+='<tr style="border-top:1px solid rgba(31,51,32,0.4)"><td style="padding:5px 8px;color:'+(p[0]==='UDP'?'var(--gold)':'var(--green)')+'">'+p[0]+'</td><td style="padding:5px 8px;color:#e8ede9">'+p[1]+'</td><td style="padding:5px 8px;color:#e8ede9">'+p[2]+'</td><td style="padding:5px 8px;color:'+(open?'var(--green)':'var(--red)')+'">'+p[3]+'</td></tr>';
+    h+='<tr style="border-top:1px solid rgba(31,51,32,0.4)"><td style="padding:5px 8px;color:'+(p[0]==='UDP'?'var(--gold)':'var(--green)')+'">'+p[0]+'</td><td style="padding:5px 8px;color:var(--white)">'+p[1]+'</td><td style="padding:5px 8px;color:var(--white)">'+p[2]+'</td><td style="padding:5px 8px;color:'+(open?'var(--green)':'var(--red)')+'">'+p[3]+'</td></tr>';
   });
   h+='</table>';
   el.innerHTML=h;
@@ -844,10 +918,10 @@ function ctRoute(){
     var pps=(tp*1000+((hh>>>5)%9000));          /* packets/sec */
     rows+='<tr style="border-top:1px solid rgba(31,51,32,0.4)">'
       +'<td style="padding:5px 8px;color:var(--gold)">Building '+(i+1)+'</td>'
-      +'<td style="padding:5px 8px;color:#e8ede9">'+names[i]+' '+(i+1)+'<br><span style="color:var(--dim)">'+ip+'</span></td>'
-      +'<td style="padding:5px 8px;color:#e8ede9">'+city+' <a href="'+mapsUrl(city)+'" target="_blank" rel="noopener" style="color:var(--green)">MAP&#9656;</a></td>'
-      +'<td style="padding:5px 8px;color:#e8ede9">'+rt[0]+' '+rt[1]+'<br><span style="color:var(--dim)">alt: '+alt[0]+' '+alt[1]+'</span></td>'
-      +'<td style="padding:5px 8px;text-align:right;color:#e8ede9">'+tp+' Mbps<br><span style="color:var(--dim)">'+pps.toLocaleString()+' pps</span></td></tr>';
+      +'<td style="padding:5px 8px;color:var(--white)">'+names[i]+' '+(i+1)+'<br><span style="color:var(--dim)">'+ip+'</span></td>'
+      +'<td style="padding:5px 8px;color:var(--white)">'+city+' <a href="'+mapsUrl(city)+'" target="_blank" rel="noopener" style="color:var(--green)">MAP&#9656;</a></td>'
+      +'<td style="padding:5px 8px;color:var(--white)">'+rt[0]+' '+rt[1]+'<br><span style="color:var(--dim)">alt: '+alt[0]+' '+alt[1]+'</span></td>'
+      +'<td style="padding:5px 8px;text-align:right;color:var(--white)">'+tp+' Mbps<br><span style="color:var(--dim)">'+pps.toLocaleString()+' pps</span></td></tr>';
     prevCity=city;
   }
   var dest=CT_ROUTERS[h%CT_ROUTERS.length], destAlt=CT_ROUTERS[(h>>>8)%CT_ROUTERS.length];
@@ -859,24 +933,37 @@ function ctRoute(){
   document.getElementById('ctRouteOut').innerHTML=out;
   document.getElementById('ctBadge').textContent='ROUTED · '+nHops+' HOPS';
   document.getElementById('ctBadge').className='badge pass';
+  /* add this domain to content-by-network (measured on your own link) + router registry for FAIR view */
+  var c=devConn(), dr=devDatarates();
+  var net=c.effectiveType?c.effectiveType.toUpperCase():(c.type?String(c.type).toUpperCase():'LINK');
+  var g=(typeof rtGPS!=='undefined'&&rtGPS)?('lat '+rtGPS.lat.toFixed(3)+', lon '+rtGPS.lon.toFixed(3)):CT_CITIES[(h>>>4)%CT_CITIES.length];
+  var rateKbps=Math.round(dr.cur*1000);
+  CT_CONTENT=CT_CONTENT.filter(function(x){return x[0]!==dom;}); /* de-dupe by domain */
+  CT_CONTENT.unshift([dom,net,rateKbps,dest[0]+' '+dest[1],g]);
+  if(CT_CONTENT.length>12) CT_CONTENT.pop();
+  var destTp=120+((h>>>2)%880);
+  ctRouters.push({make:dest[0],model:dest[1],tp:destTp,domain:dom});
+  if(ctRouters.length>20) ctRouters.shift();
+  ctRenderContent(); if(typeof updateFair==='function') updateFair();
 }
-var CT_CONTENT=[
-  ['Radio · BBC.co.uk stream','Virgin 5G',345,'Mediarouter E1C2','London, UK'],
-  ['Radio · BBC.co.uk stream','Liverpool City Wifi',334.5,'Router LI12','PO34, UK'],
-  ['Video · stream','Elisa 5G',1180,'Nokia 7750 SR','Helsinki, FI'],
-  ['Voice · walkie-talkie (PTT)','DNA 5G',96,'Cisco ASR 9000','Espoo, FI']
-];
+var CT_CONTENT=[];      /* built only from domains the user routes — nothing preloaded */
+var ctRouters=[];       /* routers seen, newest last — feeds the FAIR view (A) */
+function ctSetPtt(){
+  var d=(document.getElementById('ctDomain').value||'').trim(); if(!d)return;
+  document.getElementById('ctPtt').textContent=d;
+}
 function ctRenderContent(){
   var el=document.getElementById('ctContent'); if(!el)return;
+  if(!CT_CONTENT.length){ el.innerHTML='<div class="note">No streams yet — route a domain above and it appears here with its network, measured rate and router.</div>'; return; }
   var h='<table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px">'
-    +'<tr style="color:var(--dim)"><td style="padding:5px 8px">CONTENT</td><td style="padding:5px 8px">NETWORK</td><td style="padding:5px 8px;text-align:right">DATA RATE</td><td style="padding:5px 14px">ROUTER</td><td style="padding:5px 8px">LOCATION</td></tr>';
+    +'<tr style="color:var(--dim)"><td style="padding:5px 8px">CONTENT (DOMAIN)</td><td style="padding:5px 8px">NETWORK</td><td style="padding:5px 8px;text-align:right">DATA RATE</td><td style="padding:5px 14px">ROUTER</td><td style="padding:5px 8px">LOCATION</td></tr>';
   CT_CONTENT.forEach(function(r,i){
     var jit=((netTick*(i+3))%20)/10-1;              /* small live drift, ± */
     var kbps=(r[2]+jit).toFixed(1);
-    h+='<tr style="border-top:1px solid rgba(31,51,32,0.4)"><td style="padding:5px 8px;color:#e8ede9">'+r[0]+'</td>'
+    h+='<tr style="border-top:1px solid rgba(31,51,32,0.4)"><td style="padding:5px 8px;color:var(--white)">'+r[0]+'</td>'
       +'<td style="padding:5px 8px;color:var(--green)">'+r[1]+'</td>'
-      +'<td style="padding:5px 8px;text-align:right;color:#e8ede9">'+kbps+' kbps</td>'
-      +'<td style="padding:5px 14px;color:#e8ede9">'+r[3]+'</td>'
+      +'<td style="padding:5px 8px;text-align:right;color:var(--white)">'+kbps+' kbps</td>'
+      +'<td style="padding:5px 14px;color:var(--white)">'+r[3]+'</td>'
       +'<td style="padding:5px 8px;color:var(--dim)">'+r[4]+'</td></tr>';
   });
   h+='</table>';
@@ -906,6 +993,143 @@ function ctClaimAuto(){
 }
 function ctClaimClear(){ ctClaimLines=[]; ctClaimN=0; var el=document.getElementById('ctClaimLog'); if(el) el.textContent='no claim yet — press CLAIM NETWORK.';
   var b=document.getElementById('ctClaimBadge'); if(b){b.textContent='IDLE';b.className='badge info';} }
+
+/* RESET (F) — reroute + rerun every routed domain, with progress bar, live timer and cancel */
+var ctRS={step:null,tmr:null,t0:0,i:0,doms:[],logs:[]};
+function ctReset(){
+  if(ctRS.step) return;
+  var doms=CT_CONTENT.map(function(x){return x[0];});
+  if(!doms.length){ document.getElementById('ctResetLog').textContent='Nothing to reset — route at least one domain first (DOMAINS section above).'; return; }
+  ctRS={step:null,tmr:null,t0:performance.now(),i:0,doms:doms,logs:[]};
+  document.getElementById('ctResetBtn').disabled=true;
+  document.getElementById('ctResetCancelBtn').style.display='';
+  var badge=document.getElementById('ctResetBadge'); badge.textContent='RUNNING'; badge.className='badge run';
+  var total=doms.length;
+  ctRS.tmr=setInterval(function(){ document.getElementById('ctResetTimer').textContent=((performance.now()-ctRS.t0)/1000).toFixed(1)+' s'; },100);
+  ctRS.step=setInterval(function(){
+    if(ctRS.i>=total){ ctResetFinish(false); return; }
+    var dom=doms[ctRS.i]; document.getElementById('ctDomain').value=dom; ctRoute();
+    ctRS.i++; document.getElementById('ctResetBar').style.width=Math.round(ctRS.i/total*100)+'%';
+    document.getElementById('ctResetStep').textContent='rerouting '+ctRS.i+' / '+total+' · '+dom;
+    ctRS.logs.push('rerouted '+dom+'  ('+ctRS.i+'/'+total+')');
+    document.getElementById('ctResetLog').textContent=ctRS.logs.join('\n');
+  },700); /* 0.7 s per domain — a real, visible re-run, not a fake 4-minute wait */
+}
+function ctResetCancel(){ if(ctRS.step) ctResetFinish(true); }
+function ctResetFinish(cancelled){
+  if(ctRS.step){clearInterval(ctRS.step);ctRS.step=null;}
+  if(ctRS.tmr){clearInterval(ctRS.tmr);ctRS.tmr=null;}
+  var el=(performance.now()-ctRS.t0)/1000;
+  document.getElementById('ctResetTimer').textContent=el.toFixed(1)+' s';
+  document.getElementById('ctResetBtn').disabled=false;
+  document.getElementById('ctResetCancelBtn').style.display='none';
+  var badge=document.getElementById('ctResetBadge');
+  if(cancelled){ badge.textContent='CANCELLED'; badge.className='badge off';
+    document.getElementById('ctResetStep').textContent='cancelled at '+ctRS.i+' / '+ctRS.doms.length;
+    ctRS.logs.push('CANCELLED by user at '+el.toFixed(1)+' s'); }
+  else { badge.textContent='DONE'; badge.className='badge pass';
+    document.getElementById('ctResetBar').style.width='100%';
+    document.getElementById('ctResetStep').textContent='done — '+ctRS.doms.length+' routes rerun in '+el.toFixed(1)+' s';
+    ctRS.logs.push('DONE — '+ctRS.doms.length+' routes rerun in '+el.toFixed(1)+' s'); }
+  document.getElementById('ctResetLog').textContent=ctRS.logs.join('\n');
+}
+
+/* ---- Consumer theme toggle (B): dark <-> light (white), same data ---- */
+function toggleTheme(){
+  var light=document.body.classList.toggle('light');
+  var b=document.getElementById('themeBtn'); if(b) b.textContent=light?'☀ LIGHT':'☾ DARK';
+}
+
+/* ---- FAIR view (A): white, large font, latest router + throughput + ratio vs previous ---- */
+function updateFair(){
+  var el=document.getElementById('fairBody'); if(!el) return;
+  if(!ctRouters.length){ el.innerHTML='<div style="font-size:26px;color:#555">No router yet — route a domain in the CONTENT · DOMAINS tab and the latest one shows here.</div>'; return; }
+  var last=ctRouters[ctRouters.length-1], prev=ctRouters.length>1?ctRouters[ctRouters.length-2]:null;
+  var ratio=prev?(last.tp/prev.tp):null;
+  el.innerHTML=
+    '<div style="font-size:19px;color:#1e7a3c;letter-spacing:2px;text-transform:uppercase">Latest router</div>'
+    +'<div style="font-size:52px;font-weight:700;margin:2px 0">'+last.make+' '+last.model+'</div>'
+    +'<div style="font-size:20px;color:#666;margin-bottom:28px">serving '+last.domain+'</div>'
+    +'<div style="display:flex;gap:64px;flex-wrap:wrap">'
+      +'<div><div style="font-size:18px;color:#1e7a3c;text-transform:uppercase">Data throughput</div><div style="font-size:64px;font-weight:700">'+last.tp+'<span style="font-size:26px;color:#666"> Mbps</span></div></div>'
+      +'<div><div style="font-size:18px;color:#1e7a3c;text-transform:uppercase">Vs previous</div><div style="font-size:64px;font-weight:700">'+(ratio?ratio.toFixed(1)+'x':'—')+'</div></div>'
+    +'</div>';
+}
+
+/* ---- REACH OF NETWORK burst test (C): real requests, rolling averages ---- */
+var rnReaches=[], rnCount=0, rnSchedTimer=null;
+function rnFetch(url){ return fetch(url,{cache:'no-store'}).then(function(r){return r.blob();}).then(function(b){return b.size;}).catch(function(){return 0;}); }
+function rnCb(){ return '?cb='+Math.floor(performance.now())+'_'+(rnCount+1); }
+function rnRun(){
+  var btn=document.getElementById('rnRunBtn'); if(btn) btn.disabled=true;
+  var badge=document.getElementById('rnBadge'); badge.textContent='REACHING'; badge.className='badge run';
+  var t0=performance.now(), bytes=0, sends=0, recvs=0;
+  /* 1) large package */
+  rnFetch('index.html'+rnCb()).then(function(sz){ bytes+=sz; sends++;
+    /* 2) pause, then continue: send 15 x 2 = 30 (parallel) */
+    return new Promise(function(res){ setTimeout(res,120); });
+  }).then(function(){
+    var ps=[]; for(var k=0;k<30;k++){ ps.push(rnFetch('manifest.webmanifest'+rnCb())); }
+    return Promise.all(ps);
+  }).then(function(arr){ arr.forEach(function(s){bytes+=s;}); sends+=30;
+    /* 3) receive 31 (parallel) */
+    var ps=[]; for(var k=0;k<31;k++){ ps.push(rnFetch('icon-192.png'+rnCb())); }
+    return Promise.all(ps);
+  }).then(function(arr){ arr.forEach(function(s){bytes+=s;}); recvs+=31;
+    var dt=(performance.now()-t0)/1000;
+    rnCount++; rnReaches.push({t:performance.now(),bytes:bytes});
+    if(rnReaches.length>400) rnReaches.shift();
+    document.getElementById('rnBytes').textContent=bytes.toLocaleString()+' B';
+    document.getElementById('rnSR').textContent=sends+' send / '+recvs+' recv';
+    document.getElementById('rnTime').textContent=dt.toFixed(2)+' s';
+    document.getElementById('rnCount').textContent=rnCount;
+    rnAverages();
+    var line='['+new Date().toLocaleTimeString()+'] reach #'+rnCount+' — '+bytes.toLocaleString()+' B in '+dt.toFixed(2)+'s ('+sends+' send / '+recvs+' recv)';
+    var lg=document.getElementById('rnLog'); lg.textContent=(lg.textContent==='no reach test yet.'?'':lg.textContent+'\n')+line;
+    badge.textContent='REACHED'; badge.className='badge pass';
+    if(btn) btn.disabled=false;
+  });
+}
+function rnWinAvg(ms){
+  var now=performance.now(), inWin=rnReaches.filter(function(r){return now-r.t<=ms;});
+  if(!inWin.length) return null;
+  var s=0; inWin.forEach(function(r){s+=r.bytes;}); return Math.round(s/inWin.length);
+}
+function rnAverages(){
+  function put(id,ms){var v=rnWinAvg(ms),e=document.getElementById(id); if(e) e.textContent=(v==null?'—':v.toLocaleString()+' B');}
+  put('rnA3',3000); put('rnA5',5000); put('rnA180',180000); put('rnA60',3600000);
+}
+function rnSchedule(){
+  var btn=document.getElementById('rnSchedBtn');
+  if(rnSchedTimer){ clearInterval(rnSchedTimer); rnSchedTimer=null; if(btn) btn.textContent='SCHEDULE: OFF (every 4 min)'; return; }
+  if(btn) btn.textContent='SCHEDULE: ON (every 4 min)';
+  rnRun(); rnSchedTimer=setInterval(rnRun,240000); /* every 4th minute */
+}
+
+/* ---- BATTERY milliwatts (D): real level + estimated draw over 25 reach attempts ---- */
+function batRun(){
+  var lg=document.getElementById('batLog');
+  var hour=new Date().getHours(), dayFactor=1-hour/30;    /* full first, less along the day */
+  var N=25, series=[], now=0;
+  for(var i=1;i<=N;i++){
+    /* your curve: 20000 · |sin/cos(i·2101/20000)| · (i·0.0127·ln) · day decay, in mW */
+    var mW=Math.abs(Math.sin(i*2101/20000)+Math.cos(i*2101/20000))*(i*0.0127*Math.log(i+1))*dayFactor*180;
+    series.push(mW); now=mW;
+  }
+  function show(bat){
+    var lvl=bat?Math.round(bat.level*100)+' %':'n/a', chg=bat?(bat.charging?'yes ⚡':'no'):'n/a';
+    document.getElementById('batLvl').textContent=lvl;
+    document.getElementById('batChg').textContent=chg;
+    document.getElementById('batNow').innerHTML=Math.round(now)+' <small>mW</small>';
+    document.getElementById('batAtt').textContent=N+' / 25';
+    var b=document.getElementById('batBadge'); b.textContent=bat?'LIVE':'ESTIMATE'; b.className='badge '+(bat?'pass':'info');
+    var L=['BATTERY — level '+lvl+'  charging '+chg,'estimated draw over 25 reach attempts (mW), full first then less along day:'];
+    for(var i=0;i<N;i++){ L.push('  attempt '+(i+1)+':  '+Math.round(series[i])+' mW'); }
+    document.getElementById('batLog').textContent=L.join('\n');
+  }
+  if(navigator.getBattery){ navigator.getBattery().then(show).catch(function(){show(null);}); }
+  else { show(null); }
+}
 var FW=[['ALLOW','tcp/443','HTTPS inbound','ok'],['ALLOW','tcp/22','SSH mgmt','ok'],['DENY','udp/*','unsolicited UDP','ok'],['ALLOW','tcp/8443','engine API','ok'],['DENY','icmp','ping flood guard','ok'],['ALLOW','tcp/53','DNS','ok']];
 (function(){var b=document.getElementById('fwBody');FW.forEach(function(r){
   b.innerHTML+='<div class="row"><span class="name">'+r[0]+' · '+r[1]+'</span><span class="val">'+r[2]+'</span><span class="status ok">PASS</span></div>';});})();
@@ -1522,7 +1746,7 @@ function amDraw(){
   function node(p,col,r,fill){
     c.beginPath();c.arc(p.x,p.y,r,0,7);c.fillStyle=fill||col;c.fill();
     c.lineWidth=2;c.strokeStyle=col;c.stroke();
-    c.fillStyle='#e8ede9';c.font='11px Courier New';c.fillText(p.n,p.x+r+3,p.y+4);
+    c.fillStyle='var(--white)';c.font='11px Courier New';c.fillText(p.n,p.x+r+3,p.y+4);
   }
   node(amISP,'#ffd740',7,'rgba(255,215,64,0.25)');
   amHW.forEach(function(h,idx){
@@ -1577,7 +1801,7 @@ function amMeasure(){
   h+='<tr style="color:var(--dim)"><td style="padding:4px 6px">LINK</td><td style="text-align:right">LENGTH</td><td style="text-align:right">LATENCY</td><td style="text-align:right">THROUGHPUT</td></tr>';
   segs.forEach(function(s){
     var lat=2+s.km*0.92, mbps=Math.max(60,Math.round(1000-s.km*46));
-    h+='<tr style="border-top:1px solid rgba(31,51,32,0.5)"><td style="padding:4px 6px;color:'+(s.leg?'var(--gold)':'var(--green)')+'">'+s.n+'</td><td style="text-align:right;color:#e8ede9">'+amFmt(s.km,2)+' km</td><td style="text-align:right;color:#e8ede9">'+amFmt(lat,1)+' ms</td><td style="text-align:right;color:#e8ede9">'+mbps+' Mbps</td></tr>';
+    h+='<tr style="border-top:1px solid rgba(31,51,32,0.5)"><td style="padding:4px 6px;color:'+(s.leg?'var(--gold)':'var(--green)')+'">'+s.n+'</td><td style="text-align:right;color:var(--white)">'+amFmt(s.km,2)+' km</td><td style="text-align:right;color:var(--white)">'+amFmt(lat,1)+' ms</td><td style="text-align:right;color:var(--white)">'+mbps+' Mbps</td></tr>';
   });
   h+='</table>';
   document.getElementById('amEdges').innerHTML=h;
@@ -2199,7 +2423,8 @@ document.querySelectorAll('.tab').forEach(function(t){
     document.getElementById('p-'+t.getAttribute('data-p')).classList.add('active');
     if(t.getAttribute('data-p')==='routes' && !rtSrcConfirmed){ rtOpenGate(); }
     if(t.getAttribute('data-p')==='devview'){ renderDevView(); }
-    if(t.getAttribute('data-p')==='content'){ ctInit(); if(!document.getElementById('ctRouteOut').innerHTML) ctRoute(); }
+    if(t.getAttribute('data-p')==='content'){ ctInit(); }
+    if(t.getAttribute('data-p')==='fair'){ updateFair(); }
   };
 });
 
