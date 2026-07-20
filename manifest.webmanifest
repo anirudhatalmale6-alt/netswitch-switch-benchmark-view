@@ -1,7 +1,7 @@
 {
-  "name": "NetSwitch — Route & Benchmark",
-  "short_name": "NetSwitch",
-  "description": "UK network routing visualiser: pick a source, see the route, latency, signal-path distance and the equipment on the path. Runs offline.",
+  "name": "6GGW — 5G Gateway Router",
+  "short_name": "6GGW",
+  "description": "6GGW — 5G gateway & routing app. Pick a source, see the fastest route, real measured speed/latency, S1-U / S11 tunnelling and the equipment on the path. Installable on Android & iOS. Runs offline.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",

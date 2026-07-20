@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NetSwitch — Switch &amp; Benchmark Net</title>
+<title>6GGW — 5G Gateway Router</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0a0f0a">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="NetSwitch">
+<meta name="apple-mobile-web-app-title" content="6GGW">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" type="image/png" href="icon-192.png">
 <style>
@@ -21,35 +21,36 @@
 --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--white);font-family:var(--sans);font-size:14px;line-height:1.55;min-height:100vh}
-.container{max-width:1000px;margin:0 auto;padding:14px 18px}
-.header{text-align:center;padding:26px 0 18px;border-bottom:1px solid var(--border)}
-.header h1{font-size:26px;letter-spacing:6px;color:var(--green);font-weight:300}
-.header .sub{font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:2px;margin-top:4px}
-.header .version{font-family:var(--mono);font-size:10px;color:var(--gold);margin-top:8px;background:rgba(255,215,64,0.08);display:inline-block;padding:2px 12px;border-radius:2px}
+body{background:var(--bg);color:var(--white);font-family:var(--sans);font-size:16px;line-height:1.6;min-height:100vh}
+.container{max-width:1060px;margin:0 auto;padding:14px 18px}
+.header{text-align:center;padding:28px 0 20px;border-bottom:1px solid var(--border)}
+.header h1{font-size:44px;letter-spacing:10px;color:var(--green);font-weight:600}
+.header .tagline{font-family:var(--mono);font-size:13px;color:var(--green2);letter-spacing:5px;margin-top:6px;text-transform:uppercase}
+.header .sub{font-family:var(--mono);font-size:12px;color:var(--dim);letter-spacing:2px;margin-top:8px}
+.header .version{font-family:var(--mono);font-size:11px;color:var(--gold);margin-top:10px;background:rgba(255,215,64,0.08);display:inline-block;padding:3px 14px;border-radius:2px}
 
 /* Tabs */
-.tabs{display:flex;gap:6px;margin:18px 0 8px;flex-wrap:wrap}
-.tab{font-family:var(--mono);font-size:12px;letter-spacing:1px;padding:9px 16px;background:var(--card);border:1px solid var(--border);border-radius:3px;color:var(--dim);cursor:pointer;user-select:none}
+.tabs{display:flex;gap:7px;margin:20px 0 8px;flex-wrap:wrap}
+.tab{font-family:var(--mono);font-size:13px;letter-spacing:1px;padding:11px 18px;background:var(--card);border:1px solid var(--border);border-radius:3px;color:var(--dim);cursor:pointer;user-select:none}
 .tab.active{color:var(--bg);background:var(--green);border-color:var(--green);font-weight:700}
 .panel{display:none}
 .panel.active{display:block}
 
 .section{margin:16px 0;border:1px solid var(--border);border-radius:4px;overflow:hidden}
 .section-head{background:var(--card);padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-.section-head h2{font-size:13px;letter-spacing:2px;color:var(--green2);font-weight:400}
+.section-head h2{font-size:15px;letter-spacing:1.5px;color:var(--green2);font-weight:500}
 .section-head .badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:2px;color:var(--bg)}
 .badge.pass{background:var(--green)}.badge.run{background:var(--gold);color:#000}.badge.info{background:var(--blue)}.badge.off{background:var(--dim)}
 .section-body{padding:14px 16px;background:var(--card2)}
 
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
 .stat{background:var(--card);border:1px solid var(--border);border-radius:3px;padding:12px}
-.stat .k{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:1px;text-transform:uppercase}
-.stat .v{font-size:22px;color:var(--white);margin-top:4px;font-weight:300}
-.stat .v small{font-size:12px;color:var(--dim)}
+.stat .k{font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:1px;text-transform:uppercase}
+.stat .v{font-size:28px;color:var(--white);margin-top:5px;font-weight:400}
+.stat .v small{font-size:13px;color:var(--dim)}
 .stat.good .v{color:var(--green)}.stat.warn .v{color:var(--gold)}
 
-.row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(31,51,32,0.5);font-family:var(--mono);font-size:12px}
+.row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(31,51,32,0.5);font-family:var(--mono);font-size:13px}
 .row:last-child{border-bottom:none}
 .row .name{color:var(--dim);flex:1}
 .row .val{color:var(--white);min-width:120px;text-align:right}
@@ -61,7 +62,7 @@ body{background:var(--bg);color:var(--white);font-family:var(--sans);font-size:1
 .bar>span{display:block;height:100%;background:linear-gradient(90deg,var(--green),var(--gold));border-radius:4px;transition:width .5s ease}
 .bar-lbl{display:flex;justify-content:space-between;margin-top:4px;font-family:var(--mono);font-size:10px;color:var(--dim)}
 
-button{font-family:var(--mono);font-size:12px;letter-spacing:1px;padding:9px 18px;background:var(--green);color:var(--bg);border:none;border-radius:3px;cursor:pointer;font-weight:700}
+button{font-family:var(--mono);font-size:13px;letter-spacing:1px;padding:10px 20px;background:var(--green);color:var(--bg);border:none;border-radius:3px;cursor:pointer;font-weight:700}
 button:hover{background:var(--green2)}
 button.ghost{background:transparent;border:1px solid var(--border);color:var(--dim)}
 button.ghost:hover{color:var(--white);border-color:var(--green2)}
@@ -79,7 +80,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green2)}
 .toggle input:checked+.sw{background:rgba(0,230,118,0.35)}
 .toggle input:checked+.sw::after{left:20px;background:var(--green)}
 
-pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padding:14px;font-family:var(--mono);font-size:11px;color:#9fd6a8;white-space:pre;overflow:auto;max-height:420px;line-height:1.45}
+pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padding:14px;font-family:var(--mono);font-size:12.5px;color:#9fd6a8;white-space:pre;overflow:auto;max-height:460px;line-height:1.5}
 .ports{display:grid;grid-template-columns:repeat(auto-fit,minmax(74px,1fr));gap:8px;margin:8px 0}
 .port{background:var(--card);border:1px solid var(--border);border-radius:3px;padding:10px 6px;text-align:center;cursor:pointer;font-family:var(--mono);font-size:11px}
 .port .p{font-size:14px;color:var(--white)}
@@ -87,12 +88,12 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
 .port.up{border-color:var(--green2)}.port.up .s{color:var(--green)}
 .port.down{opacity:.5}
 .foot{text-align:center;font-family:var(--mono);font-size:10px;color:var(--dim);padding:24px 0 30px;letter-spacing:1px}
-.note{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:6px;line-height:1.6}
+.note{font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:6px;line-height:1.65}
 .hl{color:var(--gold)}
 /* ROUTES — director white theme (scoped) */
 #p-routes .rt-wrap{background:#ffffff;color:#12261a;border-radius:6px;padding:16px;border:1px solid #cdd9d0}
 #p-routes .rt-head{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid #e2eae4;padding-bottom:8px;margin-bottom:10px;flex-wrap:wrap}
-#p-routes .rt-head h2{font-size:15px;color:#0b6b39;font-weight:600;letter-spacing:.4px}
+#p-routes .rt-head h2{font-size:18px;color:#0b6b39;font-weight:700;letter-spacing:.4px}
 #p-routes .rt-badge{font-family:var(--mono);font-size:10px;background:#0b6b39;color:#fff;padding:3px 10px;border-radius:3px;letter-spacing:1px}
 #p-routes .rt-controls{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}
 #p-routes label{display:block;color:#5a6b60;text-transform:uppercase;font-size:10px;font-family:var(--mono);letter-spacing:1px;margin-bottom:3px}
@@ -103,7 +104,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
 #p-routes .rt-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
 #p-routes .rt-card{background:#f6faf7;border:1px solid #dce6df;border-radius:4px;padding:10px}
 #p-routes .rt-card .k{font-size:10px;color:#5a6b60;text-transform:uppercase;font-family:var(--mono);letter-spacing:1px}
-#p-routes .rt-card .v{font-size:18px;color:#0b6b39;margin-top:3px}
+#p-routes .rt-card .v{font-size:21px;color:#0b6b39;margin-top:3px;font-weight:600}
 #p-routes table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;color:#12261a}
 #p-routes th{text-align:left;color:#5a6b60;font-weight:600;padding:6px;border-bottom:2px solid #cdd9d0;white-space:nowrap}
 #p-routes td{padding:6px;border-bottom:1px solid #e8efe9;vertical-align:top}
@@ -144,9 +145,10 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
 <body>
 <div class="container">
   <div class="header">
-    <h1>NETSWITCH</h1>
+    <h1>6GGW</h1>
+    <div class="tagline">5G GATEWAY ROUTER</div>
     <div class="sub">SWITCH · PERFORMANCE MONITOR · 6G GATEWAY · CPU·GPU · AREA MAP · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · Engine v2.34.0 · serverless · installable app (PWA) — runs on Android 13 · Windows · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.35.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
   </div>
 
   <div class="tabs">
@@ -192,9 +194,10 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
       <div class="section-head"><h2>PERFORMANCE MONITOR — GPU / DRAM / CPU / SCREEN</h2><span class="badge run" id="benchBadge">IDLE</span></div>
       <div class="section-body">
         <div class="grid" id="benchStats">
+          <div class="stat"><div class="k">CPU · DRAMM</div><div class="v" id="bCpu">—</div></div>
+          <div class="stat"><div class="k">GPU Screen Write</div><div class="v" id="bGpuW">—</div></div>
           <div class="stat"><div class="k">GPU Fill Rate</div><div class="v" id="bGpu">—</div></div>
           <div class="stat"><div class="k">Memory Bandwidth</div><div class="v" id="bDram">—</div></div>
-          <div class="stat"><div class="k">CPU Compute</div><div class="v" id="bCpu">—</div></div>
           <div class="stat"><div class="k">Screen Refresh</div><div class="v" id="bScrn">—</div></div>
           <div class="stat good"><div class="k">Battery</div><div class="v" id="bBatt">—</div></div>
           <div class="stat good"><div class="k">Download Speed</div><div class="v" id="bLoad">—</div></div>
@@ -204,7 +207,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
           <button class="ghost" onclick="resetBench()">RESET</button>
         </div>
         <div id="benchBars"></div>
-        <div class="note">Measured live on <span class="hl">this device and this connection</span> — CPU on real Web Worker threads (your DRAMM Mixed CPU Workload), memory bandwidth from a real array read+write, GPU from a real WebGL fill test, screen refresh from the browser's frame clock, battery from the Battery API, and download speed + round-trip latency from a real file fetch. Nothing here is hardcoded; numbers will differ on every phone, PC and network. Works offline for the CPU / memory / GPU / screen tests (the connection tests need internet).</div>
+        <div class="note">Measured live on <span class="hl">this device and this connection</span> — CPU on real Web Worker threads (your DRAMM Mixed CPU Workload), GPU screen-writing from a real WebGL fill test (pixel write bandwidth + 1080p frames/s), memory bandwidth from a real array read+write, screen refresh from the browser's frame clock, battery from the Battery API, and download speed + round-trip latency from a real file fetch. These are the <span class="hl">raw measured numbers</span> — no scoring or comparison bars. Nothing is hardcoded; numbers will differ on every phone, PC and network (iOS, Windows, Mac, Linux all read differently). Works offline for the CPU / GPU / memory / screen tests (the connection tests need internet).</div>
       </div>
     </div>
 
@@ -539,35 +542,41 @@ function benchGrade(v,ref){ return Math.max(3,Math.min(100,Math.round(v/ref*100)
 function runBench(){
   var badge=document.getElementById('benchBadge');
   badge.textContent='MEASURING…'; badge.className='badge run';
-  ['bGpu','bDram','bCpu','bScrn','bBatt','bLoad'].forEach(function(id){document.getElementById(id).textContent='…';});
+  ['bGpu','bGpuW','bDram','bCpu','bScrn','bBatt','bLoad'].forEach(function(id){document.getElementById(id).textContent='…';});
   var gpu=benchGpuMpix(), dram=benchDramGBs();
   Promise.all([benchCpu(),benchScreenHz(),benchLatency(),benchDownload(),benchBattery()]).then(function(r){
     var cpu=r[0],hz=r[1],lat=r[2],dl=r[3],bat=r[4];
+    /* GPU screen-writing: the fill test writes pixels to the framebuffer; 1 pixel = 4 bytes (RGBA).
+       Report the write bandwidth and the equivalent full-screen 1080p frames it could paint per second. */
+    var gpuWmbs = gpu!=null ? gpu*4 : null;                 /* MB/s (Mpix/s × 4 bytes) */
+    var gpuFps1080 = gpu!=null ? gpu/2.0736 : null;         /* 1920×1080 = 2.0736 Mpix per frame */
+    function fmtBW(mbs){ return mbs==null?'n/a':(mbs>=1000?(mbs/1000).toFixed(1)+' GB/s':mbs.toFixed(0)+' MB/s'); }
     document.getElementById('bGpu').textContent = gpu!=null? gpu.toFixed(0)+' Mpix/s':'n/a';
+    document.getElementById('bGpuW').textContent = fmtBW(gpuWmbs);
     document.getElementById('bDram').textContent = dram.gbs>0? dram.gbs.toFixed(1)+' GB/s':'n/a';
     document.getElementById('bCpu').textContent = cpu.multiMops>0? cpu.multiMops.toFixed(0)+' MOPS':'n/a';
     document.getElementById('bScrn').textContent = hz.toFixed(0)+' Hz';
     document.getElementById('bBatt').textContent = bat? bat.level+'%'+(bat.charging?' ⚡':''):'n/a';
     document.getElementById('bLoad').textContent = dl? (dl.mbps>=1? dl.mbps.toFixed(1)+' Mbps':Math.round(dl.kbps)+' kbps') : (navigator.onLine?'—':'offline');
+    /* plain measured readout — the raw numbers this device produced, no scoring / comparison bars. */
     var bars=document.getElementById('benchBars'); bars.innerHTML='';
     var rows=[
-      {lbl:'CPU compute · '+cpu.mode, val:cpu.multiMops.toFixed(0)+' MOPS (1 core '+cpu.singleMops.toFixed(0)+')', pct:benchGrade(cpu.multiMops,2000)},
-      {lbl:'GPU fill rate', val:(gpu!=null?gpu.toFixed(0)+' Mpix/s':'n/a'), pct:gpu!=null?benchGrade(gpu,20000):0},
-      {lbl:'Memory bandwidth', val:(dram.gbs>0?dram.gbs.toFixed(1)+' GB/s':'n/a'), pct:benchGrade(dram.gbs,10)},
-      {lbl:'Screen refresh', val:hz.toFixed(0)+' Hz', pct:benchGrade(hz,120)},
-      {lbl:'Download speed', val:(dl?(dl.mbps>=1?dl.mbps.toFixed(1)+' Mbps':Math.round(dl.kbps)+' kbps')+' · '+(dl.bytes/1e6).toFixed(1)+' MB in '+dl.s.toFixed(2)+'s':(navigator.onLine?'not reachable':'offline')), pct:dl?benchGrade(dl.mbps,300):0},
-      {lbl:'Network latency (round-trip)', val:(lat?lat.med.toFixed(0)+' ms (best '+lat.min.toFixed(0)+')':(navigator.onLine?'not reachable':'offline')), pct:lat?Math.max(3,Math.min(100,Math.round(120-lat.med))):0}
+      {lbl:'CPU · DRAMM ('+cpu.mode+')', val:cpu.multiMops.toFixed(0)+' MOPS &#183; 1 core '+cpu.singleMops.toFixed(0)+' MOPS'},
+      {lbl:'GPU screen write', val:(gpu!=null? fmtBW(gpuWmbs)+' &#183; '+gpuFps1080.toFixed(0)+' fps at 1080p':'n/a')},
+      {lbl:'GPU fill rate', val:(gpu!=null?gpu.toFixed(0)+' Mpix/s':'n/a')},
+      {lbl:'Memory bandwidth', val:(dram.gbs>0?dram.gbs.toFixed(1)+' GB/s':'n/a')},
+      {lbl:'Screen refresh', val:hz.toFixed(0)+' Hz'},
+      {lbl:'Download speed', val:(dl?(dl.mbps>=1?dl.mbps.toFixed(1)+' Mbps':Math.round(dl.kbps)+' kbps')+' &#183; '+(dl.bytes/1e6).toFixed(1)+' MB in '+dl.s.toFixed(2)+'s':(navigator.onLine?'not reachable':'offline'))},
+      {lbl:'Network latency (round-trip)', val:(lat?lat.med.toFixed(0)+' ms (best '+lat.min.toFixed(0)+')':(navigator.onLine?'not reachable':'offline'))}
     ];
     rows.forEach(function(x){
-      bars.innerHTML+='<div class="bar-wrap"><div class="bar"><span style="width:0%" data-w="'+x.pct+'"></span></div><div class="bar-lbl"><span>'+x.lbl+'</span><span>'+x.val+'</span></div></div>';
+      bars.innerHTML+='<div class="row"><span class="name">'+x.lbl+'</span><span class="val" style="min-width:auto;color:var(--green)">'+x.val+'</span></div>';
     });
-    var spans=bars.querySelectorAll('.bar>span');
-    setTimeout(function(){spans.forEach(function(s){s.style.width=s.getAttribute('data-w')+'%';});},60);
     badge.textContent='MEASURED'; badge.className='badge pass';
   });
 }
 function resetBench(){
-  ['bGpu','bDram','bCpu','bScrn','bBatt','bLoad'].forEach(function(id){document.getElementById(id).textContent='—';});
+  ['bGpu','bGpuW','bDram','bCpu','bScrn','bBatt','bLoad'].forEach(function(id){document.getElementById(id).textContent='—';});
   document.getElementById('benchBars').innerHTML='';
   document.getElementById('benchBadge').textContent='IDLE';document.getElementById('benchBadge').className='badge run';
 }
@@ -1530,10 +1539,30 @@ function rtCustomerPerf(path){
       effBody+=' Both routes here have low enough latency that the line is the limit, not the route — latency starts to bite on long-haul or busy routes.';
   }
   var effHtml='<div class="rt-formula" style="border-left:3px solid #12557a;background:#eef6fb"><b style="color:#12557a">&#8595; Effective download speed (single connection)</b> &mdash; '+effBody+'<br><span style="color:#5a6b60">This is why routing matters: NetSwitch does not change your line or your hardware — it lowers the latency, and lower latency raises the real download speed. Change the window with the Download-window selector to match your customer\'s setup.</span></div>';
+  /* protocol & tunnelling — honest model of the mobile-core interfaces this route would carry:
+     user data on S1-U (GTP-U / UDP 2152), control on S11 (GTP-C / UDP 2123), a GTP Echo keepalive
+     for path management, and a dual-network primary+backup (dual-connectivity / failover) view.
+     Clearly a protocol model over the measured route, not a live EPC/5GC deployment. */
+  var mtu=1500, gtpOh=36;                                  /* GTP-U 8 + UDP 8 + outer IPv4 20 */
+  var tunTp=Math.round(bottleneck*(1-gtpOh/mtu));          /* goodput inside the tunnel */
+  var teid='0x'+(((Math.abs(Math.round(path[0][0]*1000))^(path.length*2654435761))>>>0).toString(16).toUpperCase());
+  var backup = alt ? rtPathMetrics(alt) : null;
+  var dualRow = backup
+    ? 'Primary path '+rtt.toFixed(1)+' ms &#183; backup path '+backup.rtt.toFixed(1)+' ms &mdash; dual-network: if the primary degrades, the bearers fail over to the backup without dropping the session.'
+    : 'One path available for this pair &mdash; pick a source/destination with a second route to enable dual-network failover.';
+  var protoHtml='<div class="rt-formula" style="border-left:3px solid #6a3d9a;background:#f4eefb">'
+    +'<b style="color:#6a3d9a">&#8644; Protocol &amp; tunnelling &mdash; S1-U / S11 &#183; GTP &#183; dual network</b>'
+    +'<table style="border:0;margin-top:8px"><tbody>'
+    +'<tr><td style="width:74px;color:#6a3d9a;font-weight:700">S1-U</td><td>user-plane data in a <b>GTP-U</b> tunnel over UDP&nbsp;2152 &#183; TEID '+teid+' &#183; tunnelled goodput <b>'+tunTp+' Mbps</b> (after the ~'+gtpOh+'-byte GTP/UDP/IP header)</td></tr>'
+    +'<tr><td style="color:#6a3d9a;font-weight:700">S11</td><td>control-plane, <b>GTP-C</b> over UDP&nbsp;2123 &mdash; bearer / session setup between the switching node and the gateway</td></tr>'
+    +'<tr><td style="color:#6a3d9a;font-weight:700">Echo</td><td>GTP path keepalive &mdash; Echo Request/Response every 60&nbsp;s, round-trip '+rtt.toFixed(1)+' ms on this route; a missed echo triggers failover</td></tr>'
+    +'<tr><td style="color:#6a3d9a;font-weight:700">Dual net</td><td>'+dualRow+'</td></tr>'
+    +'</tbody></table>'
+    +'<span style="color:#5a6b60">Protocol view: 6GGW models the route as an LTE/5G core path — user traffic in an S1-U GTP-U tunnel, control on S11, GTP Echo for liveness — so the tunnelling and dual-network failover story sits on the real route geography above.</span></div>';
   var verdict = (surf&&stream&&cloud) ? 'Excellent for fast surfing and business data — pages feel instant, calls and cloud apps run smoothly, and it stays fast on a phone.'
               : (surf&&calls) ? 'Strong for surfing, calls and everyday business data, on desktop and mobile.'
               : 'Usable for business data; best over the shorter London routes for instant response.';
-  return '<div class="rt-summary">'+cards+'</div>'+ gainHtml + effHtml +
+  return '<div class="rt-summary">'+cards+'</div>'+ gainHtml + effHtml + protoHtml +
     '<div class="rt-formula"><b>Customer verdict:</b> '+verdict+'<br>'+
     '<table style="border:0;margin-top:6px"><tbody>'+
     chk(surf,'Fast web surfing','first response about '+rtt.toFixed(0)+' ms &#183; ~'+rtt5.toFixed(0)+' ms on 5G')+
