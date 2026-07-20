@@ -146,7 +146,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
   <div class="header">
     <h1>NETSWITCH</h1>
     <div class="sub">ROUTER / SWITCH · BENCHMARK NET · CPU·GPU · AREA MAP · UK ROUTES · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · Engine v2.29.0 · serverless · installable app (PWA) — runs on Android 13 · Windows · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · Engine v2.30.0 · serverless · installable app (PWA) — runs on Android 13 · Windows · any browser</div>
   </div>
 
   <div class="tabs">
@@ -1320,36 +1320,57 @@ function rtPerfGrade(rtt){
   if(rtt<100) return {t:'Good',c:'#7a5300'};
   return {t:'Usable',c:'#a3560b'};
 }
-function rtCustomerPerf(path){
+/* one route -> its headline numbers (shared so the active + alternate paths use the same math) */
+function rtPathMetrics(path){
   var totMs=0, bottleneck=Infinity;
   for(var i=1;i<path.length;i++){
     var km=rtHav(path[i-1],path[i]), ms=0.6+km*0.014; totMs+=ms;
     var mbps=Math.max(60,Math.round(1000-km*46)); if(mbps<bottleneck) bottleneck=mbps;
   }
   if(!isFinite(bottleneck)) bottleneck=1000;
-  var rtt=totMs*2, g=rtPerfGrade(rtt);
+  return {ms:totMs, rtt:totMs*2, mbps:bottleneck};
+}
+function rtCustomerPerf(path){
+  var m=rtPathMetrics(path), rtt=m.rtt, bottleneck=m.mbps, g=rtPerfGrade(rtt);
   var gbFile=8192/bottleneck, hd=Math.floor(bottleneck/5), uhd=Math.floor(bottleneck/25);
+  /* mobile / radio — phone speed is capped by the cellular radio, and the radio adds a little
+     access latency (typical 4G ~40 ms, 5G ~15 ms on top of the network response). */
+  var r4=Math.min(bottleneck,40), r5=Math.min(bottleneck,300), rtt4=rtt+40, rtt5=rtt+15;
   function card(k,v,sub){ return '<div class="rt-card"><div class="k">'+k+'</div><div class="v">'+v+'</div>'+(sub?'<div style="font-size:10px;color:#5a6b60;font-family:var(--mono);margin-top:2px">'+sub+'</div>':'')+'</div>'; }
   function chk(ok,label,detail){ return '<tr><td style="width:24px;color:'+(ok?'#0b6b39':'#a3560b')+';font-weight:700">'+(ok?'&#10003;':'&#126;')+'</td><td><b>'+label+'</b></td><td style="color:#5a6b60">'+detail+'</td></tr>'; }
   var surf=rtt<90, calls=rtt<100, stream=bottleneck>=25, cloud=rtt<90, files=bottleneck>=100;
   var cards=
     card('Response (round-trip)','<span style="color:'+g.c+'">'+rtt.toFixed(1)+' ms</span>',g.t)+
     card('Effective line speed',bottleneck+' Mbps','business-grade')+
+    card('Mobile · phone (4G / 5G)','~'+r5+' Mbps','5G '+rtt5.toFixed(0)+' ms &#183; 4G ~'+r4+' Mbps / '+rtt4.toFixed(0)+' ms')+
     card('1 GB business file',gbFile.toFixed(1)+' s','at line speed')+
     card('Live HD video',hd+' streams','or '+uhd+' in 4K');
-  var verdict = (surf&&stream&&cloud) ? 'Excellent for fast surfing and business data — pages feel instant, calls and cloud apps run smoothly.'
-              : (surf&&calls) ? 'Strong for surfing, calls and everyday business data.'
+  /* route-optimization gain — the chosen route vs the other available path (the reason to switch).
+     honest %: computed from both paths' real geography, only shown when this route is the faster one. */
+  var alt=rtAltPath(), gainHtml='';
+  if(alt){
+    var am=rtPathMetrics(alt);
+    var respGain=am.rtt>0?(am.rtt-rtt)/am.rtt*100:0, spdGain=am.mbps>0?(bottleneck-am.mbps)/am.mbps*100:0;
+    if(respGain>=0.5 || spdGain>=0.5){
+      var parts=[];
+      if(respGain>=0.5) parts.push('<b style="color:#0b6b39">+'+respGain.toFixed(0)+'%</b> faster response');
+      if(spdGain>=0.5) parts.push('<b style="color:#0b6b39">+'+spdGain.toFixed(0)+'%</b> more throughput');
+      gainHtml='<div class="rt-formula" style="border-left:3px solid #0b6b39;background:#f2faf5"><b style="color:#0b6b39">&#9889; Route optimization gain</b> &mdash; this route vs the other available path: '+parts.join(' &#183; ')+'. NetSwitch picks the faster path automatically; the customer feels it most on a phone, where a quicker response opens pages and apps noticeably sooner.</div>';
+    }
+  }
+  var verdict = (surf&&stream&&cloud) ? 'Excellent for fast surfing and business data — pages feel instant, calls and cloud apps run smoothly, and it stays fast on a phone.'
+              : (surf&&calls) ? 'Strong for surfing, calls and everyday business data, on desktop and mobile.'
               : 'Usable for business data; best over the shorter London routes for instant response.';
-  return '<div class="rt-summary">'+cards+'</div>'+
+  return '<div class="rt-summary">'+cards+'</div>'+ gainHtml +
     '<div class="rt-formula"><b>Customer verdict:</b> '+verdict+'<br>'+
     '<table style="border:0;margin-top:6px"><tbody>'+
-    chk(surf,'Fast web surfing','first response about '+rtt.toFixed(0)+' ms')+
+    chk(surf,'Fast web surfing','first response about '+rtt.toFixed(0)+' ms &#183; ~'+rtt5.toFixed(0)+' ms on 5G')+
     chk(calls,'Video calls · Teams / Zoom','low-latency, no lag')+
     chk(stream,'HD / 4K streaming',hd+' HD or '+uhd+' 4K streams at once')+
     chk(cloud,'Cloud business apps','SQL / ERP / SaaS respond quickly')+
     chk(files,'Large file transfer & backups','1 GB in about '+gbFile.toFixed(0)+' s')+
     '</tbody></table>'+
-    '<span style="color:#5a6b60">Estimated on a business-grade line — response time from the real route geography, throughput from the app\'s benchmark model (end-to-end speed is limited by the slowest link).</span></div>';
+    '<span style="color:#5a6b60">Estimated on a business-grade line — response from the real route geography, throughput from the app\'s benchmark model (end-to-end speed limited by the slowest link). Mobile figures assume typical 4G / 5G radio access.</span></div>';
 }
 function rtRender(){
   var path=rtActivePath();
