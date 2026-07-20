@@ -146,7 +146,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
   <div class="header">
     <h1>NETSWITCH</h1>
     <div class="sub">ROUTER / SWITCH · BENCHMARK NET · CPU·GPU · AREA MAP · UK ROUTES · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · Engine v2.31.0 · serverless · installable app (PWA) — runs on Android 13 · Windows · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · Engine v2.32.0 · serverless · installable app (PWA) — runs on Android 13 · Windows · any browser</div>
   </div>
 
   <div class="tabs">
@@ -204,7 +204,21 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
           <button class="ghost" onclick="resetBench()">RESET</button>
         </div>
         <div id="benchBars"></div>
-        <div class="note">Measured live on <span class="hl">this device and this connection</span> — CPU on real Web Worker threads, memory bandwidth from a real array read+write, GPU from a real WebGL fill test, screen refresh from the browser's frame clock, battery from the Battery API, and download speed + round-trip latency from a real file fetch. Nothing here is hardcoded; numbers will differ on every phone, PC and network. Works offline for the CPU / memory / GPU / screen tests (the connection tests need internet).</div>
+        <div class="note">Measured live on <span class="hl">this device and this connection</span> — CPU on real Web Worker threads (your DRAMM Mixed CPU Workload), memory bandwidth from a real array read+write, GPU from a real WebGL fill test, screen refresh from the browser's frame clock, battery from the Battery API, and download speed + round-trip latency from a real file fetch. Nothing here is hardcoded; numbers will differ on every phone, PC and network. Works offline for the CPU / memory / GPU / screen tests (the connection tests need internet).</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>DRAMM CPU BENCHMARK — Mixed CPU Workload (your algorithm)</h2><span class="badge run" id="drammBadge">IDLE</span></div>
+      <div class="section-body">
+        <div class="note">This runs your <span class="hl">cpu_benchmark.cpp</span> ported faithfully to run in the browser / app — the same three phases (Integer, Float, Memory), the same fast_sin / fast_cos / fast_sqrt / fast_exp approximations, and the same metric (operations = iterations &#215; 3). It runs your workload on every CPU thread the device has.</div>
+        <div class="field-grid" style="margin-top:12px">
+          <div><label>Iterations (per thread)</label><input type="number" id="drammIters" value="3000000" step="500000"></div>
+        </div>
+        <div class="btn-row">
+          <button onclick="runDramm()">RUN DRAMM BENCHMARK</button>
+        </div>
+        <pre class="log" id="drammOut" style="margin-top:12px">Press RUN DRAMM BENCHMARK to run your Mixed CPU Workload on this device.</pre>
       </div>
     </div>
   </div>
@@ -447,12 +461,12 @@ var FW=[['ALLOW','tcp/443','HTTPS inbound','ok'],['ALLOW','tcp/22','SSH mgmt','o
    Battery: real Battery API. Connection: a real file download + real round-trip latency. */
 function benchCpu(){
   return new Promise(function(resolve){
-    var cores=navigator.hardwareConcurrency||4, iters=4000000;
+    var cores=navigator.hardwareConcurrency||4, iters=2000000;   /* DRAMM does 3 phases per iter */
     runCpuUnits(cores,iters,function(res){
-      var agg=0,best=Infinity;
-      res.forEach(function(r){ if(r.ms>0){ agg+=iters/(r.ms/1000); if(r.ms<best)best=r.ms; } });
-      resolve({multiMops:agg/1e6, singleMops:best<Infinity?(iters/(best/1000))/1e6:0,
-               cores:cores, mode:(res[0]&&res[0].seq)?'1 thread':cores+' threads'});
+      var agg=0,best=0;
+      res.forEach(function(r){ var ops=r.opsPerSec||(iters*3/(r.ms/1000)); agg+=ops; if(ops>best)best=ops; });
+      resolve({multiMops:agg/1e6, singleMops:best/1e6, cores:cores,
+               mode:(res[0]&&res[0].seq)?'1 thread':cores+' threads'});
     });
   });
 }
@@ -551,6 +565,49 @@ function resetBench(){
   ['bGpu','bDram','bCpu','bScrn','bBatt','bLoad'].forEach(function(id){document.getElementById(id).textContent='—';});
   document.getElementById('benchBars').innerHTML='';
   document.getElementById('benchBadge').textContent='IDLE';document.getElementById('benchBadge').className='badge run';
+}
+/* your DRAMM benchmark — prints in the same layout as your C++ print_results() */
+function runDramm(){
+  var badge=document.getElementById('drammBadge'); badge.textContent='RUNNING'; badge.className='badge run';
+  var iters=parseInt(document.getElementById('drammIters').value)||3000000;
+  var cores=navigator.hardwareConcurrency||4;
+  var out=document.getElementById('drammOut');
+  out.textContent='Running Mixed CPU Workload — '+iters.toLocaleString()+' iterations on '+cores+' thread(s)…';
+  setTimeout(function(){
+    runCpuUnits(cores,iters,function(res){
+      res.sort(function(a,b){return a.unit-b.unit;});
+      var mode=(res[0]&&res[0].seq)?'sequential · 1 thread':'parallel · '+cores+' threads';
+      var aggOps=0,bestOps=0,bestUnit=0,maxMs=0;
+      res.forEach(function(r){ var o=r.opsPerSec||0; aggOps+=o; if(o>bestOps){bestOps=o;bestUnit=r.unit;} if(r.ms>maxMs)maxMs=r.ms; });
+      var L=[];
+      L.push('========================================');
+      L.push(' CPU Benchmark Results  (DRAMM)');
+      L.push('========================================');
+      L.push('');
+      L.push('Benchmark Type: Mixed CPU Workload');
+      L.push('Iterations:     '+iters.toLocaleString()+'  (x3 = '+(iters*3).toLocaleString()+' operations per thread)');
+      L.push('Threads:        '+cores+'  ('+mode+')');
+      L.push('');
+      L.push('Per-thread:');
+      L.push('  UNIT |   TIME(s)   | OPERATIONS/SEC |  TIME/OP(ns)');
+      res.forEach(function(r){
+        L.push('  '+String(r.unit).padStart(4)+' | '+(r.ms/1000).toFixed(6).padStart(11)+' | '+Math.round(r.opsPerSec||0).toLocaleString().padStart(14)+' | '+(r.nsPerOp||0).toFixed(2).padStart(10));
+      });
+      L.push('');
+      L.push('Performance Metrics:');
+      L.push('  '+'Total Time:'.padEnd(24)+(maxMs/1000).toFixed(6)+' seconds (wall clock, all threads in parallel)');
+      L.push('  '+'Operations/Second:'.padEnd(24)+Math.round(aggOps).toLocaleString()+'   ('+(aggOps/1e6).toFixed(1)+' MOPS across all threads)');
+      L.push('  '+'Fastest single core:'.padEnd(24)+'CPU '+bestUnit+' -> '+Math.round(bestOps).toLocaleString()+' ops/s ('+(bestOps/1e6).toFixed(1)+' MOPS)');
+      L.push('  '+'Time/Operation:'.padEnd(24)+(bestOps>0?(1e9/bestOps).toFixed(2):'—')+' ns (fastest thread)');
+      L.push('');
+      L.push('Note: CPU benchmarks measure computational throughput and may vary based on');
+      L.push('      CPU frequency scaling, thermal throttling, and system load.');
+      L.push('AI-2-ORBIT Co. - Sami Leino 2026  ·  ported to serverless web/APK for NetSwitch');
+      L.push('========================================');
+      out.textContent=L.join('\n');
+      badge.textContent='DONE'; badge.className='badge pass';
+    });
+  },40);
 }
 
 /* ---------------- NET DATA ---------------- */
@@ -715,10 +772,28 @@ function detectHardware(){
   }
   return {cores:cores,gl:g};
 }
+/* ===== DRAMM CPU benchmark — faithful JS port of Sami Leino's cpu_benchmark.cpp =====
+   "Mixed CPU Workload" (Integer + Float + Memory). Same three phases, same fast_sin/cos/
+   sqrt/exp bit-tricks, same operation count (iterations x 3). One source string is the
+   single source of truth: it runs both inside the Web Workers and on the main thread. */
+var DRAMM_SRC = ""
++ "var _ab=new ArrayBuffer(8),_f64=new Float64Array(_ab),_u32=new Uint32Array(_ab);"
++ "function _xor64(a,b){var aH=Math.floor(a/4294967296),aL=a%4294967296,bH=Math.floor(b/4294967296),bL=b%4294967296;return ((aH^bH)>>>0)*4294967296+((aL^bL)>>>0);}"
++ "function _dint(n){var r=1;for(var i=0;i<n;i++){r=(r*31+17)%1000000007;var s=r*8192+Math.floor(r/524288);r=_xor64(r,s);}return r;}"
++ "var _TP=6.283185307179586,_PI=3.141592653589793,_HP=1.5707963267948966;"
++ "function _fsin(x){x-=_TP*Math.trunc(x/_TP);if(x<0)x+=_TP;var sg=1.0;if(x>_TP*0.5){x=_TP-x;sg=-1.0;}var nu=16.0*x*(_PI-x),de=5.0*_PI*_PI-4.0*x*(_PI-x);return sg*nu/de;}"
++ "function _fcos(x){return _fsin(x+_HP);}"
++ "var _SQH=0x1FF7A3BE,_SQL=0xA91D9B1B;"
++ "function _fsqrt(x){if(x<=0.0)return 0.0;_f64[0]=x;var lo=_u32[0],hi=_u32[1];var nl=((lo>>>1)|((hi&1)<<31))>>>0,nh=(hi>>>1)>>>0;var ls=nl+_SQL,cy=ls>=4294967296?1:0;_u32[0]=ls>>>0;_u32[1]=(nh+_SQH+cy)>>>0;var y=_f64[0];y=0.5*(y+x/y);y=0.5*(y+x/y);return y;}"
++ "var _EA=6497320848556798,_EB=4607182418800017408;"
++ "function _fexp(x){if(x>88.0)return 1.0e38;if(x<-88.0)return 0.0;var i=_EA*x+_EB,hi=Math.floor(i/4294967296),lo=i-hi*4294967296;_u32[0]=lo>>>0;_u32[1]=hi>>>0;return _f64[0];}"
++ "function _dflt(n){var r=1.0;for(var i=0;i<n;i++){r=_fsin(r+i)*_fcos(r);r=_fsqrt(r<0.0?-r+1.0:r+1.0);r=_fexp(r*0.1)-1.0;}return r;}"
++ "var _mem=null;"
++ "function _dmem(n){if(_mem===null){_mem=new Float64Array(1024);for(var k=0;k<1024;k++)_mem[k]=k*31+17;}var r=0;for(var i=0;i<n;i++){var ix=(i*7)%1024;r+=_mem[ix];_mem[ix]=((r%1000000007)*13)%1000000007;if(r>=1e14)r=r%1000000007;}return r;}"
++ "function drammRun(iters){var t0=(typeof performance!=='undefined'?performance.now():Date.now());var a=_dint(iters),b=_dflt(iters),c=_dmem(iters);var ms=(typeof performance!=='undefined'?performance.now():Date.now())-t0;if(ms<=0)ms=0.0001;return {iters:iters,ms:ms,opsPerSec:(iters*3)/(ms/1000),nsPerOp:(ms/(iters*3))*1e6,checksum:[a,b,c]};}";
+var DRAMM_LOCAL = new Function(DRAMM_SRC + ';return drammRun;')();
 function cpuWorkerCode(){
-  return 'self.onmessage=function(e){var n=e.data.iters,u=e.data.unit,s=1.0;'+
-         'var t0=performance.now();for(var i=0;i<n;i++){s+=Math.sqrt((i%9973)+1.7)*1.0000003;if(s>1e12)s=s%97.13;}'+
-         'var t1=performance.now();self.postMessage({unit:u,ms:(t1-t0),checksum:s});};';
+  return DRAMM_SRC + ';self.onmessage=function(e){var r=drammRun(e.data.iters);r.unit=e.data.unit;self.postMessage(r);};';
 }
 function runCpuUnits(cores,iters,cb){
   var results=[],done=0,useWorker=(typeof Worker!=='undefined');
@@ -742,13 +817,11 @@ function runCpuUnits(cores,iters,cb){
   }
   runSeq();
   function runSeq(){
-    // fallback: sequential single-thread, still real timings per unit
+    // fallback: sequential single-thread DRAMM workload, still real timings per unit
     results.length=0;
     for(var u=0;u<cores;u++){
-      var s=1.0,t0=performance.now();
-      for(var i=0;i<iters;i++){s+=Math.sqrt((i%9973)+1.7)*1.0000003;if(s>1e12)s=s%97.13;}
-      var t1=performance.now();
-      results.push({unit:u,ms:(t1-t0),checksum:s,seq:true});
+      var r=DRAMM_LOCAL(iters); r.unit=u; r.seq=true;
+      results.push(r);
     }
     finish();
   }

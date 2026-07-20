@@ -1,6 +1,6 @@
 /* NetSwitch service worker — offline-first so a live demo never depends on venue wifi.
    Stale-while-revalidate: serve from cache instantly, refresh in the background when online. */
-var CACHE = 'netswitch-v2.31.0';
+var CACHE = 'netswitch-v2.32.0';
 var ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', function (e) {
