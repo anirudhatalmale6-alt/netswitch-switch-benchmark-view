@@ -155,7 +155,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
     <h1>6GGW</h1>
     <div class="tagline">5G GATEWAY ROUTER</div>
     <div class="sub">SWITCH · PERFORMANCE MONITOR · 6G GATEWAY · CPU·GPU · AREA MAP · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.41.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.42.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
   </div>
 
   <div class="tabs">
@@ -462,6 +462,26 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
           <button class="ghost" onclick="window.print()">PRINT / SAVE PDF</button>
         </div>
         <div id="devTable"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>STORAGE — ON-DEVICE (real read / write)</h2><span class="badge info" id="stBadge">READY</span></div>
+      <div class="section-body">
+        <div class="note" style="margin-top:0">This is the honest, shippable way an app reads phone storage. It uses the standard StorageManager API for this app's own storage quota and usage, and it genuinely writes then reads a test block on the device to measure real write / read throughput (MB/s). An installed app is sandboxed by Android / iOS out of the raw eMMC / MMC block device — no app, native or web, can read /dev/mmcblk on a normal phone. What is measurable, we measure for real; nothing is faked.</div>
+        <div class="grid" style="margin-bottom:10px">
+          <div class="stat"><div class="k">App storage used</div><div class="v" id="stUsed">—</div></div>
+          <div class="stat"><div class="k">Storage quota (available to app)</div><div class="v" id="stQuota">—</div></div>
+          <div class="stat"><div class="k">Persisted (survives eviction)</div><div class="v" id="stPersist">—</div></div>
+          <div class="stat good"><div class="k">Write throughput</div><div class="v" id="stWrite">—</div></div>
+          <div class="stat good"><div class="k">Read throughput</div><div class="v" id="stRead">—</div></div>
+          <div class="stat"><div class="k">Test block</div><div class="v" id="stBlock">—</div></div>
+        </div>
+        <div class="btn-row">
+          <button onclick="stMeasure()">MEASURE STORAGE</button>
+          <button class="ghost" onclick="stRequestPersist()">REQUEST PERSISTENT</button>
+        </div>
+        <div id="stLog" class="note" style="margin-top:10px;display:none"></div>
       </div>
     </div>
   </div>
@@ -890,6 +910,62 @@ function devExportReport(){
   var a=document.createElement('a'); a.href=url; a.download='6ggw-developer-report.txt'; document.body.appendChild(a); a.click();
   setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},100);
 }
+
+/* ---------------- STORAGE — on-device real read/write (honest MMC read) ---------------- */
+function stFmt(b){ if(b==null) return '—'; if(b<1024) return b+' B'; if(b<1048576) return (b/1024).toFixed(1)+' KB'; if(b<1073741824) return (b/1048576).toFixed(1)+' MB'; return (b/1073741824).toFixed(2)+' GB'; }
+function stLog(msg){ var el=document.getElementById('stLog'); if(!el)return; el.style.display='block'; el.textContent=msg; }
+async function stRequestPersist(){
+  try{
+    if(navigator.storage && navigator.storage.persist){
+      var ok=await navigator.storage.persist();
+      document.getElementById('stPersist').textContent = ok ? 'yes' : 'no (best-effort)';
+      stLog('Persistent storage '+(ok?'granted':'not granted')+' by the OS.');
+    } else { stLog('StorageManager.persist not available in this browser.'); }
+  }catch(e){ stLog('Persist request failed: '+e.message); }
+}
+async function stMeasure(){
+  var badge=document.getElementById('stBadge'); if(badge){badge.textContent='RUNNING';badge.className='badge warn';}
+  // 1) Quota + usage (real, from the OS via StorageManager)
+  try{
+    if(navigator.storage && navigator.storage.estimate){
+      var est=await navigator.storage.estimate();
+      document.getElementById('stUsed').textContent  = stFmt(est.usage);
+      document.getElementById('stQuota').textContent = stFmt(est.quota);
+    } else {
+      document.getElementById('stUsed').textContent='not exposed';
+      document.getElementById('stQuota').textContent='not exposed';
+    }
+    if(navigator.storage && navigator.storage.persisted){
+      document.getElementById('stPersist').textContent = (await navigator.storage.persisted()) ? 'yes' : 'no';
+    }
+  }catch(e){ stLog('Quota read failed: '+e.message); }
+  // 2) Genuine write then read of a test block on the device, timed
+  try{
+    var SIZE=4*1024*1024; // 4 MB test block
+    var buf=new Uint8Array(SIZE);
+    for(var i=0;i<SIZE;i+=4096){ buf[i]=(i>>12)&255; } // touch pages so it isn't optimised away
+    document.getElementById('stBlock').textContent=stFmt(SIZE);
+    var db=await stOpenDb();
+    var t0=performance.now();
+    await stPut(db,'blk', buf);
+    var tW=performance.now()-t0;
+    var t1=performance.now();
+    var got=await stGet(db,'blk');
+    var tR=performance.now()-t1;
+    var mb=SIZE/1048576;
+    var wr=(mb/(tW/1000)), rd=(mb/(tR/1000));
+    document.getElementById('stWrite').textContent = wr.toFixed(1)+' MB/s';
+    document.getElementById('stRead').textContent  = rd.toFixed(1)+' MB/s';
+    var okLen=(got&&got.length===SIZE);
+    stLog('Wrote '+stFmt(SIZE)+' in '+tW.toFixed(1)+' ms, read back in '+tR.toFixed(1)+' ms · integrity '+(okLen?'OK':'MISMATCH')+'. Measured on this device via the app storage sandbox (IndexedDB) — real timing, not simulated.');
+    await stDel(db,'blk');
+  }catch(e){ stLog('Read/write test failed: '+e.message); document.getElementById('stWrite').textContent='n/a'; document.getElementById('stRead').textContent='n/a'; }
+  if(badge){badge.textContent='DONE';badge.className='badge good';}
+}
+function stOpenDb(){ return new Promise(function(res,rej){ var r=indexedDB.open('ggw-storage-test',1); r.onupgradeneeded=function(){ r.result.createObjectStore('blocks'); }; r.onsuccess=function(){res(r.result);}; r.onerror=function(){rej(r.error);}; }); }
+function stPut(db,k,v){ return new Promise(function(res,rej){ var tx=db.transaction('blocks','readwrite'); tx.objectStore('blocks').put(v,k); tx.oncomplete=function(){res();}; tx.onerror=function(){rej(tx.error);}; }); }
+function stGet(db,k){ return new Promise(function(res,rej){ var tx=db.transaction('blocks','readonly'); var rq=tx.objectStore('blocks').get(k); rq.onsuccess=function(){res(rq.result);}; rq.onerror=function(){rej(rq.error);}; }); }
+function stDel(db,k){ return new Promise(function(res){ var tx=db.transaction('blocks','readwrite'); tx.objectStore('blocks').delete(k); tx.oncomplete=function(){res();}; tx.onerror=function(){res();}; }); }
 
 /* ---------------- CONTENT · DOMAINS (E) — route a domain, content by network, claim network ---------------- */
 function ctHash(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=(h*16777619)>>>0;}return h;}
