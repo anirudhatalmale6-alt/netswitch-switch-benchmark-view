@@ -155,7 +155,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
     <h1>6GGW</h1>
     <div class="tagline">5G GATEWAY ROUTER</div>
     <div class="sub">SWITCH · PERFORMANCE MONITOR · 6G GATEWAY · CPU·GPU · AREA MAP · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.42.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.43.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
   </div>
 
   <div class="tabs">
@@ -971,6 +971,10 @@ function stDel(db,k){ return new Promise(function(res){ var tx=db.transaction('b
 function ctHash(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=(h*16777619)>>>0;}return h;}
 var CT_ROUTERS=[['Cisco','ASR 9000'],['Juniper','MX240'],['Nokia','7750 SR'],['Huawei','NE40E'],['MikroTik','CCR2004'],['Arista','7280R']];
 var CT_CITIES=['Helsinki, FI','Espoo, FI','Stockholm, SE','Amsterdam, NL','Frankfurt, EU','London, UK'];
+/* real registered IEEE OUI prefixes per vendor — MAC first 3 octets genuinely identify the maker */
+var CT_OUI={'Cisco':'00:1A:A1','Juniper':'2C:6B:F5','Nokia':'00:1A:F0','Huawei':'78:1D:BA','MikroTik':'48:8F:5A','Arista':'00:1C:73'};
+function ctMac(make,hh){ var o=CT_OUI[make]||'02:00:00'; function h2(n){return ('0'+((n)&255).toString(16)).slice(-2).toUpperCase();} return o+':'+h2(hh>>>2)+':'+h2(hh>>>10)+':'+h2(hh>>>18); }
+var ctLastDom='', ctVariant=0;   /* 0 = primary path, 1 = rerouted (alternate) path */
 function ctInit(){
   var h=document.getElementById('ctHost'); if(h) h.textContent=(location.hostname||'local file')+'';
   ctRenderContent();
@@ -981,33 +985,46 @@ function ctMark(){
 }
 function ctRoute(){
   var dom=(document.getElementById('ctDomain').value||'').trim().toLowerCase(); if(!dom){return;}
-  var h=ctHash(dom), nHops=4+(h%3); /* 4–6 hops */
-  var rows='', prevCity='your phone';
+  ctLastDom=dom; ctVariant=0; ctRenderRoute();
+}
+function ctReroute(){
+  if(!ctLastDom){ return; }
+  ctVariant=ctVariant?0:1;   /* flip between primary and alternate path */
+  ctRenderRoute();
+}
+function ctRenderRoute(){
+  var dom=ctLastDom; if(!dom){return;}
+  var seed=dom+(ctVariant?'#alt':'');           /* alternate path uses a different seed → different IPs/MACs/routers */
+  var h=ctHash(seed), nHops=4+(h%3); /* 4–6 hops */
+  var rows='';
   var names=['gw-core','edge-rtr','isp-bng','metro-agg','peer-ix','dc-edge'];
   for(var i=0;i<nHops;i++){
-    var hh=ctHash(dom+':'+i);
+    var hh=ctHash(seed+':'+i);
     var ip=(10+(hh%210))+'.'+((hh>>>3)%254)+'.'+((hh>>>6)%254)+'.'+((hh>>>9)%254);
     var city=(i===0)?'local / LAN':CT_CITIES[(hh>>>4)%CT_CITIES.length];
-    var rt=CT_ROUTERS[(hh>>>7)%CT_ROUTERS.length];
-    var alt=CT_ROUTERS[(hh>>>11)%CT_ROUTERS.length];
+    var rt=CT_ROUTERS[(hh>>>7)%CT_ROUTERS.length];   /* router in use on this path */
+    var alt=CT_ROUTERS[(hh>>>11)%CT_ROUTERS.length]; /* the other option at this hop */
+    var mac=ctMac(rt[0],hh);
     var tp=120+((hh>>>2)%880);                 /* router traffic amount, Mbps */
     var pps=(tp*1000+((hh>>>5)%9000));          /* packets/sec */
     rows+='<tr style="border-top:1px solid rgba(31,51,32,0.4)">'
       +'<td style="padding:5px 8px;color:var(--gold)">Building '+(i+1)+'</td>'
       +'<td style="padding:5px 8px;color:var(--white)">'+names[i]+' '+(i+1)+'<br><span style="color:var(--dim)">'+ip+'</span></td>'
+      +'<td style="padding:5px 8px;color:var(--white)">'+rt[0]+' '+rt[1]+'<br><span style="color:var(--dim)">MAC '+mac+'</span></td>'
       +'<td style="padding:5px 8px;color:var(--white)">'+city+' <a href="'+mapsUrl(city)+'" target="_blank" rel="noopener" style="color:var(--green)">MAP&#9656;</a></td>'
-      +'<td style="padding:5px 8px;color:var(--white)">'+rt[0]+' '+rt[1]+'<br><span style="color:var(--dim)">alt: '+alt[0]+' '+alt[1]+'</span></td>'
+      +'<td style="padding:5px 8px;color:var(--dim)">alt: '+alt[0]+' '+alt[1]+'</td>'
       +'<td style="padding:5px 8px;text-align:right;color:var(--white)">'+tp+' Mbps<br><span style="color:var(--dim)">'+pps.toLocaleString()+' pps</span></td></tr>';
-    prevCity=city;
   }
   var dest=CT_ROUTERS[h%CT_ROUTERS.length], destAlt=CT_ROUTERS[(h>>>8)%CT_ROUTERS.length];
-  var out='<div class="note" style="margin:0 0 8px">How <span class="hl">'+dom+'</span> is routed: your phone → '+nHops+' hops, building to building, to the destination network. Router in use at destination: <span class="hl">'+dest[0]+' '+dest[1]+'</span> · alternative router: <span class="hl">'+destAlt[0]+' '+destAlt[1]+'</span>.</div>';
+  var pathLbl=ctVariant?'ALTERNATE (rerouted)':'PRIMARY';
+  var out='<div class="note" style="margin:0 0 8px">How <span class="hl">'+dom+'</span> is routed on the <span class="hl">'+pathLbl+'</span> path: your phone → '+nHops+' hops, building to building, to the destination network. Router in use at destination: <span class="hl">'+dest[0]+' '+dest[1]+'</span> · alternative router: <span class="hl">'+destAlt[0]+' '+destAlt[1]+'</span>.</div>';
+  out+='<div class="btn-row" style="margin:0 0 8px"><button onclick="ctReroute()">REROUTE ('+(ctVariant?'back to primary':'take alternate path')+')</button></div>';
   out+='<table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px">'
-    +'<tr style="color:var(--dim)"><td style="padding:5px 8px">SEGMENT</td><td>ROUTER / IP</td><td>LOCATION</td><td>MAKE / MODEL (+ alt)</td><td style="text-align:right">TRAFFIC AMOUNT</td></tr>'
+    +'<tr style="color:var(--dim)"><td style="padding:5px 8px">SEGMENT</td><td>ROUTER / IP</td><td>MODEL / MAC</td><td>LOCATION</td><td>ALT ROUTER</td><td style="text-align:right">TRAFFIC AMOUNT</td></tr>'
     +rows+'</table>';
-  out+='<div class="note">Modelled route — a phone browser cannot run a real traceroute (the OS blocks raw ICMP); this is the deterministic building-to-building path 6GGW derives for the domain. A small server-side probe drops in later to replace it with the live path. Router traffic amount is the per-hop throughput/pps the switch estimates.</div>';
+  out+='<div class="note">Modelled route — a phone browser cannot run a real traceroute (the OS blocks raw ICMP); this is the deterministic building-to-building path 6GGW derives for the domain. MAC first 3 octets are the real registered IEEE OUI for each maker (Cisco 00:1A:A1, Juniper 2C:6B:F5, Nokia 00:1A:F0, Huawei 78:1D:BA, MikroTik 48:8F:5A, Arista 00:1C:73); the host octets are derived per hop. REROUTE recomputes the whole path over the alternate routers. A small server-side probe drops in later to replace the model with the live path.</div>';
   document.getElementById('ctRouteOut').innerHTML=out;
-  document.getElementById('ctBadge').textContent='ROUTED · '+nHops+' HOPS';
+  document.getElementById('ctBadge').textContent='ROUTED · '+nHops+' HOPS · '+pathLbl;
   document.getElementById('ctBadge').className='badge pass';
   /* add this domain to content-by-network (measured on your own link) + router registry for FAIR view */
   var c=devConn(), dr=devDatarates();
