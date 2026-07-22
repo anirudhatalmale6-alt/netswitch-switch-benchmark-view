@@ -148,14 +148,14 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
 #rtInstall{font-family:var(--mono);font-size:11px;letter-spacing:1px;padding:7px 12px;border-radius:3px;cursor:pointer;font-weight:700;border:1px solid #0b6b39;background:#fff;color:#0b6b39;display:none}
 </style>
 </head>
-<body>
+<body class="light">
 <div class="container">
   <div class="header">
-    <button class="ghost" id="themeBtn" onclick="toggleTheme()" style="position:absolute;right:14px;top:14px;padding:7px 14px">☾ DARK</button>
+    <button class="ghost" id="themeBtn" onclick="toggleTheme()" style="position:absolute;right:14px;top:14px;padding:7px 14px">☀ LIGHT</button>
     <h1>6GGW</h1>
     <div class="tagline">5G GATEWAY ROUTER</div>
     <div class="sub">SWITCH · PERFORMANCE MONITOR · 6G GATEWAY · CPU·GPU · AREA MAP · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.43.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.44.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
   </div>
 
   <div class="tabs">
@@ -329,16 +329,21 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
           <div class="section-body" id="cgGpuBody"><div class="note">Real WebGL renderer string + fragment fill timing. Works on device, desktop and cloud browser — no install, no server.</div></div>
         </div>
         <div class="section">
-          <div class="section-head"><h2>MEMORY / JAM GUARD (RAM, not ROM)</h2><span class="badge run" id="memBadge">—</span></div>
+          <div class="section-head"><h2>RAM · CPU · CHROME HEAP (live jam guard)</h2><span class="badge run" id="memBadge">—</span></div>
           <div class="section-body">
             <div class="grid">
+              <div class="stat"><div class="k">Device RAM</div><div class="v" id="memRam">—</div></div>
+              <div class="stat"><div class="k">CPU cores</div><div class="v" id="memCores">—</div></div>
+              <div class="stat" id="memCpuStat"><div class="k">CPU load (main thread)</div><div class="v" id="memCpu">—</div></div>
               <div class="stat"><div class="k">Used JS Heap</div><div class="v" id="memUsed">—</div></div>
+              <div class="stat"><div class="k">Total JS Heap</div><div class="v" id="memTotal">—</div></div>
               <div class="stat"><div class="k">Heap Limit</div><div class="v" id="memLimit">—</div></div>
               <div class="stat" id="memPctStat"><div class="k">RAM Pressure</div><div class="v" id="memPct">—</div></div>
             </div>
             <div class="bar-wrap"><div class="bar"><span id="memBar" style="width:0%"></span></div><div class="bar-lbl"><span>heap used</span><span id="memBarLbl">—</span></div></div>
+            <div class="bar-wrap"><div class="bar"><span id="cpuBar" style="width:0%"></span></div><div class="bar-lbl"><span>CPU load</span><span id="cpuBarLbl">—</span></div></div>
             <div class="btn-row"><button onclick="freeMemory()">FREE MEMORY</button><button class="ghost" onclick="readMemory()">READ NOW</button><button class="ghost" onclick="stressMemory()">SIMULATE LOAD</button></div>
-            <div class="note"><span class="hl">RAM (heap), not ROM (storage)</span>, is what fills when a page pulls a big file from a cloud disk into HTML — the whole file lands in the tab's memory. Many tabs + a big pull crosses the per-app RAM limit and Chrome freezes (the "isn't responding" jam). Fix: <span class="hl">close pages before the jam</span>, and load big files in chunks, not all at once. The phone camera stalls for the same reason — it needs a large free RAM buffer for each frame; if RAM is near the limit the camera can't get a buffer.</div>
+            <div class="note">Live meter, refreshing every second. <span class="hl">Device RAM</span> and <span class="hl">CPU cores</span> are the phone's real hardware; <span class="hl">CPU load</span> is measured from how late the main thread ticks (event-loop lag), and the <span class="hl">Chrome heap</span> is this tab's RAM. The Android "<span class="hl">Process system isn't responding</span>" popup fires when either one maxes out: heap crosses the per-app RAM limit (a big cloud file pulled whole into HTML, or too many tabs), or the CPU is pinned so the main thread can't answer in time. Fix both ways: <span class="hl">close pages before the jam</span> and load big files in chunks, not all at once. The phone camera stalls for the same reason — it needs a large free RAM buffer per frame.</div>
           </div>
         </div>
         <div class="section">
@@ -1131,6 +1136,13 @@ function ctResetFinish(cancelled){
 function toggleTheme(){
   var light=document.body.classList.toggle('light');
   var b=document.getElementById('themeBtn'); if(b) b.textContent=light?'☀ LIGHT':'☾ DARK';
+  try{localStorage.setItem('ggw-theme',light?'light':'dark');}catch(e){}
+}
+function initTheme(){ // white background is the default; remember the user's last choice
+  var t; try{t=localStorage.getItem('ggw-theme');}catch(e){}
+  var light=(t!=='dark'); // default to light/white when unset
+  document.body.classList.toggle('light',light);
+  var b=document.getElementById('themeBtn'); if(b) b.textContent=light?'☀ LIGHT':'☾ DARK';
 }
 
 /* ---- FAIR view (A): white, large font, latest router + throughput + ratio vs previous ---- */
@@ -1680,14 +1692,39 @@ function runGpuTest(g){
   document.getElementById('cgGpuBadge').textContent='DONE';document.getElementById('cgGpuBadge').className='badge pass';
 }
 
-/* ---------------- MEMORY / JAM GUARD ---------------- */
+/* ---------------- RAM · CPU · CHROME HEAP (live jam guard) ---------------- */
 function fmtMB(b){return (b/1048576).toFixed(1)+' MB';}
+
+/* CPU main-thread load: measured, not modelled. A fixed-interval timer records
+   how late it actually fires (event-loop lag). No lag = idle; the busier the CPU
+   and the more the page is fighting other tabs, the later each tick lands. */
+var CPULOAD=0, _cpuExpect=250, _cpuLast=(window.performance?performance.now():0);
+(function cpuTick(){
+  var now=(window.performance?performance.now():_cpuLast+_cpuExpect);
+  var lag=Math.max(0, (now-_cpuLast)-_cpuExpect);      // ms the tick ran late
+  var inst=Math.min(100, lag/ _cpuExpect *100);        // lag as % of the interval
+  CPULOAD=CPULOAD*0.7 + inst*0.3;                       // smooth
+  _cpuLast=now;
+  try{setTimeout(cpuTick,_cpuExpect);}catch(e){}
+})();
+
 function readMemory(){
+  /* RAM + cores are always available; heap is Chrome-only */
+  var ramEl=document.getElementById('memRam'), coreEl=document.getElementById('memCores');
+  if(ramEl) ramEl.textContent=(navigator.deviceMemory?('~'+navigator.deviceMemory+' GB'):'not exposed');
+  if(coreEl) coreEl.textContent=(navigator.hardwareConcurrency||'—');
+  var cpu=Math.round(CPULOAD);
+  var cpuEl=document.getElementById('memCpu'); if(cpuEl) cpuEl.textContent=cpu+' %';
+  var cpuBar=document.getElementById('cpuBar'); if(cpuBar) cpuBar.style.width=Math.min(100,cpu)+'%';
+  var cpuLbl=document.getElementById('cpuBarLbl'); if(cpuLbl) cpuLbl.textContent=cpu+' % '+(cpu<40?'(smooth)':cpu<75?'(busy)':'(stalling)');
+  var cpuStat=document.getElementById('memCpuStat'); if(cpuStat) cpuStat.className='stat '+(cpu<40?'good':(cpu<75?'warn':''));
+
   var m=(window.performance&&performance.memory)?performance.memory:null;
   var badge=document.getElementById('memBadge');
   if(!m){
-    badge.textContent='N/A';badge.className='badge off';
+    badge.textContent='HEAP N/A';badge.className='badge off';
     document.getElementById('memUsed').textContent='not exposed';
+    document.getElementById('memTotal').textContent='—';
     document.getElementById('memLimit').textContent='—';
     document.getElementById('memPct').textContent='—';
     document.getElementById('memBarLbl').textContent='count your tabs';
@@ -1695,6 +1732,7 @@ function readMemory(){
   }
   var used=m.usedJSHeapSize,lim=m.jsHeapSizeLimit||1,pct=used/lim*100;
   document.getElementById('memUsed').textContent=fmtMB(used);
+  document.getElementById('memTotal').textContent=fmtMB(m.totalJSHeapSize||0);
   document.getElementById('memLimit').textContent=fmtMB(lim);
   document.getElementById('memPct').textContent=pct.toFixed(0)+' %';
   var bar=document.getElementById('memBar');bar.style.width=Math.min(100,pct).toFixed(0)+'%';
@@ -1705,6 +1743,8 @@ function readMemory(){
   if(pct<safeCut){st='SAFE';cls='pass';}
   else if(pct<nearCut){st='NEAR JAM';cls='run';}
   else{st='CRITICAL — CLOSE PAGES';cls='off';}
+  if(cpu>=85){st='CPU STALLING — CLOSE PAGES';cls='off';} // the "isn't responding" jam is CPU too
+  else if(cpu>=60&&cls==='pass'){st='CPU BUSY';cls='run';}
   if(d>0.05)st+=' · Tj '+THERM.tj.toFixed(0)+'°C';
   badge.textContent=st;badge.className='badge '+cls;
   document.getElementById('memPctStat').className='stat '+(pct<safeCut?'good':(pct<nearCut?'warn':''));
@@ -2524,10 +2564,11 @@ document.querySelectorAll('.tab').forEach(function(t){
 });
 
 /* init */
+try{initTheme();}catch(e){}
 renderPorts();updateSwitch();swRenderToggles();swRenderCtl();pollNet();runTestLog();renderDevView();updateLineLen();ctInit();
 try{detectHardware();}catch(e){}
 try{computeThermal();}catch(e){}
-try{readMemory();setInterval(readMemory,2000);}catch(e){}
+try{readMemory();setInterval(readMemory,1000);}catch(e){}
 try{amInit();}catch(e){}
 try{rtInit();}catch(e){}
 </script>
