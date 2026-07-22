@@ -155,7 +155,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
     <h1>6GGW</h1>
     <div class="tagline">5G GATEWAY ROUTER</div>
     <div class="sub">SWITCH · PERFORMANCE MONITOR · 6G GATEWAY · CPU·GPU · AREA MAP · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.47.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.48.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
   </div>
 
   <div class="gsearch" style="display:flex;gap:8px;margin:0 0 12px;align-items:stretch">
@@ -439,15 +439,21 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
             <option value="8">MPEG-4 Full HD 1080p — 8 Mbps</option>
             <option value="16">MPEG-4 UHD 4K — 16 Mbps</option>
           </select></div>
-          <div><label>Concurrent users (post addresses)</label><input type="number" id="seUsers" value="30000" step="1000"></div>
-          <div><label>Server uplink (Gbps)</label><input type="number" id="seServer" value="10" step="1"></div>
+          <div><label>Subscribers (post addresses)</label><input type="number" id="seUsers" value="30000" step="1000"></div>
+          <div><label>Server / node uplink (Gbps)</label><input type="number" id="seServer" value="10" step="1"></div>
+          <div><label>Online at peak (%)</label><input type="number" id="sePeak" value="30" min="1" max="100" step="5"></div>
+          <div><label>Split-for-cache (edge)</label><select id="seCache" onchange="streamEstimate()">
+            <option value="0">Off — origin serves every stream (unicast)</option>
+            <option value="1" selected>On — segments cached at edge, re-sent many times</option>
+          </select></div>
+          <div><label>Cache hit ratio (%)</label><input type="number" id="seHit" value="95" min="0" max="99" step="1"></div>
         </div>
         <div class="btn-row"><button onclick="streamEstimate()">RUN ESTIMATE</button><button class="ghost" onclick="seMeasureLink()">RE-MEASURE LINK</button></div>
         <div class="grid" style="margin-top:8px">
-          <div class="stat good"><div class="k">Total demand</div><div class="v" id="seDemand" style="font-size:18px">—</div></div>
-          <div class="stat"><div class="k">Streams one server serves</div><div class="v" id="seCap" style="font-size:18px">—</div></div>
-          <div class="stat" id="seCoverStat"><div class="k">Coverage of the address base</div><div class="v" id="seCover" style="font-size:18px">—</div></div>
-          <div class="stat"><div class="k">Servers needed for all</div><div class="v" id="seNeed" style="font-size:18px">—</div></div>
+          <div class="stat good"><div class="k">Peak demand (users online)</div><div class="v" id="seDemand" style="font-size:18px">—</div></div>
+          <div class="stat"><div class="k">Streams one node serves</div><div class="v" id="seCap" style="font-size:18px">—</div></div>
+          <div class="stat" id="seCoverStat"><div class="k">Origin egress (with cache)</div><div class="v" id="seCover" style="font-size:18px">—</div></div>
+          <div class="stat"><div class="k">Nodes needed (origin / edge)</div><div class="v" id="seNeed" style="font-size:18px">—</div></div>
         </div>
         <div id="seCmp" style="margin-top:10px"></div>
         <div class="note">Reference access speeds (fixed line / mobile Wi-Fi / 5G) are typical figures, labelled as such; your own downlink is measured live. The per-user check answers "can each address actually pull this stream," and the demand/capacity math is straight bitrate × users vs the server and access-link throughput — honest capacity planning, no fake numbers.</div>
@@ -1534,34 +1540,44 @@ function streamEstimate(){
   seMeasureLink();
   var svEl=document.getElementById('seService'); var svVal=svEl?parseFloat(svEl.value):NaN;
   var bitrate=(svEl && svEl.value)?svVal:(parseFloat(document.getElementById('seCodec').value)||1.5); // Mbps / stream
-  var users=Math.max(1,parseInt(document.getElementById('seUsers').value,10)||30000);
+  var subs=Math.max(1,parseInt(document.getElementById('seUsers').value,10)||30000);
   var serverGbps=Math.max(0.1,parseFloat(document.getElementById('seServer').value)||10);
+  var peak=Math.min(100,Math.max(1,parseFloat(document.getElementById('sePeak').value)||30));
+  var cacheOn=document.getElementById('seCache').value==='1';
+  var hit=cacheOn?Math.min(99,Math.max(0,parseFloat(document.getElementById('seHit').value)||0)):0;
   var serverMbps=serverGbps*1000;
+  var users=Math.max(1,Math.round(subs*peak/100));               // concurrent at peak
   var demand=bitrate*users, cap=Math.floor(serverMbps/bitrate);
-  var cover=Math.min(100, cap/users*100), need=Math.ceil(demand/serverMbps);
+  var originMbps=demand*(1-hit/100);                             // cache absorbs hit% at the edge
+  var edgeNodes=Math.ceil(demand/serverMbps);                    // edges serve users
+  var originNodes=Math.max(1,Math.ceil(originMbps/serverMbps));  // origin only feeds the misses
+  var cover=Math.min(100, cap/users*100);
   var svc=seServiceLabel();
-  document.getElementById('seDemand').textContent=(demand>=1000?(demand/1000).toFixed(1)+' Gbps':demand.toFixed(0)+' Mbps')+(svc?' · '+svc:'');
+  document.getElementById('seDemand').textContent=(demand>=1000?(demand/1000).toFixed(1)+' Gbps':demand.toFixed(0)+' Mbps')+' · '+users.toLocaleString()+' online'+(svc?' · '+svc:'');
   document.getElementById('seCap').textContent=cap.toLocaleString()+' streams';
-  document.getElementById('seCover').textContent=cover.toFixed(1)+' %';
-  document.getElementById('seNeed').textContent=need+' server'+(need>1?'s':'')+' @ '+serverGbps+' Gbps';
-  document.getElementById('seCoverStat').className='stat '+(cover>=100?'good':(cover>=50?'warn':''));
+  document.getElementById('seCover').textContent=cacheOn?((originMbps>=1000?(originMbps/1000).toFixed(1)+' Gbps':originMbps.toFixed(0)+' Mbps')+' ('+hit+'% cached)'):'no cache';
+  document.getElementById('seNeed').textContent=cacheOn?(originNodes+' origin / '+edgeNodes+' edge'):(edgeNodes+' server'+(edgeNodes>1?'s':''));
+  document.getElementById('seCoverStat').className='stat '+(cacheOn?'good':'warn');
+  var need=cacheOn?originNodes:edgeNodes;
   var acc=[{n:'Fixed line (fibre)',d:500},{n:'Mobile Wi-Fi (4G)',d:40},{n:'5G',d:300}];
   if(SE_DOWN!=null) acc.unshift({n:'Your link',d:SE_DOWN,me:true});
   var rows='<table style="width:100%;border-collapse:collapse;font-size:13px"><tr style="text-align:left"><th style="padding:6px 8px">Access</th><th>Downlink</th><th>Streams sustained</th><th>Fits '+bitrate+' Mbps?</th></tr>';
   acc.forEach(function(a){
     rows+='<tr style="border-top:1px solid var(--border)"><td style="padding:6px 8px">'+a.n+(a.me?' <span class="hl">(measured)</span>':' <span style="opacity:.6">(typical)</span>')+'</td><td>'+a.d+' Mbps</td><td>'+Math.floor(a.d/bitrate)+'</td><td>'+(a.d>=bitrate?'yes':'no')+'</td></tr>';
   });
-  var model='';
-  if(svc){
-    var live=/BBC (iPlayer\/ )?Live|Live TV/i.test(svc) || /Sounds/i.test(svc);
-    var edges=Math.ceil(need); var perEdge=Math.floor(serverMbps/bitrate);
-    model='<div class="note" style="margin-top:8px"><b>'+svc+' delivery model —</b> '+
-      (live
-        ? 'live/linear: one source can <span class="hl">multicast / CDN-fan-out</span>, so egress does not grow 1:1 per viewer — the number below is the worst case (pure unicast).'
-        : 'on-demand: each listener/viewer pulls their own <span class="hl">unicast</span> stream, so egress grows linearly with concurrent users.')+
-      ' At '+bitrate+' Mbps/stream, one '+serverGbps+' Gbps node sustains <b>'+perEdge.toLocaleString()+'</b> streams, so '+users.toLocaleString()+
-      ' concurrent addresses need <b>'+edges+'</b> node'+(edges>1?'s':'')+' ('+(demand/1000).toFixed(1)+' Gbps aggregate egress). Real services cut this with edge caching, adaptive bitrate and peak-concurrency &lt; total subscribers.</div>';
-  }
+  var perEdge=Math.floor(serverMbps/bitrate);
+  var saved=cacheOn?(demand-originMbps):0;
+  var model='<div class="note" style="margin-top:8px"><b>'+(svc?svc+' ':'')+'delivery model —</b> '+
+    (cacheOn
+      ? 'split-for-cache ON: the stream is cut into segments cached at the <span class="hl">edge</span>; each segment is fetched from origin once and <span class="hl">re-sent many times</span> to viewers. Origin only carries the misses ('+(100-hit)+'%), so if the origin container goes <span class="hl">offline the edges keep serving</span> from cache.'
+      : 'split-for-cache OFF: every viewer pulls a <span class="hl">unicast</span> stream straight from origin, so origin egress grows 1:1 with viewers and a container outage stops everyone.')+
+    ' At '+bitrate+' Mbps/stream one '+serverGbps+' Gbps node sustains <b>'+perEdge.toLocaleString()+'</b> streams. '+
+    subs.toLocaleString()+' subscribers × '+peak+'% peak = <b>'+users.toLocaleString()+'</b> online = '+
+    (demand>=1000?(demand/1000).toFixed(1)+' Gbps':demand.toFixed(0)+' Mbps')+' total'+
+    (cacheOn
+      ? ', but caching drops origin to <b>'+(originMbps>=1000?(originMbps/1000).toFixed(1)+' Gbps':originMbps.toFixed(0)+' Mbps')+'</b> ('+originNodes+' origin node'+(originNodes>1?'s':'')+' + '+edgeNodes+' edge node'+(edgeNodes>1?'s':'')+'; saves '+(saved>=1000?(saved/1000).toFixed(1)+' Gbps':saved.toFixed(0)+' Mbps')+' of origin bandwidth).'
+      : ' → <b>'+edgeNodes+'</b> node'+(edgeNodes>1?'s':'')+' of origin egress, no cache fallback.')+
+    ' Segment speed is held inside each node\'s thermal/uplink limit; adaptive bitrate trims it further.</div>';
   document.getElementById('seCmp').innerHTML=rows+'</table>'+model;
   var b=document.getElementById('seBadge'); b.textContent=(cover>=100?'SERVED':'CAPACITY '+cover.toFixed(0)+'%'); b.className='badge '+(cover>=100?'pass':'run');
 }

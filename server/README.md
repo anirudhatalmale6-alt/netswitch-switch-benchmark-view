@@ -26,6 +26,38 @@ Open `http://<server-ip>:8090/` — it serves the full 6GGW client, so **one box
 | `GET /api/ping` | Tiny echo. The **client (phone in your hand) times this request** to get the real server↔phone **line length** (ping to the phone, exactly as you described with bbc.co.uk). |
 | `GET /api/distance?host=bbc.co.uk` | Resolves DNS, then does a **real TCP-handshake RTT** to the host (3 samples, takes the closest), and computes the signal-path cable length from that latency using the constant `d = 0.0001607 m/ps`. This is a genuine network measurement — the honest, portable stand-in for a raw ICMP traceroute (which needs root and is blocked on most hosts). |
 | `GET /api/estimate?users=30000&bitrate=1.5&server=10` | MPEG-4 / broadband **delivery capacity** for N post addresses from one server, plus the fixed-line / mobile-Wi-Fi / 5G comparison. `bitrate` in Mbps/stream, `server` uplink in Gbps. |
+| `POST /api/device/health` | Store a device's health snapshot in its **own encrypted DB** (`data/devices/<id>.db`, AES-256-GCM at rest). Body: `{"id":"site-A", ...stats}`. |
+| `GET /api/device/history?id=site-A` | Read that device's stored history (decrypted server-side). |
+| `GET /api/devices` | List known device IDs. |
+| `POST /api/backup` | Bundle **all** device DBs into one gzipped, checksummed archive under `data/backups/*.6ggwbak.gz` — ready to copy onto tape (IBM/LTO) or offsite. Blobs stay encrypted inside the archive. |
+| `GET /api/backups` | List archives already made. |
+
+## Release channels
+
+`CHANNEL=dev|rc|prod node server.js` — same code, different config. `dev` = your working build, `rc` = the release candidate you test before promoting, `prod` = production. Reported in `/api/health` and stamped on every stored record. Set a real `DB_KEY=...` for rc/prod.
+
+## Backup of network data (for tape / LTO / offsite)
+
+The per-device DBs are already **AES-256-GCM encrypted at rest**, so backups carry the encrypted
+blobs byte-for-byte — the DB key never has to touch the backup process. Two ways:
+
+```bash
+# 1) via the running server
+curl -X POST http://localhost:8090/api/backup      # -> data/backups/backup-<channel>-<ts>.6ggwbak.gz (+ .sha256)
+
+# 2) standalone (no server, no key) — ideal for cron -> tape
+node backup.js                                     # writes the same archive
+
+# verify + restore an archive (checks the .sha256 and every per-device hash first)
+node restore.js data/backups/backup-....6ggwbak.gz --verify   # verify only
+node restore.js data/backups/backup-....6ggwbak.gz            # restore into data/devices/ (keeps *.db.bak)
+```
+
+Point your IBM tape / LTO job (or `rsync`, or any offsite store) at `data/backups/`. A nightly cron:
+
+```cron
+0 2 * * *  cd /path/to/server && node backup.js >> data/backups/backup.log 2>&1
+```
 
 ### Example
 
@@ -48,7 +80,8 @@ actually opens a socket to the target and times the round trip.
 ## Deploy notes
 
 - Runs anywhere Node runs. For a public box, put it behind nginx/Caddy for TLS, or run `PORT=80`.
-- No database, no secrets, no external calls except the latency probe you ask it to make.
+- Per-device data lives in `data/devices/` (encrypted at rest); backups in `data/backups/`. Both are git-ignored.
+- The only outbound calls are the latency probes you ask it to make. Set `DB_KEY` for rc/prod.
 - Android/Windows/Mac/Linux clients all just open the served page or call the API.
 
 © AI2ORBIT Co. 2026

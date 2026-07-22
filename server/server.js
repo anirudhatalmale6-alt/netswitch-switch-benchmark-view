@@ -39,10 +39,11 @@ const fs = require('fs');
 const path = require('path');
 const url = require('url');
 const crypto = require('crypto');
+const zlib = require('zlib');
 
 const PORT = process.env.PORT || 8090;
 const CHANNEL = (process.env.CHANNEL || 'dev').toLowerCase();   // dev | rc | prod
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 const SIGNAL_CONST = 0.0001607;            // metres per picosecond (client's constant; ~160,700 km/s cable)
 const CLIENT_DIR = path.join(__dirname, '..');   // the PWA lives one level up (index.html, sw.js, ...)
 const DB_DIR = path.join(__dirname, 'data', 'devices');
@@ -81,6 +82,40 @@ function saveHealth(id, record) {
 function listDevices() {
   if (!fs.existsSync(DB_DIR)) return [];
   return fs.readdirSync(DB_DIR).filter(f => f.endsWith('.db')).map(f => f.slice(0, -3));
+}
+
+/* ---- backup: bundle the (already-encrypted) per-device DBs into one gzipped, checksummed
+        archive under data/backups/. The blobs stay AES-256 encrypted inside the bundle, so it
+        is safe to copy straight onto tape (IBM/LTO) or any offline store. No DB key needed here. ---- */
+const BACKUP_DIR = path.join(__dirname, 'data', 'backups');
+function sha256(buf) { return crypto.createHash('sha256').update(buf).digest('hex'); }
+function makeBackup() {
+  fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  const ids = listDevices();
+  const files = [], blobs = {};
+  for (const id of ids) {
+    const raw = fs.readFileSync(deviceFile(id));            // encrypted bytes, as-is
+    files.push({ id, bytes: raw.length, sha256: sha256(raw) });
+    blobs[id] = raw.toString('base64');
+  }
+  const manifest = {
+    created_at: new Date().toISOString(), channel: CHANNEL, version: VERSION,
+    device_count: ids.length, files, encryption: 'AES-256-GCM at rest (blobs unchanged)'
+  };
+  const bundleJson = Buffer.from(JSON.stringify({ manifest, blobs }));
+  const gz = zlib.gzipSync(bundleJson);
+  const stamp = manifest.created_at.replace(/[:.]/g, '-');
+  const name = 'backup-' + CHANNEL + '-' + stamp + '.6ggwbak.gz';
+  const outPath = path.join(BACKUP_DIR, name);
+  fs.writeFileSync(outPath, gz);
+  fs.writeFileSync(outPath + '.sha256', sha256(gz) + '  ' + name + '\n');
+  return { file: name, path: outPath, devices: ids.length, bytes: gz.length,
+    bundle_sha256: sha256(gz), manifest };
+}
+function listBackups() {
+  if (!fs.existsSync(BACKUP_DIR)) return [];
+  return fs.readdirSync(BACKUP_DIR).filter(f => f.endsWith('.6ggwbak.gz'))
+    .map(f => ({ file: f, bytes: fs.statSync(path.join(BACKUP_DIR, f)).size }));
 }
 
 /* ---- real TCP-handshake RTT to host:port (ms), rejects on failure ---- */
@@ -222,6 +257,8 @@ const srv = http.createServer(async (req, res) => {
       return json(res, 200, { id: safeId(id), history: readHistory(id) });
     }
     if (u.pathname === '/api/devices') return json(res, 200, { channel: CHANNEL, devices: listDevices() });
+    if (u.pathname === '/api/backup' && req.method === 'POST') return json(res, 200, makeBackup());
+    if (u.pathname === '/api/backups') return json(res, 200, { channel: CHANNEL, dir: BACKUP_DIR, backups: listBackups() });
     return serveStatic(req, res, u.pathname);
   } catch (e) {
     return json(res, 502, { error: String(e && e.message || e) });
@@ -237,6 +274,8 @@ srv.listen(PORT, () => {
   console.log('  POST /api/device/health      {"id":"phone-01", ...stats}   (per-device encrypted DB)');
   console.log('  GET  /api/device/history?id=phone-01');
   console.log('  GET  /api/devices');
+  console.log('  POST /api/backup             (bundle all device DBs -> data/backups/*.6ggwbak.gz, for tape/LTO)');
+  console.log('  GET  /api/backups');
   console.log('  GET  /                        (serves the bundled 6GGW client)');
   if (CHANNEL !== 'prod' && (process.env.DB_KEY || '') === '')
     console.log('  note: using the dev DB key. Set DB_KEY=... for rc/prod.');
