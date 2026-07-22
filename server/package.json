@@ -1,0 +1,12 @@
+{
+  "name": "6ggw-server",
+  "version": "0.1.0",
+  "description": "6GGW server component — real health, TCP-RTT distance, and stream-delivery estimates. Serves the bundled 6GGW client. Zero dependencies.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": { "node": ">=16" },
+  "license": "UNLICENSED",
+  "author": "AI2ORBIT Co. 2026"
+}

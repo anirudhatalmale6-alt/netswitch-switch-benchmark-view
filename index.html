@@ -155,8 +155,14 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
     <h1>6GGW</h1>
     <div class="tagline">5G GATEWAY ROUTER</div>
     <div class="sub">SWITCH · PERFORMANCE MONITOR · 6G GATEWAY · CPU·GPU · AREA MAP · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.44.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.45.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
   </div>
+
+  <div class="gsearch" style="display:flex;gap:8px;margin:0 0 12px;align-items:stretch">
+    <input type="text" id="gsInput" placeholder="Search — IP address, phone number (+44…), router name, or domain" style="flex:1" onkeydown="if(event.key==='Enter')gsGo()">
+    <button onclick="gsGo()" style="white-space:nowrap">SEARCH</button>
+  </div>
+  <div id="gsOut" class="section" style="display:none;margin-bottom:12px"><div class="section-body" id="gsOutBody"></div></div>
 
   <div class="tabs">
     <div class="tab active" data-p="switch">SWITCH</div>
@@ -342,7 +348,8 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
             </div>
             <div class="bar-wrap"><div class="bar"><span id="memBar" style="width:0%"></span></div><div class="bar-lbl"><span>heap used</span><span id="memBarLbl">—</span></div></div>
             <div class="bar-wrap"><div class="bar"><span id="cpuBar" style="width:0%"></span></div><div class="bar-lbl"><span>CPU load</span><span id="cpuBarLbl">—</span></div></div>
-            <div class="btn-row"><button onclick="freeMemory()">FREE MEMORY</button><button class="ghost" onclick="readMemory()">READ NOW</button><button class="ghost" onclick="stressMemory()">SIMULATE LOAD</button></div>
+            <div class="btn-row"><button onclick="healthSnapshot()">HEALTH SNAPSHOT</button><button class="ghost" onclick="freeMemory()">FREE MEMORY</button><button class="ghost" onclick="readMemory()">READ NOW</button><button class="ghost" onclick="stressMemory()">SIMULATE LOAD</button></div>
+            <pre class="log" id="hsOut" style="display:none;max-height:260px"></pre>
             <div class="note">Live meter, refreshing every second. <span class="hl">Device RAM</span> and <span class="hl">CPU cores</span> are the phone's real hardware; <span class="hl">CPU load</span> is measured from how late the main thread ticks (event-loop lag), and the <span class="hl">Chrome heap</span> is this tab's RAM. The Android "<span class="hl">Process system isn't responding</span>" popup fires when either one maxes out: heap crosses the per-app RAM limit (a big cloud file pulled whole into HTML, or too many tabs), or the CPU is pinned so the main thread can't answer in time. Fix both ways: <span class="hl">close pages before the jam</span> and load big files in chunks, not all at once. The phone camera stalls for the same reason — it needs a large free RAM buffer per frame.</div>
           </div>
         </div>
@@ -386,6 +393,38 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
         </div>
         <div class="btn-row"><button onclick="pollNet()">REFRESH DATA</button></div>
         <div class="note">Hop table mirrors the engine's reroute_trace module: router name / IP / MAC-OUI vendor / <span class="hl">geolocated city</span> per hop. MAP opens that server's city in Google Maps. City is derived from the IP octet (LA / Washington / London / Frankfurt buckets in this build); a full offline GeoIP database drops in for exact city per real IP.</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>STREAM DELIVERY ESTIMATE — MPEG-4 / broadband to many users</h2><span class="badge pass" id="seBadge">READY</span></div>
+      <div class="section-body">
+        <div class="note" style="margin-top:0">Line length = the live <span class="hl">server↔phone ping</span> (e.g. ping bbc.co.uk to the phone in your hand). From your measured link speed and a chosen codec, this estimates how much of one server pushing to <span class="hl">30,000 post addresses</span> (mobile + broadband) can be served at once — and compares fixed line vs mobile Wi-Fi vs 5G.</div>
+        <div class="grid">
+          <div class="stat"><div class="k">Measured downlink</div><div class="v" id="seDown">—</div></div>
+          <div class="stat"><div class="k">Measured RTT</div><div class="v" id="seRtt">—</div></div>
+          <div class="stat"><div class="k">Signal-path (line length)</div><div class="v" id="seLine">—</div></div>
+        </div>
+        <div class="field-grid" style="margin-top:10px">
+          <div><label>Codec / stream</label><select id="seCodec">
+            <option value="0.32">Music (AAC) — 0.32 Mbps</option>
+            <option value="1.5" selected>MPEG-4 SD — 1.5 Mbps</option>
+            <option value="4">MPEG-4 HD 720p — 4 Mbps</option>
+            <option value="8">MPEG-4 Full HD 1080p — 8 Mbps</option>
+            <option value="16">MPEG-4 UHD 4K — 16 Mbps</option>
+          </select></div>
+          <div><label>Concurrent users (post addresses)</label><input type="number" id="seUsers" value="30000" step="1000"></div>
+          <div><label>Server uplink (Gbps)</label><input type="number" id="seServer" value="10" step="1"></div>
+        </div>
+        <div class="btn-row"><button onclick="streamEstimate()">RUN ESTIMATE</button><button class="ghost" onclick="seMeasureLink()">RE-MEASURE LINK</button></div>
+        <div class="grid" style="margin-top:8px">
+          <div class="stat good"><div class="k">Total demand</div><div class="v" id="seDemand" style="font-size:18px">—</div></div>
+          <div class="stat"><div class="k">Streams one server serves</div><div class="v" id="seCap" style="font-size:18px">—</div></div>
+          <div class="stat" id="seCoverStat"><div class="k">Coverage of the address base</div><div class="v" id="seCover" style="font-size:18px">—</div></div>
+          <div class="stat"><div class="k">Servers needed for all</div><div class="v" id="seNeed" style="font-size:18px">—</div></div>
+        </div>
+        <div id="seCmp" style="margin-top:10px"></div>
+        <div class="note">Reference access speeds (fixed line / mobile Wi-Fi / 5G) are typical figures, labelled as such; your own downlink is measured live. The per-user check answers "can each address actually pull this stream," and the demand/capacity math is straight bitrate × users vs the server and access-link throughput — honest capacity planning, no fake numbers.</div>
       </div>
     </div>
 
@@ -1435,6 +1474,49 @@ function updateLineLen(){
   if(to) to.innerHTML=(amLastTotal!=null?amLastTotal.toFixed(2):'—')+' <small>km</small>';
 }
 
+/* ---------------- STREAM DELIVERY ESTIMATE (MPEG-4 / broadband to many users) ---------------- */
+var SE_DOWN=null, SE_RTT=null;
+function seLineKm(){ return SE_RTT==null?null:0.0001607*(SE_RTT*1e9)/1000/2; } // client's constant, one way
+function seFill(){
+  var d=document.getElementById('seDown'); if(d) d.textContent=(SE_DOWN!=null?SE_DOWN.toFixed(1)+' Mbps':'not exposed — measuring');
+  var r=document.getElementById('seRtt'); if(r) r.textContent=(SE_RTT!=null?SE_RTT+' ms':'—');
+  var l=document.getElementById('seLine'); var km=seLineKm(); if(l) l.textContent=(km!=null?km.toFixed(1)+' km':'—');
+}
+function seMeasureLink(){
+  var c=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+  if(c){ if(c.downlink!=null) SE_DOWN=c.downlink; if(c.rtt!=null) SE_RTT=c.rtt; }
+  var t0=(window.performance?performance.now():0);       // real same-origin RTT cross-check
+  try{
+    fetch(location.pathname+'?_='+Math.floor(t0),{cache:'no-store'}).then(function(){
+      var rtt=Math.round((window.performance?performance.now():0)-t0);
+      if(SE_RTT==null || !c) SE_RTT=rtt; seFill();
+    }).catch(function(){ seFill(); });
+  }catch(e){ seFill(); }
+  seFill();
+}
+function streamEstimate(){
+  seMeasureLink();
+  var bitrate=parseFloat(document.getElementById('seCodec').value)||1.5;      // Mbps / stream
+  var users=Math.max(1,parseInt(document.getElementById('seUsers').value,10)||30000);
+  var serverGbps=Math.max(0.1,parseFloat(document.getElementById('seServer').value)||10);
+  var serverMbps=serverGbps*1000;
+  var demand=bitrate*users, cap=Math.floor(serverMbps/bitrate);
+  var cover=Math.min(100, cap/users*100), need=Math.ceil(demand/serverMbps);
+  document.getElementById('seDemand').textContent=(demand>=1000?(demand/1000).toFixed(1)+' Gbps':demand.toFixed(0)+' Mbps');
+  document.getElementById('seCap').textContent=cap.toLocaleString()+' streams';
+  document.getElementById('seCover').textContent=cover.toFixed(1)+' %';
+  document.getElementById('seNeed').textContent=need+' server'+(need>1?'s':'')+' @ '+serverGbps+' Gbps';
+  document.getElementById('seCoverStat').className='stat '+(cover>=100?'good':(cover>=50?'warn':''));
+  var acc=[{n:'Fixed line (fibre)',d:500},{n:'Mobile Wi-Fi (4G)',d:40},{n:'5G',d:300}];
+  if(SE_DOWN!=null) acc.unshift({n:'Your link',d:SE_DOWN,me:true});
+  var rows='<table style="width:100%;border-collapse:collapse;font-size:13px"><tr style="text-align:left"><th style="padding:6px 8px">Access</th><th>Downlink</th><th>Streams sustained</th><th>Fits '+bitrate+' Mbps?</th></tr>';
+  acc.forEach(function(a){
+    rows+='<tr style="border-top:1px solid var(--border)"><td style="padding:6px 8px">'+a.n+(a.me?' <span class="hl">(measured)</span>':' <span style="opacity:.6">(typical)</span>')+'</td><td>'+a.d+' Mbps</td><td>'+Math.floor(a.d/bitrate)+'</td><td>'+(a.d>=bitrate?'yes':'no')+'</td></tr>';
+  });
+  document.getElementById('seCmp').innerHTML=rows+'</table>';
+  var b=document.getElementById('seBadge'); b.textContent=(cover>=100?'SERVED':'CAPACITY '+cover.toFixed(0)+'%'); b.className='badge '+(cover>=100?'pass':'run');
+}
+
 /* ---------------- TEST LOG TOOL (cpu_remainder model, ported from C++) ---------------- */
 function num(v,prec,euro){
   var s=Number(v).toFixed(prec);
@@ -1748,6 +1830,46 @@ function readMemory(){
   if(d>0.05)st+=' · Tj '+THERM.tj.toFixed(0)+'°C';
   badge.textContent=st;badge.className='badge '+cls;
   document.getElementById('memPctStat').className='stat '+(pct<safeCut?'good':(pct<nearCut?'warn':''));
+}
+/* HEALTH SNAPSHOT — one tap: gather this device's REAL stats into a shareable
+   report a field user can send back (Web Share -> clipboard -> download fallback). */
+function healthSnapshot(){
+  readMemory();
+  var L=[]; function add(k,v){ L.push((k+':').padEnd(18)+v); }
+  var now=new Date();
+  L.push('6GGW DEVICE HEALTH SNAPSHOT'); L.push('generated '+now.toISOString()); L.push('');
+  add('Platform', navigator.platform||'—');
+  add('User agent', (navigator.userAgent||'—').slice(0,90));
+  add('Device RAM', navigator.deviceMemory?('~'+navigator.deviceMemory+' GB'):'not exposed');
+  add('CPU cores', navigator.hardwareConcurrency||'—');
+  add('CPU load', Math.round(CPULOAD)+' % (main-thread, live)');
+  var m=(window.performance&&performance.memory)?performance.memory:null;
+  if(m){ add('Heap used', fmtMB(m.usedJSHeapSize)); add('Heap total', fmtMB(m.totalJSHeapSize)); add('Heap limit', fmtMB(m.jsHeapSizeLimit)); add('RAM pressure', (m.usedJSHeapSize/(m.jsHeapSizeLimit||1)*100).toFixed(0)+' %'); }
+  else add('Chrome heap','not exposed (non-Chrome)');
+  var c=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+  if(c){ add('Net type', (c.effectiveType||'—')+(c.type?(' / '+c.type):'')); add('Downlink', (c.downlink!=null?c.downlink+' Mbps':'—')); add('RTT', (c.rtt!=null?c.rtt+' ms':'—')); }
+  add('Screen', screen.width+'x'+screen.height+' @'+(window.devicePixelRatio||1)+'x');
+  add('Language', navigator.language||'—'); add('Online', navigator.onLine?'yes':'no');
+  var badge=document.getElementById('memBadge'); add('Jam status', badge?badge.textContent:'—');
+  if(navigator.getBattery){
+    navigator.getBattery().then(function(b){ add('Battery', Math.round(b.level*100)+'% '+(b.charging?'(charging)':'')); finish(); });
+  } else { add('Battery','not exposed'); finish(); }
+  function finish(){
+    var txt=L.join('\n');
+    var pre=document.getElementById('hsOut'); pre.style.display='block'; pre.textContent=txt;
+    var blob=new Blob([txt],{type:'text/plain'});
+    var file=null; try{ file=new File([blob],'6ggw-health-'+now.getTime()+'.txt',{type:'text/plain'}); }catch(e){}
+    if(navigator.share && file && navigator.canShare && navigator.canShare({files:[file]})){
+      navigator.share({files:[file],title:'6GGW device health',text:'6GGW device health snapshot'}).catch(function(){});
+    } else if(navigator.share){
+      navigator.share({title:'6GGW device health',text:txt}).catch(function(){ hsFallback(txt,blob); });
+    } else { hsFallback(txt,blob); }
+  }
+  function hsFallback(txt,blob){
+    try{ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(txt).catch(function(){}); }catch(e){}
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='6ggw-health-'+now.getTime()+'.txt';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
 }
 var MEMHOLD=[];
 function stressMemory(){ // demo: shows how pulling a big blob into HTML raises RAM
@@ -2549,6 +2671,82 @@ function rtInit(){
   rtRender();
 }
 
+/* ---------------- top search bar (IP / phone / router / domain) ---------------- */
+function gotoTab(name){
+  document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active');});
+  document.querySelectorAll('.panel').forEach(function(x){x.classList.remove('active');});
+  var tab=document.querySelector('.tab[data-p="'+name+'"]'); if(tab)tab.classList.add('active');
+  var pan=document.getElementById('p-'+name); if(pan)pan.classList.add('active');
+  if(name==='devview'){try{renderDevView();}catch(e){}}
+  if(name==='content'){try{ctInit();}catch(e){}}
+  if(name==='fair'){try{updateFair();}catch(e){}}
+  if(name==='routes' && !rtSrcConfirmed){try{rtOpenGate();}catch(e){}}
+}
+/* Honest phone parse: country + line type from the dialling prefix only.
+   A number carries NO location — we never claim one. */
+var GS_CC=[
+  {p:'+358',c:'Finland',mob:['4','5']},{p:'+44',c:'United Kingdom',mob:['7']},
+  {p:'+1',c:'USA / Canada',mob:[]},{p:'+91',c:'India',mob:['6','7','8','9']},
+  {p:'+49',c:'Germany',mob:['15','16','17']},{p:'+33',c:'France',mob:['6','7']},
+  {p:'+46',c:'Sweden',mob:['7']},{p:'+47',c:'Norway',mob:['4','9']},{p:'+45',c:'Denmark',mob:['2','3','4','5']}
+];
+function gsParsePhone(raw){
+  var v=raw.replace(/[()\s\-]/g,'');
+  if(v.charAt(0)==='0'){ return {ok:true,country:'national number (no country code) — add +CC to identify country',type:'unknown',nat:v}; }
+  if(v.charAt(0)!=='+') v='+'+v;
+  var hit=null; GS_CC.forEach(function(cc){ if(v.indexOf(cc.p)===0 && (!hit||cc.p.length>hit.p.length)) hit=cc; });
+  if(!hit) return {ok:false};
+  var nat=v.slice(hit.p.length);
+  var type='landline / fixed';
+  for(var i=0;i<hit.mob.length;i++){ if(nat.indexOf(hit.mob[i])===0){ type='mobile'; break; } }
+  if(hit.mob.length===0) type='NANP (mobile/landline share the same range)';
+  return {ok:true,country:hit.c,cc:hit.p,type:type,nat:nat};
+}
+function gsClassifyIp(v){
+  var o=v.split('.').map(Number); if(o.length!==4||o.some(function(n){return isNaN(n)||n<0||n>255;})) return null;
+  var priv=(o[0]===10)||(o[0]===172&&o[1]>=16&&o[1]<=31)||(o[0]===192&&o[1]===168);
+  var cls=o[0]<128?'A':o[0]<192?'B':o[0]<224?'C':o[0]<240?'D (multicast)':'E (reserved)';
+  var scope=priv?'private / LAN (behind NAT)':(o[0]===127?'loopback':'public / routable');
+  return {ip:o.join('.'),scope:scope,cls:cls};
+}
+function gsGo(){
+  var v=(document.getElementById('gsInput').value||'').trim();
+  var out=document.getElementById('gsOut'), body=document.getElementById('gsOutBody');
+  if(!v){ out.style.display='none'; return; }
+  out.style.display='block';
+  var ip=gsClassifyIp(v);
+  if(ip){
+    body.innerHTML='<div class="section-head" style="margin:-14px -16px 12px"><h2>IP ADDRESS</h2><span class="badge info">ROUTED</span></div>'+
+      '<div class="grid"><div class="stat"><div class="k">Address</div><div class="v">'+ip.ip+'</div></div>'+
+      '<div class="stat"><div class="k">Scope</div><div class="v" style="font-size:16px">'+ip.scope+'</div></div>'+
+      '<div class="stat"><div class="k">Class</div><div class="v">'+ip.cls+'</div></div></div>'+
+      '<div class="note">Routing this IP as a destination in the CONTENT · DOMAINS view — opening it now with the full building-to-building path, router models and MACs.</div>';
+    document.getElementById('ctDomain').value=ip.ip; gotoTab('content'); try{ctRoute();}catch(e){}
+    return;
+  }
+  if(/[+]?\d[\d\s()\-]{5,}$/.test(v) && /\d{6,}/.test(v.replace(/\D/g,''))){
+    var ph=gsParsePhone(v);
+    if(ph.ok){
+      body.innerHTML='<div class="section-head" style="margin:-14px -16px 12px"><h2>PHONE NUMBER</h2><span class="badge run">METADATA ONLY</span></div>'+
+        '<div class="grid"><div class="stat"><div class="k">Country</div><div class="v" style="font-size:16px">'+ph.country+'</div></div>'+
+        '<div class="stat"><div class="k">Line type</div><div class="v" style="font-size:16px">'+ph.type+'</div></div>'+
+        (ph.cc?'<div class="stat"><div class="k">National part</div><div class="v" style="font-size:16px">'+ph.nat+'</div></div>':'')+'</div>'+
+        '<div class="note">This is everything a number honestly reveals — the country and line type from its dialling prefix. A phone number carries <span class="hl">no location</span>; only the carrier (under a legal request) knows where a SIM physically is. So there is no distance to show, and I will not fake one.</div>';
+    } else {
+      body.innerHTML='<div class="note">That looks like a phone number but the country code isn\'t one I map yet. Add the full +CC prefix (e.g. +44, +358) and I\'ll identify the country and line type. A number still carries no location.</div>';
+    }
+    return;
+  }
+  if(/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(v)){
+    body.innerHTML='<div class="note">Routing domain <span class="hl">'+v+'</span> in the CONTENT · DOMAINS view — full path, router models, MACs and traffic.</div>';
+    document.getElementById('ctDomain').value=v; gotoTab('content'); try{ctRoute();}catch(e){}
+    return;
+  }
+  /* treat as a router name / free text -> search it as a route label */
+  body.innerHTML='<div class="note">Looking up <span class="hl">'+v.replace(/</g,'&lt;')+'</span> as a router / node — routing it in the CONTENT · DOMAINS view so you can see its hops, model, MAC and traffic.</div>';
+  document.getElementById('ctDomain').value=v; gotoTab('content'); try{ctRoute();}catch(e){}
+}
+
 /* ---------------- tabs ---------------- */
 document.querySelectorAll('.tab').forEach(function(t){
   t.onclick=function(){
@@ -2569,6 +2767,7 @@ renderPorts();updateSwitch();swRenderToggles();swRenderCtl();pollNet();runTestLo
 try{detectHardware();}catch(e){}
 try{computeThermal();}catch(e){}
 try{readMemory();setInterval(readMemory,1000);}catch(e){}
+try{seMeasureLink();}catch(e){}
 try{amInit();}catch(e){}
 try{rtInit();}catch(e){}
 </script>
