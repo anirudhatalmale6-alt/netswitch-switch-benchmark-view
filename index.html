@@ -155,7 +155,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
     <h1>6GGW</h1>
     <div class="tagline">5G GATEWAY ROUTER</div>
     <div class="sub">SWITCH · PERFORMANCE MONITOR · 6G GATEWAY · CPU·GPU · AREA MAP · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.51.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.52.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
   </div>
 
   <div class="gsearch" style="display:flex;gap:8px;margin:0 0 12px;align-items:stretch">
@@ -408,6 +408,28 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
         </div>
         <div class="btn-row"><button onclick="pollNet()">REFRESH DATA</button></div>
         <div class="note">Hop table mirrors the engine's reroute_trace module: router name / IP / MAC-OUI vendor / <span class="hl">geolocated city</span> per hop. MAP opens that server's city in Google Maps. City is derived from the IP octet (LA / Washington / London / Frankfurt buckets in this build); a full offline GeoIP database drops in for exact city per real IP.</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>CLAIM THE NETWORK — keep-alive throughput claim (24/7)</h2><span class="badge run" id="ctnBadge">IDLE</span></div>
+      <div class="section-body">
+        <div class="note" style="margin-top:0">The phone with the Switch on it <span class="hl">claims the network</span> — it keeps the link warm by sending a small keep-alive ping at <span class="hl">randomised</span> intervals (never a fixed rhythm, so it looks natural), all day. You paid for the network, so you hold your throughput by staying active on it: an active session is scheduled better than an idle one, and the claim keeps it active. Two overlapping interval sets (<span class="hl">Set A</span> and <span class="hl">Set B</span>) take turns, each randomised, so no two claims land the same way. Every claim is real traffic with a real measured round-trip; the day's count is kept and resets each day. Built to run continuously — leave it on 24/7.</div>
+        <div class="grid">
+          <div class="stat good"><div class="k">Claims today</div><div class="v" id="ctnToday">0</div></div>
+          <div class="stat"><div class="k">Last claim RTT</div><div class="v" id="ctnRtt">—</div></div>
+          <div class="stat"><div class="k">Claim rate</div><div class="v" id="ctnRate">—</div></div>
+          <div class="stat"><div class="k">Best RTT held</div><div class="v" id="ctnBest">—</div></div>
+          <div class="stat"><div class="k">Next claim</div><div class="v" id="ctnNext">—</div></div>
+          <div class="stat"><div class="k">Claiming for</div><div class="v" id="ctnUptime">—</div></div>
+        </div>
+        <div class="btn-row">
+          <button onclick="ctnToggle()" id="ctnBtn">START CLAIMING (24/7)</button>
+          <button class="ghost" onclick="ctnClaimNow()">CLAIM ONCE NOW</button>
+          <button class="ghost" onclick="ctnResetToday()">RESET TODAY</button>
+        </div>
+        <div class="section-body" id="ctnLog" style="font-family:var(--mono);font-size:11.5px;max-height:150px;overflow-y:auto;margin-top:8px"></div>
+        <div class="note">Honest note: a browser/app can genuinely keep the connection warm with real keep-alive traffic and measure the round-trip each time — that part is real and it is what holds an active-session advantage. What an app cannot do is override the carrier's radio QoS scheduler from user space (only the network operator sets hard priority). So this claims the network the shippable way — by staying active on it — and logs every claim. For guaranteed 24/7 even when the phone screen is off, the same claim loop runs on the server component (it never sleeps); the client claims whenever the app is open.</div>
       </div>
     </div>
 
@@ -1095,7 +1117,7 @@ function stDel(db,k){ return new Promise(function(res){ var tx=db.transaction('b
 /* ---------------- CONTENT · DOMAINS (E) — route a domain, content by network, claim network ---------------- */
 function ctHash(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=(h*16777619)>>>0;}return h;}
 var CT_ROUTERS=[['Cisco','ASR 9000'],['Juniper','MX240'],['Nokia','7750 SR'],['Huawei','NE40E'],['MikroTik','CCR2004'],['Arista','7280R']];
-var CT_CITIES=['Helsinki, FI','Espoo, FI','Stockholm, SE','Amsterdam, NL','Frankfurt, EU','London, UK'];
+var CT_CITIES=['Helsinki, FI','Espoo, FI','Tallinn, EE','Stockholm, SE','Oslo, NO','Warsaw, PL','Amsterdam, NL','Frankfurt, EU','London, UK','New York, US','Los Angeles, US','Moscow, RU'];
 /* real registered IEEE OUI prefixes per vendor — MAC first 3 octets genuinely identify the maker */
 var CT_OUI={'Cisco':'00:1A:A1','Juniper':'2C:6B:F5','Nokia':'00:1A:F0','Huawei':'78:1D:BA','MikroTik':'48:8F:5A','Arista':'00:1C:73'};
 function ctMac(make,hh){ var o=CT_OUI[make]||'02:00:00'; function h2(n){return ('0'+((n)&255).toString(16)).slice(-2).toUpperCase();} return o+':'+h2(hh>>>2)+':'+h2(hh>>>10)+':'+h2(hh>>>18); }
@@ -1598,6 +1620,79 @@ function updateLineLen(){
   if(lo) lo.innerHTML=(amLastLongest!=null?amLastLongest.toFixed(2):'—')+' <small>km</small>';
   if(to) to.innerHTML=(amLastTotal!=null?amLastTotal.toFixed(2):'—')+' <small>km</small>';
 }
+
+/* ---------------- CLAIM THE NETWORK — randomised keep-alive throughput claim (24/7) ---------------- */
+var ctn={running:false, timer:null, uiTimer:null, startedAt:0, claims:0, rate:[], best:null, lastSet:'B', nextAt:0};
+function ctnKey(){ var d=new Date(); return 'ggwClaims:'+d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
+function ctnLoadToday(){ try{ var r=localStorage.getItem(ctnKey()); return r?(parseInt(r,10)||0):0; }catch(e){ return 0; } }
+function ctnSaveToday(n){ try{ localStorage.setItem(ctnKey(),String(n)); }catch(e){} }
+/* two overlapping randomised interval sets: Set A tighter, Set B longer — alternate + jitter so it's natural */
+function ctnNextDelay(){
+  ctn.lastSet=(ctn.lastSet==='A')?'B':'A';
+  var base=(ctn.lastSet==='A')?(2500+Math.random()*4000):(5000+Math.random()*7000);
+  var jitter=(Math.random()-0.5)*1500;
+  return Math.max(1500, Math.round(base+jitter));
+}
+function ctnFmtMs(ms){ return ms<1000?Math.round(ms)+' ms':(ms/1000).toFixed(1)+' s'; }
+function ctnLog(line){
+  var el=document.getElementById('ctnLog'); if(!el) return;
+  var d=new Date(), t=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2);
+  el.innerHTML='<div>'+t+'  '+line+'</div>'+el.innerHTML;
+  while(el.children.length>60){ el.removeChild(el.lastChild); }
+}
+function ctnClaim(){
+  var t0=(window.performance?performance.now():0), set=ctn.lastSet;
+  function done(ok){
+    var rtt=(window.performance?performance.now():0)-t0;
+    ctn.claims++; ctnSaveToday(ctn.claims);
+    ctn.rate.push(new Date().getTime()); var cutoff=new Date().getTime()-60000; ctn.rate=ctn.rate.filter(function(x){return x>=cutoff;});
+    if(ok){ if(ctn.best===null||rtt<ctn.best) ctn.best=rtt; }
+    var e;
+    if(e=document.getElementById('ctnToday')) e.textContent=ctn.claims.toLocaleString();
+    if(e=document.getElementById('ctnRtt')) e.textContent=ok?ctnFmtMs(rtt):'no route';
+    if(e=document.getElementById('ctnBest')) e.textContent=ctn.best!=null?ctnFmtMs(ctn.best):'—';
+    ctnLog('claim #'+ctn.claims+'  set '+set+'  '+(ok?ctnFmtMs(rtt)+'  ok':'offline'));
+  }
+  if(!navigator.onLine){ done(false); return; }
+  fetch('manifest.webmanifest?claim='+Math.round(t0)+'_'+Math.floor(Math.random()*1e6),{cache:'no-store'})
+    .then(function(r){ return r.ok?r.text():Promise.reject(0); }).then(function(){ done(true); }).catch(function(){ done(false); });
+}
+function ctnSchedule(){
+  if(!ctn.running) return;
+  var delay=ctnNextDelay(); ctn.nextAt=new Date().getTime()+delay;
+  ctn.timer=setTimeout(function(){ ctnClaim(); ctnSchedule(); }, delay);
+}
+function ctnTickUI(){
+  if(!ctn.running) return; var e;
+  var left=Math.max(0,ctn.nextAt-new Date().getTime());
+  if(e=document.getElementById('ctnNext')) e.textContent=ctnFmtMs(left)+' (set '+((ctn.lastSet==='A')?'B':'A')+')';
+  var up=new Date().getTime()-ctn.startedAt, mm=Math.floor(up/60000), ss=Math.floor((up%60000)/1000);
+  if(e=document.getElementById('ctnUptime')) e.textContent=mm+'m '+('0'+ss).slice(-2)+'s';
+  if(e=document.getElementById('ctnRate')) e.textContent=ctn.rate.length+' /min';
+}
+function ctnToggle(){
+  ctn.running=!ctn.running;
+  var btn=document.getElementById('ctnBtn'), b=document.getElementById('ctnBadge');
+  if(ctn.running){
+    ctn.startedAt=new Date().getTime();
+    if(btn) btn.textContent='STOP CLAIMING';
+    if(b){ b.textContent='CLAIMING'; b.className='badge pass'; }
+    ctnLog('started — claiming the network 24/7 (Set A + Set B, randomised)');
+    ctnClaim(); ctnSchedule();
+    if(!ctn.uiTimer) ctn.uiTimer=setInterval(ctnTickUI,500);
+  } else {
+    if(btn) btn.textContent='START CLAIMING (24/7)';
+    if(b){ b.textContent='IDLE'; b.className='badge run'; }
+    if(ctn.timer){ clearTimeout(ctn.timer); ctn.timer=null; }
+    var n=document.getElementById('ctnNext'); if(n) n.textContent='—';
+    ctnLog('stopped');
+  }
+}
+function ctnClaimNow(){ ctnClaim(); }
+function ctnResetToday(){ ctn.claims=0; ctnSaveToday(0); ctn.best=null;
+  var e; if(e=document.getElementById('ctnToday')) e.textContent='0'; if(e=document.getElementById('ctnBest')) e.textContent='—';
+  ctnLog('today counter reset'); }
+function ctnInit(){ ctn.claims=ctnLoadToday(); var t=document.getElementById('ctnToday'); if(t) t.textContent=ctn.claims.toLocaleString(); }
 
 /* ---------------- STREAM DELIVERY ESTIMATE (MPEG-4 / broadband to many users) ---------------- */
 var SE_DOWN=null, SE_RTT=null;
@@ -2523,7 +2618,17 @@ var RT_CITY={
  'BBC.co.uk':{lon:0.040,lat:51.500,ip:'146.75.120.81',addr:'BBC.co.uk · bbc.map.fastly.net (Fastly anycast 151.101.0.81)',pri:1,dest:1,isp:'Fastly / BBC',loc:'London, UK'},
  /* Helsinki testing site (client scope: London + Helsinki) */
  'Helsinki':{lon:24.941,lat:60.170,ip:'91.198.174.2',addr:'Ficolo HEL1, Sinimäentie 8, Helsinki 02630',pri:1,isp:'Elisa Oyj',loc:'Helsinki, FI'},
- 'Helsinki Espoo':{lon:24.657,lat:60.205,ip:'62.78.96.10',addr:'Telia HEL, Keilaniemi, Espoo 02150',pri:1,isp:'Telia Finland',loc:'Espoo, FI'}
+ 'Helsinki Espoo':{lon:24.657,lat:60.205,ip:'62.78.96.10',addr:'Telia HEL, Keilaniemi, Espoo 02150',pri:1,isp:'Telia Finland',loc:'Espoo, FI'},
+ /* around-the-world POPs — cross-country / global reroute demo */
+ 'Tallinn':{lon:24.753,lat:59.437,ip:'193.40.0.10',addr:'TLLIX, Akadeemia tee, Tallinn 12611',isp:'Elisa Eesti',loc:'Tallinn, EE'},
+ 'Stockholm':{lon:18.068,lat:59.329,ip:'194.68.128.10',addr:'STHIX, Bahnhofsgatan, Stockholm 111',isp:'Telia',loc:'Stockholm, SE'},
+ 'Oslo':{lon:10.752,lat:59.913,ip:'193.75.0.10',addr:'NIX Oslo, Nydalen, Oslo 0484',isp:'Telenor',loc:'Oslo, NO'},
+ 'Warsaw':{lon:21.012,lat:52.230,ip:'195.114.0.10',addr:'PLIX, Konstruktorska, Warsaw 02-673',isp:'Orange PL',loc:'Warsaw, PL'},
+ 'Amsterdam':{lon:4.895,lat:52.370,ip:'80.249.208.10',addr:'AMS-IX, Science Park, Amsterdam 1098',isp:'AMS-IX',loc:'Amsterdam, NL'},
+ 'Frankfurt':{lon:8.682,lat:50.111,ip:'80.81.192.10',addr:'DE-CIX, Kleyerstrasse, Frankfurt 60326',isp:'DE-CIX',loc:'Frankfurt, DE'},
+ 'New York':{lon:-74.006,lat:40.713,ip:'198.32.118.10',addr:'NYIIX, 60 Hudson St, New York 10013',isp:'Telehouse',loc:'New York, US'},
+ 'Los Angeles':{lon:-118.244,lat:34.052,ip:'206.223.143.10',addr:'Any2 LAX, 600 W 7th St, Los Angeles 90017',isp:'CoreSite',loc:'Los Angeles, US'},
+ 'Moscow':{lon:37.618,lat:55.751,ip:'195.208.0.10',addr:'MSK-IX, Butlerova, Moscow 117342',isp:'Rostelecom',loc:'Moscow, RU'}
 };
 var RT_ROUTES={
  'London EC2|Birmingham':[
@@ -2546,7 +2651,7 @@ var RT_ROUTES={
    ['Camden Town','London EC2','Fastly LON','BBC.co.uk'],
    ['Camden Town','Luton','London EC2','Fastly LON','BBC.co.uk']]
 };
-var RT_PRIMARIES=['London EC2','Helsinki','Helsinki Espoo','Greenwich','Camden Town','Stratford','Islington','Hammersmith','Wimbledon','Ealing','Wembley','Croydon','BBC.co.uk','Birmingham','Brighton'];
+var RT_PRIMARIES=['London EC2','Helsinki','Helsinki Espoo','Tallinn','Stockholm','Oslo','Warsaw','Amsterdam','Frankfurt','New York','Los Angeles','Moscow','Greenwich','Camden Town','Stratford','Islington','Hammersmith','Wimbledon','Ealing','Wembley','Croydon','BBC.co.uk','Birmingham','Brighton'];
 var rtAlt=0;                                 /* 0=primary path, 1=alternate */
 /* projection window (southern/central England) — national default */
 var RT_LON0=-2.7,RT_LON1=1.0,RT_LAT0=50.45,RT_LAT1=52.85,RT_PAD=34;
@@ -3174,6 +3279,7 @@ try{var _s=localStorage.getItem('ggw-server'); if(_s)document.getElementById('hs
 try{amInit();}catch(e){}
 try{rtInit();}catch(e){}
 try{kbTodayShow();}catch(e){}
+try{ctnInit();}catch(e){}
 </script>
 </body>
 </html>
