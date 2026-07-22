@@ -1471,7 +1471,7 @@ function runDramm(){
       L.push('');
       L.push('Note: CPU benchmarks measure computational throughput and may vary based on');
       L.push('      CPU frequency scaling, thermal throttling, and system load.');
-      L.push('AI-2-ORBIT Co. - Sami Leino 2026  ·  ported to serverless web/APK for NetSwitch');
+      L.push('AI2ORBIT Co. 2026  ·  ported to serverless web/APK for NetSwitch');
       L.push('========================================');
       out.textContent=L.join('\n');
       badge.textContent='DONE'; badge.className='badge pass';
@@ -1653,7 +1653,7 @@ function runTestLog(){
     L.push('CHAMBERLAIN OK 7365481296');
     L.push('QUANTARA 655/1SEC 2,4 LOG');
     L.push('GPS OK');
-    L.push('AI2ORBIT Leino 2026');
+    L.push('AI2ORBIT Co. 2026');
   }
   L.push('=====================================================');
   document.getElementById('logOut').textContent=L.join('\n');
@@ -1731,7 +1731,7 @@ function detectHardware(){
   }
   return {cores:cores,gl:g};
 }
-/* ===== DRAMM CPU benchmark — faithful JS port of Sami Leino's cpu_benchmark.cpp =====
+/* ===== DRAMM CPU benchmark — faithful JS port of the DRAMM cpu_benchmark.cpp =====
    "Mixed CPU Workload" (Integer + Float + Memory). Same three phases, same fast_sin/cos/
    sqrt/exp bit-tricks, same operation count (iterations x 3). One source string is the
    single source of truth: it runs both inside the Web Workers and on the main thread. */

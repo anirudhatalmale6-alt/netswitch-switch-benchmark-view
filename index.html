@@ -155,7 +155,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
     <h1>6GGW</h1>
     <div class="tagline">5G GATEWAY ROUTER</div>
     <div class="sub">SWITCH · PERFORMANCE MONITOR · 6G GATEWAY · CPU·GPU · AREA MAP · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.50.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.51.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
   </div>
 
   <div class="gsearch" style="display:flex;gap:8px;margin:0 0 12px;align-items:stretch">
@@ -278,6 +278,8 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
           <div class="stat"><div class="k">Screen Refresh</div><div class="v" id="bScrn">—</div></div>
           <div class="stat good"><div class="k">Battery</div><div class="v" id="bBatt">—</div></div>
           <div class="stat good"><div class="k">Download Speed</div><div class="v" id="bLoad">—</div></div>
+          <div class="stat good"><div class="k">Kbps highest today</div><div class="v" id="bKbHi">—</div></div>
+          <div class="stat good"><div class="k">Kbps lowest today</div><div class="v" id="bKbLo">—</div></div>
         </div>
         <div class="btn-row">
           <button onclick="runBench()">RUN REAL BENCHMARK</button>
@@ -401,7 +403,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
           <div class="stat"><div class="k">Active Flows</div><div class="v" id="nFlows">—</div></div>
         </div>
         <div class="section" style="margin-top:14px">
-          <div class="section-head"><h2>REROUTE TRACE (hops)</h2><span class="badge info" id="nHopBadge">—</span></div>
+          <div class="section-head"><h2>REROUTE TRACE (hops)</h2><span class="badge pass" style="margin-right:6px">Rerouting (AI) enhanced</span><span class="badge info" id="nHopBadge">—</span></div>
           <div class="section-body" id="hopBody"></div>
         </div>
         <div class="btn-row"><button onclick="pollNet()">REFRESH DATA</button></div>
@@ -510,13 +512,14 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
   <!-- ============ TEST LOG TOOL ============ -->
   <div class="panel" id="p-areamap">
     <div class="section">
-      <div class="section-head"><h2>AREA MAP — MARK &amp; MEASURE (users · routing · ISP · hardware)</h2><span class="badge info" id="amBadge">TAP TO PLACE SPOTS</span></div>
+      <div class="section-head"><h2>AREA MAP — MARK &amp; MEASURE (users · routing · ISP · hardware)</h2><span class="badge pass" style="margin-right:6px">Rerouting (AI) enhanced</span><span class="badge info" id="amBadge">TAP TO PLACE SPOTS</span></div>
       <div class="section-body">
         <div class="note" style="margin-top:0">Tap the map to drop spots where users are in the city (2 to 4). The Switch draws the lines, measures each line length and the triangle area A between the users and the active routing node. Press <span class="hl">MEASURE NETWORK</span> to route traffic through the ISP + hardware, then <span class="hl">REROUTE TRAFFIC</span> to send it a different way — watch area A and the longest line change.</div>
         <div style="width:100%;overflow-x:auto"><canvas id="amCanvas" width="920" height="460" style="display:block;width:100%;max-width:920px;background:#060c07;border:1px solid var(--border);border-radius:4px;cursor:crosshair;touch-action:none"></canvas></div>
         <div class="btn-row">
           <button onclick="amMeasure()">MEASURE NETWORK</button>
           <button class="ghost" onclick="amReroute()">REROUTE TRAFFIC</button>
+          <button class="ghost" onclick="amAiReroute()">AI REROUTE (best relay)</button>
           <button class="ghost" onclick="amDemo()">DEMO SPOTS</button>
           <button class="ghost" onclick="amClear()">CLEAR</button>
         </div>
@@ -1114,6 +1117,21 @@ function ctReroute(){
   ctVariant=ctVariant?0:1;   /* flip between primary and alternate path */
   ctRenderRoute();
 }
+/* Rerouting (AI) enhanced — a least-cost path scorer. Each candidate router on a hop is
+   scored on link latency + link load (busy links cost more); the path cost is the sum.
+   The lower-cost path is the AI-recommended reroute. Deterministic, inspectable — no black box. */
+function ctHopLat(hh){ return 3+((hh>>>8)%38); }          /* modelled link latency, ms */
+function ctHopCost(seed,i){
+  var hh=ctHash(seed+':'+i);
+  var tp=120+((hh>>>2)%880);          /* link load, Mbps (same value shown in the table) */
+  return ctHopLat(hh)+tp/100;         /* latency + load penalty; lower = better */
+}
+function ctPathCost(dom,variant){
+  var seed=dom+(variant?'#alt':'');
+  var h=ctHash(seed), nHops=4+(h%3), c=0;
+  for(var i=0;i<nHops;i++){ c+=ctHopCost(seed,i); }
+  return Math.round(c*10)/10;
+}
 function ctRenderRoute(){
   var dom=ctLastDom; if(!dom){return;}
   var seed=dom+(ctVariant?'#alt':'');           /* alternate path uses a different seed → different IPs/MACs/routers */
@@ -1129,22 +1147,34 @@ function ctRenderRoute(){
     var mac=ctMac(rt[0],hh);
     var tp=120+((hh>>>2)%880);                 /* router traffic amount, Mbps */
     var pps=(tp*1000+((hh>>>5)%9000));          /* packets/sec */
+    var hopLat=ctHopLat(hh);                    /* modelled link latency, ms (AI cost input) */
     rows+='<tr style="border-top:1px solid rgba(31,51,32,0.4)">'
       +'<td style="padding:5px 8px;color:var(--gold)">Building '+(i+1)+'</td>'
       +'<td style="padding:5px 8px;color:var(--white)">'+names[i]+' '+(i+1)+'<br><span style="color:var(--dim)">'+ip+'</span></td>'
       +'<td style="padding:5px 8px;color:var(--white)">'+rt[0]+' '+rt[1]+'<br><span style="color:var(--dim)">MAC '+mac+'</span></td>'
       +'<td style="padding:5px 8px;color:var(--white)">'+city+' <a href="'+mapsUrl(city)+'" target="_blank" rel="noopener" style="color:var(--green)">MAP&#9656;</a></td>'
       +'<td style="padding:5px 8px;color:var(--dim)">alt: '+alt[0]+' '+alt[1]+'</td>'
-      +'<td style="padding:5px 8px;text-align:right;color:var(--white)">'+tp+' Mbps<br><span style="color:var(--dim)">'+pps.toLocaleString()+' pps</span></td></tr>';
+      +'<td style="padding:5px 8px;text-align:right;color:var(--white)">'+tp+' Mbps<br><span style="color:var(--dim)">'+pps.toLocaleString()+' pps &#183; '+hopLat+' ms</span></td></tr>';
   }
   var dest=CT_ROUTERS[h%CT_ROUTERS.length], destAlt=CT_ROUTERS[(h>>>8)%CT_ROUTERS.length];
   var pathLbl=ctVariant?'ALTERNATE (rerouted)':'PRIMARY';
-  var out='<div class="note" style="margin:0 0 8px">How <span class="hl">'+dom+'</span> is routed on the <span class="hl">'+pathLbl+'</span> path: your phone → '+nHops+' hops, building to building, to the destination network. Router in use at destination: <span class="hl">'+dest[0]+' '+dest[1]+'</span> · alternative router: <span class="hl">'+destAlt[0]+' '+destAlt[1]+'</span>.</div>';
+  /* Rerouting (AI) enhanced — score both candidate paths and recommend the lower-cost one */
+  var costPri=ctPathCost(dom,0), costAlt=ctPathCost(dom,1);
+  var aiPickVariant=(costAlt<costPri)?1:0, aiPickName=aiPickVariant?'ALTERNATE':'PRIMARY';
+  var showingAiPick=(ctVariant===aiPickVariant);
+  var costNow=ctVariant?costAlt:costPri;
+  var out='<div class="ai-reroute" style="margin:0 0 8px;padding:8px 10px;border:1px solid var(--green);border-radius:8px;background:rgba(0,230,118,0.06)">'
+    +'<span class="badge pass" style="margin-right:8px">Rerouting (AI) enhanced</span>'
+    +'Scored both candidate paths on latency + link load — PRIMARY <b>'+costPri+'</b> · ALTERNATE <b>'+costAlt+'</b> (lower = better). '
+    +'AI recommends the <b style="color:var(--green)">'+aiPickName+'</b> path. '
+    +(showingAiPick?'You are on the AI-recommended path (cost '+costNow+').':'You are on the '+pathLbl+' path (cost '+costNow+') — press REROUTE to take the AI pick.')
+    +'</div>';
+  out+='<div class="note" style="margin:0 0 8px">How <span class="hl">'+dom+'</span> is routed on the <span class="hl">'+pathLbl+'</span> path: your phone → '+nHops+' hops, building to building, to the destination network. Router in use at destination: <span class="hl">'+dest[0]+' '+dest[1]+'</span> · alternative router: <span class="hl">'+destAlt[0]+' '+destAlt[1]+'</span>.</div>';
   out+='<div class="btn-row" style="margin:0 0 8px"><button onclick="ctReroute()">REROUTE ('+(ctVariant?'back to primary':'take alternate path')+')</button></div>';
   out+='<table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px">'
     +'<tr style="color:var(--dim)"><td style="padding:5px 8px">SEGMENT</td><td>ROUTER / IP</td><td>MODEL / MAC</td><td>LOCATION</td><td>ALT ROUTER</td><td style="text-align:right">TRAFFIC AMOUNT</td></tr>'
     +rows+'</table>';
-  out+='<div class="note">Modelled route — a phone browser cannot run a real traceroute (the OS blocks raw ICMP); this is the deterministic building-to-building path 6GGW derives for the domain. MAC first 3 octets are the real registered IEEE OUI for each maker (Cisco 00:1A:A1, Juniper 2C:6B:F5, Nokia 00:1A:F0, Huawei 78:1D:BA, MikroTik 48:8F:5A, Arista 00:1C:73); the host octets are derived per hop. REROUTE recomputes the whole path over the alternate routers. A small server-side probe drops in later to replace the model with the live path.</div>';
+  out+='<div class="note">Modelled route — a phone browser cannot run a real traceroute (the OS blocks raw ICMP); this is the deterministic building-to-building path 6GGW derives for the domain. MAC first 3 octets are the real registered IEEE OUI for each maker (Cisco 00:1A:A1, Juniper 2C:6B:F5, Nokia 00:1A:F0, Huawei 78:1D:BA, MikroTik 48:8F:5A, Arista 00:1C:73); the host octets are derived per hop. REROUTE recomputes the whole path over the alternate routers. <span class="hl">Rerouting (AI) enhanced</span> means a least-cost path scorer: each hop is costed on link latency + link load, the two candidate paths are summed, and the lower-cost path is recommended — it is a transparent scoring heuristic (the same class as least-cost routing), not a black box, and you can read the score above. A small server-side probe drops in later to replace the modelled latency/load with live measured values.</div>';
   document.getElementById('ctRouteOut').innerHTML=out;
   document.getElementById('ctBadge').textContent='ROUTED · '+nHops+' HOPS · '+pathLbl;
   document.getElementById('ctBadge').className='badge pass';
@@ -1433,6 +1463,21 @@ function benchBattery(){
   });
 }
 function benchGrade(v,ref){ return Math.max(3,Math.min(100,Math.round(v/ref*100))); }
+/* ---- Kbps today: highest / lowest measured download speed, kept per calendar day ---- */
+function kbTodayKey(){ var d=new Date(); return 'ggwKbps:'+d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
+function kbTodayLoad(){ try{ var r=localStorage.getItem(kbTodayKey()); return r?JSON.parse(r):null; }catch(e){ return null; } }
+function kbTodayRecord(kbps){
+  if(!(kbps>0)) return;
+  var t=kbTodayLoad()||{hi:kbps,lo:kbps};
+  if(kbps>t.hi) t.hi=kbps; if(kbps<t.lo) t.lo=kbps;
+  try{ localStorage.setItem(kbTodayKey(),JSON.stringify(t)); }catch(e){}
+  kbTodayShow();
+}
+function kbTodayShow(){
+  var t=kbTodayLoad(), hi=document.getElementById('bKbHi'), lo=document.getElementById('bKbLo');
+  if(hi) hi.textContent=t?Math.round(t.hi).toLocaleString()+' kbps':'—';
+  if(lo) lo.textContent=t?Math.round(t.lo).toLocaleString()+' kbps':'—';
+}
 function runBench(){
   var badge=document.getElementById('benchBadge');
   badge.textContent='MEASURING…'; badge.className='badge run';
@@ -1452,6 +1497,7 @@ function runBench(){
     document.getElementById('bScrn').textContent = hz.toFixed(0)+' Hz';
     document.getElementById('bBatt').textContent = bat? bat.level+'%'+(bat.charging?' ⚡':''):'n/a';
     document.getElementById('bLoad').textContent = dl? (dl.mbps>=1? dl.mbps.toFixed(1)+' Mbps':Math.round(dl.kbps)+' kbps') : (navigator.onLine?'—':'offline');
+    if(dl&&dl.kbps>0) kbTodayRecord(dl.kbps); else kbTodayShow();
     /* plain measured readout — the raw numbers this device produced, no scoring / comparison bars. */
     var bars=document.getElementById('benchBars'); bars.innerHTML='';
     var rows=[
@@ -1471,6 +1517,7 @@ function runBench(){
 }
 function resetBench(){
   ['bGpu','bGpuW','bDram','bCpu','bScrn','bBatt','bLoad'].forEach(function(id){document.getElementById(id).textContent='—';});
+  kbTodayShow();   /* keep today's Kbps hi/lo — it's a daily record, not cleared on reset */
   document.getElementById('benchBars').innerHTML='';
   document.getElementById('benchBadge').textContent='IDLE';document.getElementById('benchBadge').className='badge run';
 }
@@ -1510,7 +1557,7 @@ function runDramm(){
       L.push('');
       L.push('Note: CPU benchmarks measure computational throughput and may vary based on');
       L.push('      CPU frequency scaling, thermal throttling, and system load.');
-      L.push('AI-2-ORBIT Co. - Sami Leino 2026  ·  ported to serverless web/APK for NetSwitch');
+      L.push('AI2ORBIT Co. 2026  ·  ported to serverless web/APK for NetSwitch');
       L.push('========================================');
       out.textContent=L.join('\n');
       badge.textContent='DONE'; badge.className='badge pass';
@@ -1692,7 +1739,7 @@ function runTestLog(){
     L.push('CHAMBERLAIN OK 7365481296');
     L.push('QUANTARA 655/1SEC 2,4 LOG');
     L.push('GPS OK');
-    L.push('AI2ORBIT Leino 2026');
+    L.push('AI2ORBIT Co. 2026');
   }
   L.push('=====================================================');
   document.getElementById('logOut').textContent=L.join('\n');
@@ -1770,7 +1817,7 @@ function detectHardware(){
   }
   return {cores:cores,gl:g};
 }
-/* ===== DRAMM CPU benchmark — faithful JS port of Sami Leino's cpu_benchmark.cpp =====
+/* ===== DRAMM CPU benchmark — faithful JS port of the DRAMM cpu_benchmark.cpp =====
    "Mixed CPU Workload" (Integer + Float + Memory). Same three phases, same fast_sin/cos/
    sqrt/exp bit-tricks, same operation count (iterations x 3). One source string is the
    single source of truth: it runs both inside the Web Workers and on the main thread. */
@@ -2225,6 +2272,21 @@ function amReroute(){
   if(amPts.length<2){ amBadge('PLACE SPOTS FIRST','run'); return; }
   amRelay=(amRelay+1)%amHW.length;
   amBadge('REROUTED → '+amHW[amRelay].n,'run');
+  amMeasure();
+}
+/* Rerouting (AI) enhanced — evaluate every relay and pick the one with the shortest total
+   traffic path (spot → relay → spot around the ring). Least-cost relay selection, inspectable. */
+function amRoutePathFor(relayIdx){
+  var R=amHW[relayIdx], rp=0;
+  for(var j=0;j<amPts.length;j++){var a=amPts[j],b=amPts[(j+1)%amPts.length];rp+=amDist(a,R)+amDist(R,b);}
+  return rp;
+}
+function amAiReroute(){
+  if(amPts.length<2){ amBadge('PLACE SPOTS FIRST','run'); return; }
+  var best=amRelay,bestRp=Infinity;
+  for(var k=0;k<amHW.length;k++){var rp=amRoutePathFor(k); if(rp<bestRp){bestRp=rp;best=k;}}
+  amRelay=best;
+  amBadge('AI REROUTE → '+amHW[amRelay].n+' · shortest path '+amFmt(bestRp,2)+' km','pass');
   amMeasure();
 }
 function amDemo(){
@@ -3111,6 +3173,7 @@ try{seMeasureLink();}catch(e){}
 try{var _s=localStorage.getItem('ggw-server'); if(_s)document.getElementById('hsServer').value=_s; var _d=localStorage.getItem('ggw-devid'); if(_d)document.getElementById('hsDevId').value=_d;}catch(e){}
 try{amInit();}catch(e){}
 try{rtInit();}catch(e){}
+try{kbTodayShow();}catch(e){}
 </script>
 </body>
 </html>

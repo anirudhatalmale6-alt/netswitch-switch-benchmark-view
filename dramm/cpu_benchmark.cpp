@@ -2,7 +2,7 @@
  * cpu_benchmark.cpp - CPU benchmark implementation
  *
  * Tests computational performance using integer, floating-point,
- * and memory-bound operations. Copyright AI-2-ORBIT Co. Sami Leino 2026 January assignment
+ * and memory-bound operations. Copyright AI2ORBIT Co. 2026
  */
 
 #include "cpu_benchmark.h"
