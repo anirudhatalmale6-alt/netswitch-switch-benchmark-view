@@ -43,7 +43,7 @@ const zlib = require('zlib');
 
 const PORT = process.env.PORT || 8090;
 const CHANNEL = (process.env.CHANNEL || 'dev').toLowerCase();   // dev | rc | prod
-const VERSION = '0.3.0';
+const VERSION = '0.4.0';
 const SIGNAL_CONST = 0.0001607;            // metres per picosecond (client's constant; ~160,700 km/s cable)
 const CLIENT_DIR = path.join(__dirname, '..');   // the PWA lives one level up (index.html, sw.js, ...)
 const DB_DIR = path.join(__dirname, 'data', 'devices');
@@ -155,6 +155,86 @@ async function measureDistance(host, port) {
   };
 }
 
+/* ---- round-the-clock SECURITY WATCH: a two-hand "clock" watchdog + security event log.
+        short arm = fast tick (samples request/error/listener state);
+        long arm  = slow tick (rolls the window up + runs the firewall / egress reachability
+        self-test and raises ALERTs). Everything is appended to data/security/security-<date>.log.
+        Cadences and the egress target are env-tunable (SEC_SHORT_MS / SEC_LONG_MS / SEC_FW_HOST). ---- */
+const SEC_DIR  = path.join(__dirname, 'data', 'security');
+const SHORT_MS = parseInt(process.env.SEC_SHORT_MS, 10) || 15000;    // short arm (minute hand)
+const LONG_MS  = parseInt(process.env.SEC_LONG_MS, 10)  || 300000;   // long arm  (hour hand)
+const FW_HOST  = process.env.SEC_FW_HOST || 'one.one.one.one';       // egress reachability probe
+const FW_PORT  = parseInt(process.env.SEC_FW_PORT, 10) || 443;
+const SEC = { started: Date.now(), reqTotal: 0, reqWindow: 0, errTotal: 0, errWindow: 0,
+  byIp: {}, lastShort: null, lastLong: null,
+  egress_ok: null, egress_ms: null, egress_checked: null, alerts: [] };
+
+function secLogFile() { return path.join(SEC_DIR, 'security-' + new Date().toISOString().slice(0, 10) + '.log'); }
+function secLog(level, event, detail) {
+  try {
+    fs.mkdirSync(SEC_DIR, { recursive: true });
+    fs.appendFileSync(secLogFile(), JSON.stringify(Object.assign(
+      { ts: new Date().toISOString(), level, event, channel: CHANNEL }, detail || {})) + '\n');
+    if (level === 'ALERT') { SEC.alerts.push({ ts: new Date().toISOString(), event, detail: detail || {} }); while (SEC.alerts.length > 50) SEC.alerts.shift(); }
+  } catch (e) { /* logging must never crash the server */ }
+}
+function secObserve(req, code, ms, ip) {
+  SEC.reqTotal++; SEC.reqWindow++;
+  if (code >= 400) { SEC.errTotal++; SEC.errWindow++; }
+  SEC.byIp[ip] = (SEC.byIp[ip] || 0) + 1;
+  const p = String(req.url || '').split('?')[0];
+  if (code >= 400) secLog('WARN', 'http_error', { ip, method: req.method, path: p, code, ms });
+  else if (req.method !== 'GET') secLog('INFO', 'http_write', { ip, method: req.method, path: p, code, ms });
+}
+async function secEgressCheck() {           // the firewall self-test: can we still reach out?
+  try {
+    const ms = await tcpRtt(FW_HOST, FW_PORT, 4000);
+    SEC.egress_ok = true; SEC.egress_ms = +ms.toFixed(1);
+  } catch (e) {
+    SEC.egress_ok = false; SEC.egress_ms = null;
+    secLog('ALERT', 'egress_blocked', { target: FW_HOST + ':' + FW_PORT,
+      error: String(e && e.message || e), hint: 'outbound firewall may be blocking this port' });
+  }
+  SEC.egress_checked = new Date().toISOString();
+}
+function secShortTick() {                    // minute hand
+  SEC.lastShort = new Date().toISOString();
+  if (!srv.listening) secLog('ALERT', 'listener_down', { port: PORT });
+  if (SEC.reqWindow >= 20 && SEC.errWindow / SEC.reqWindow > 0.5)
+    secLog('ALERT', 'error_rate_high', { window_requests: SEC.reqWindow, window_errors: SEC.errWindow });
+}
+async function secLongTick() {               // hour hand — roll up + firewall self-test
+  SEC.lastLong = new Date().toISOString();
+  await secEgressCheck();
+  const top = Object.entries(SEC.byIp).sort((a, b) => b[1] - a[1])[0];
+  if (top && top[1] > 1000) secLog('ALERT', 'ip_spike', { ip: top[0], requests: top[1] });
+  secLog('INFO', 'window_summary', {
+    uptime_s: Math.round((Date.now() - SEC.started) / 1000),
+    requests: SEC.reqWindow, errors: SEC.errWindow, unique_ips: Object.keys(SEC.byIp).length,
+    egress_ok: SEC.egress_ok, egress_ms: SEC.egress_ms,
+    load_avg: os.loadavg().map(n => +n.toFixed(2)), mem_free_mb: +(os.freemem() / 1048576).toFixed(0) });
+  SEC.reqWindow = 0; SEC.errWindow = 0; SEC.byIp = {};
+}
+function secStatus() {
+  return { watch: 'running', channel: CHANNEL,
+    started: new Date(SEC.started).toISOString(),
+    uptime_s: Math.round((Date.now() - SEC.started) / 1000),
+    short_arm_ms: SHORT_MS, long_arm_ms: LONG_MS,
+    last_short_tick: SEC.lastShort, last_long_tick: SEC.lastLong,
+    requests_total: SEC.reqTotal, errors_total: SEC.errTotal,
+    firewall: { egress_target: FW_HOST + ':' + FW_PORT, egress_ok: SEC.egress_ok,
+      egress_ms: SEC.egress_ms, checked: SEC.egress_checked },
+    fw_ok: SEC.egress_ok !== false,
+    recent_alerts: SEC.alerts.slice(-10), log_file: path.basename(secLogFile()) };
+}
+function secTail(n) {
+  try {
+    const lines = fs.readFileSync(secLogFile(), 'utf8').trim().split('\n');
+    return lines.slice(-Math.max(1, Math.min(500, n || 50)))
+      .map(l => { try { return JSON.parse(l); } catch (e) { return { raw: l }; } });
+  } catch (e) { return []; }
+}
+
 /* ---- delivery capacity estimate (bitrate x users vs server uplink) ---- */
 function estimate(q) {
   const bitrate = Math.max(0.05, parseFloat(q.bitrate) || 1.5);   // Mbps per stream
@@ -198,6 +278,7 @@ function health() {
     rss_mb: +(mem.rss / 1048576).toFixed(1),
     heap_used_mb: +(mem.heapUsed / 1048576).toFixed(1),
     uptime_s: +process.uptime().toFixed(0),
+    security: { watch: 'running', fw_ok: SEC.egress_ok !== false, alerts: SEC.alerts.length },
     time: new Date().toISOString()
   };
 }
@@ -234,6 +315,9 @@ function serveStatic(req, res, pathname) {
 
 const srv = http.createServer(async (req, res) => {
   const u = url.parse(req.url, true);
+  const _t0 = Date.now();
+  const _ip = (req.socket && req.socket.remoteAddress) || '?';
+  res.on('finish', () => secObserve(req, res.statusCode, Date.now() - _t0, _ip));
   try {
     if (u.pathname === '/api/health') return json(res, 200, health());
     if (u.pathname === '/api/ping')   return json(res, 200, { pong: true, t: Date.now() });
@@ -259,6 +343,8 @@ const srv = http.createServer(async (req, res) => {
     if (u.pathname === '/api/devices') return json(res, 200, { channel: CHANNEL, devices: listDevices() });
     if (u.pathname === '/api/backup' && req.method === 'POST') return json(res, 200, makeBackup());
     if (u.pathname === '/api/backups') return json(res, 200, { channel: CHANNEL, dir: BACKUP_DIR, backups: listBackups() });
+    if (u.pathname === '/api/security') return json(res, 200, secStatus());
+    if (u.pathname === '/api/security/log') return json(res, 200, { log: path.basename(secLogFile()), lines: secTail(parseInt(u.query.n, 10) || 50) });
     return serveStatic(req, res, u.pathname);
   } catch (e) {
     return json(res, 502, { error: String(e && e.message || e) });
@@ -276,7 +362,15 @@ srv.listen(PORT, () => {
   console.log('  GET  /api/devices');
   console.log('  POST /api/backup             (bundle all device DBs -> data/backups/*.6ggwbak.gz, for tape/LTO)');
   console.log('  GET  /api/backups');
+  console.log('  GET  /api/security           (round-the-clock watch status + firewall self-test)');
+  console.log('  GET  /api/security/log?n=50');
   console.log('  GET  /                        (serves the bundled 6GGW client)');
   if (CHANNEL !== 'prod' && (process.env.DB_KEY || '') === '')
     console.log('  note: using the dev DB key. Set DB_KEY=... for rc/prod.');
+  // start the security clock: immediate firewall/egress sweep, then the two hands tick round the clock
+  secLog('INFO', 'watch_start', { port: PORT, short_arm_ms: SHORT_MS, long_arm_ms: LONG_MS, fw_target: FW_HOST + ':' + FW_PORT });
+  secLongTick().catch(() => {});
+  setInterval(secShortTick, SHORT_MS).unref();
+  setInterval(function () { secLongTick().catch(() => {}); }, LONG_MS).unref();
+  console.log('  security watch: ON  (short arm ' + (SHORT_MS / 1000) + 's, long arm ' + (LONG_MS / 1000) + 's, fw probe ' + FW_HOST + ':' + FW_PORT + ')');
 });

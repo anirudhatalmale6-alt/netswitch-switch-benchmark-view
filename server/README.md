@@ -31,6 +31,28 @@ Open `http://<server-ip>:8090/` — it serves the full 6GGW client, so **one box
 | `GET /api/devices` | List known device IDs. |
 | `POST /api/backup` | Bundle **all** device DBs into one gzipped, checksummed archive under `data/backups/*.6ggwbak.gz` — ready to copy onto tape (IBM/LTO) or offsite. Blobs stay encrypted inside the archive. |
 | `GET /api/backups` | List archives already made. |
+| `GET /api/security` | Round-the-clock **security watch** status: uptime, request/error counters, the firewall/egress self-test result (`fw_ok`), and recent alerts. |
+| `GET /api/security/log?n=50` | Tail the security event log (JSON lines). |
+
+## Security watch (round-the-clock)
+
+A watchdog runs on a two-hand clock the whole time the server is up, and writes to
+`data/security/security-<date>.log`:
+
+- **short arm** (default every 15 s) — samples request/error rate and checks the listener is still bound; raises an ALERT on an error-rate spike or a downed listener.
+- **long arm** (default every 5 min) — rolls the window into a summary line and runs the **firewall / egress self-test**: a real TCP connect to an outbound target (default `one.one.one.one:443`). If it can't get out, it logs `ALERT egress_blocked` with the hint that an outbound firewall may be blocking that port — exactly the "make sure no fw issues" check.
+
+Every 4xx/5xx and every write (POST) is logged with the client IP, path and status. Tune with
+`SEC_SHORT_MS`, `SEC_LONG_MS`, `SEC_FW_HOST`, `SEC_FW_PORT`. Check it at a glance from the client
+(CPU·GPU tab → SECURITY WATCH), or:
+
+```bash
+curl http://localhost:8090/api/security        # fw_ok, counters, recent alerts
+curl "http://localhost:8090/api/security/log?n=50"
+```
+
+Note: this watches the server process and its egress reachability (the honest, portable check). For
+OS-level packet-filter rules, keep running your `ufw`/`firewalld`/`iptables` audit alongside it.
 
 ## Release channels
 

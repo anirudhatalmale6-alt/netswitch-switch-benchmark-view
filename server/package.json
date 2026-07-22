@@ -1,6 +1,6 @@
 {
   "name": "6ggw-server",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "6GGW server component — real health, TCP-RTT distance, and stream-delivery estimates. Serves the bundled 6GGW client. Zero dependencies.",
   "main": "server.js",
   "scripts": {
