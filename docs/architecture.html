@@ -1,0 +1,94 @@
+<!doctype html><html><head><meta charset="utf-8"><title>6GGW Architecture</title>
+<style>
+  body{margin:0;background:#ffffff;color:#12251a;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  .wrap{width:1180px;margin:0 auto;padding:28px 20px}
+  h1{font-size:26px;margin:0 0 2px;color:#0b8f3e;letter-spacing:1px}
+  .sub{color:#5a6a5c;font-size:13px;margin-bottom:22px}
+  .row{display:flex;gap:22px;align-items:stretch}
+  .col{flex:1}
+  .box{border:1.5px solid #c9d4ca;border-radius:8px;background:#f7faf7;padding:14px 16px;margin-bottom:14px}
+  .box h2{font-size:14px;margin:0 0 8px;color:#0b8f3e;letter-spacing:.5px;text-transform:uppercase}
+  .box.dark{background:#0d150e;border-color:#1f3320;color:#e8f5ec}
+  .box.dark h2{color:#4fd47e}
+  .tag{display:inline-block;font-size:11px;font-family:ui-monospace,Menlo,Consolas,monospace;background:#e6f2ea;color:#0b6b39;border:1px solid #bfe0cb;border-radius:4px;padding:2px 7px;margin:3px 4px 0 0}
+  .box.dark .tag{background:#12251a;color:#7fe0a2;border-color:#255a38}
+  .li{font-size:12.5px;line-height:1.7;color:#2a3a2e}
+  .box.dark .li{color:#cfe6d6}
+  .mid{display:flex;flex-direction:column;align-items:center;justify-content:center;width:150px;color:#0b6b39;font-size:12px;text-align:center}
+  .arrow{font-size:26px;line-height:1;color:#0b8f3e}
+  .pill{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;background:#0b8f3e;color:#fff;border-radius:20px;padding:4px 12px;margin:6px 0}
+  .chan{display:flex;gap:8px;margin-top:4px}
+  .chan span{flex:1;text-align:center;font-family:ui-monospace,monospace;font-size:11px;padding:5px 0;border-radius:5px;border:1px solid #bfe0cb;background:#e6f2ea;color:#0b6b39}
+  .foot{margin-top:18px;font-size:11.5px;color:#5a6a5c;line-height:1.7;border-top:1px solid #e0e8e2;padding-top:12px}
+  .k{color:#a06b00;font-weight:600}
+</style></head><body>
+<div class="wrap">
+  <h1>6GGW — CLIENT / SERVER ARCHITECTURE</h1>
+  <div class="sub">AI2ORBIT Co. 2026 · network &amp; hardware maintenance platform · client (PWA) + server component · v2.45.0 client / v0.2.0 server</div>
+
+  <div class="row">
+    <!-- CLIENT -->
+    <div class="col">
+      <div class="box">
+        <h2>1 · Client — 6GGW PWA</h2>
+        <div class="li">Installs on Android · iOS · Windows · Mac · Linux (add-to-home-screen, offline, service worker). One codebase, all platforms.</div>
+        <div style="margin-top:6px">
+          <span class="tag">Search: IP / phone / router / domain</span>
+          <span class="tag">RAM · CPU · Chrome heap (live)</span>
+          <span class="tag">Health Snapshot (share)</span>
+          <span class="tag">Stream delivery estimate</span>
+          <span class="tag">Domain route + MAC + reroute</span>
+          <span class="tag">Storage read/write throughput</span>
+          <span class="tag">Switch control file (.switchc/.xml)</span>
+          <span class="tag">Line length (signal-path km)</span>
+        </div>
+        <div class="li" style="margin-top:8px"><b>Measured live</b> via browser APIs: StorageManager, IndexedDB, Battery, navigator.connection, WebGL, Web Workers. Modelled values are labelled as such.</div>
+      </div>
+      <div class="box">
+        <h2>Field devices</h2>
+        <div class="li">Each phone/PC in the field runs the client and can POST its <b>Health Snapshot</b> to the server — keyed by a device id.</div>
+      </div>
+    </div>
+
+    <!-- LINK -->
+    <div class="mid">
+      <div class="arrow">◀▶</div>
+      <div class="pill">HTTPS / TLS</div>
+      <div class="li" style="font-size:11px">JSON API<br>+ served client<br>(one box, both halves)</div>
+      <div class="arrow" style="margin-top:8px">◀▶</div>
+      <div class="pill" style="background:#a06b00">DNS + TCP probe</div>
+      <div class="li" style="font-size:11px">real RTT to<br>internet hosts</div>
+    </div>
+
+    <!-- SERVER -->
+    <div class="col">
+      <div class="box dark">
+        <h2>2 · Server component (Node, zero-dep)</h2>
+        <div class="li">Runs on HCL / Fujitsu / any Linux box. Does what a browser can't.</div>
+        <div style="margin-top:6px">
+          <span class="tag">GET /api/health</span>
+          <span class="tag">GET /api/ping</span>
+          <span class="tag">GET /api/distance?host=</span>
+          <span class="tag">GET /api/estimate</span>
+          <span class="tag">POST /api/device/health</span>
+          <span class="tag">GET /api/device/history</span>
+          <span class="tag">GET /api/devices</span>
+        </div>
+        <div class="li" style="margin-top:8px"><span class="k">Real measurement:</span> DNS resolve → TCP-handshake RTT (best of 3) → cable km via d=0.0001607 m/ps. Turns the client's <i>modelled</i> distance into a <i>measured</i> one.</div>
+        <div class="chan"><span>dev</span><span>rc</span><span>prod</span></div>
+        <div class="li" style="margin-top:6px;font-size:11px">CHANNEL env selects the build. Same code, promoted dev → rc → prod.</div>
+      </div>
+      <div class="box">
+        <h2>Per-device DB (encrypted)</h2>
+        <div class="li">One database file per hardware device: <b>data/devices/&lt;id&gt;.db</b>, encrypted at rest with <span class="k">AES-256-GCM</span> (Node crypto). Last 500 snapshots per device. Transport secured by TLS.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <b>Data flow —</b> field device measures itself live → optionally POSTs a Health Snapshot → server stores it in that device's encrypted DB → maintenance staff read /api/device/history &amp; /api/health to see which device or link is struggling.
+    &nbsp; <b>Line length</b> = server↔phone ping (e.g. ping bbc.co.uk to the phone), feeding the MPEG-4 / broadband delivery estimate to 30,000 post addresses, compared across fixed-line / mobile-Wi-Fi / 5G.
+    &nbsp; <b>Honesty rule:</b> everything measurable is measured; anything impossible from an app (raw traceroute, radio control, locating a phone number) is either done server-side for real or labelled as a model — never faked.
+  </div>
+</div>
+</body></html>
