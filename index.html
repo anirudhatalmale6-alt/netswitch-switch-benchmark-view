@@ -155,7 +155,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
     <h1>6GGW</h1>
     <div class="tagline">5G GATEWAY ROUTER</div>
     <div class="sub">SWITCH · PERFORMANCE MONITOR · 6G GATEWAY · CPU·GPU · AREA MAP · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.49.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.50.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
   </div>
 
   <div class="gsearch" style="display:flex;gap:8px;margin:0 0 12px;align-items:stretch">
@@ -565,6 +565,45 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
           <button class="ghost" onclick="stRequestPersist()">REQUEST PERSISTENT</button>
         </div>
         <div id="stLog" class="note" style="margin-top:10px;display:none"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>ROUTER REROUTING MAP — DWELL SUBVIEW (home · work · current)</h2><span class="badge run" id="dwBadge">MODELLED</span></div>
+      <div class="section-body">
+        <div class="note" style="margin-top:0">A separate subview of the rerouting map that shows where the phone <span class="hl">dwells</span> across a day — home address, work address and current location — and the path between them. The phone rarely moves: it sits in one place for a fraction of the day (in fifths — 1/5, 3/5, 5/5), which is exactly what decides which gateway it reroutes through. At work it may sit in the <span class="hl">locker</span>, on the <span class="hl">desk</span>, or in a <span class="hl">suit pocket</span> — that micro-split is shown too. Positions on the map are a schematic (a campus/floor layout, not a satellite map); the <span class="hl">dwell ratios are the real modelled quantity</span>. Tap the map to move the CURRENT spot, or press USE MY LOCATION to read this device's real GPS fix (with your permission) — shown as exact lat/lon.</div>
+        <div style="width:100%;overflow-x:auto"><canvas id="dwCanvas" width="920" height="460" style="display:block;width:100%;max-width:920px;background:#060c07;border:1px solid var(--border);border-radius:4px;cursor:crosshair;touch-action:none"></canvas></div>
+        <div class="btn-row">
+          <button onclick="dwDemo()">DEMO DAY</button>
+          <button class="ghost" onclick="dwUseLocation()">USE MY LOCATION (current)</button>
+          <button class="ghost" onclick="dwTogglePath()">TOGGLE PATH</button>
+          <button class="ghost" onclick="dwClear()">RESET</button>
+        </div>
+        <div style="margin-top:12px">
+          <div class="k" style="font-size:11px;color:var(--dim);margin-bottom:4px">DWELL PER PLACE — set how much of the day the phone stays there (in fifths of a day)</div>
+          <div class="grid" style="grid-template-columns:1fr 1fr 1fr">
+            <div class="stat"><div class="k">Home <span id="dwHomeF">1/5</span></div><input type="range" id="dwHome" min="0" max="5" step="1" value="1" oninput="dwOnInput()" style="width:100%"></div>
+            <div class="stat"><div class="k">Work <span id="dwWorkF">3/5</span></div><input type="range" id="dwWork" min="0" max="5" step="1" value="3" oninput="dwOnInput()" style="width:100%"></div>
+            <div class="stat"><div class="k">Current <span id="dwCurF">1/5</span></div><input type="range" id="dwCur" min="0" max="5" step="1" value="1" oninput="dwOnInput()" style="width:100%"></div>
+          </div>
+        </div>
+        <div style="margin-top:8px">
+          <div class="k" style="font-size:11px;color:var(--dim);margin-bottom:4px">AT WORK — where the phone sits (share of the work dwell)</div>
+          <div class="grid" style="grid-template-columns:1fr 1fr 1fr">
+            <div class="stat"><div class="k">Desk <span id="dwDeskP">60%</span></div><input type="range" id="dwDesk" min="0" max="100" step="5" value="60" oninput="dwOnInput()" style="width:100%"></div>
+            <div class="stat"><div class="k">Locker <span id="dwLockP">15%</span></div><input type="range" id="dwLock" min="0" max="100" step="5" value="15" oninput="dwOnInput()" style="width:100%"></div>
+            <div class="stat"><div class="k">Pocket <span id="dwPockP">25%</span></div><input type="range" id="dwPock" min="0" max="100" step="5" value="25" oninput="dwOnInput()" style="width:100%"></div>
+          </div>
+        </div>
+        <div id="dwDayBar" style="display:flex;height:26px;width:100%;border-radius:4px;overflow:hidden;margin:12px 0 4px;border:1px solid var(--border)"></div>
+        <div class="k" style="font-size:10px;color:var(--dim);text-align:center">a 24-hour day, split by dwell (work block sub-split into desk / locker / pocket)</div>
+        <div class="grid" style="margin-top:10px">
+          <div class="stat good"><div class="k">Longest dwell</div><div class="v" id="dwLongest" style="font-size:16px">—</div></div>
+          <div class="stat"><div class="k">Most-likely spot now</div><div class="v" id="dwNow" style="font-size:16px">—</div></div>
+          <div class="stat"><div class="k">Day covered</div><div class="v" id="dwCover">—</div></div>
+          <div class="stat"><div class="k">Current GPS fix</div><div class="v" id="dwGps" style="font-size:13px">not read</div></div>
+        </div>
+        <div class="note">This is modelled dwell, not live tracking. It uses only the two addresses you already know (home / work) plus, if you press the button, this device's own GPS fix read through the standard permission prompt — nothing is pulled from a number or a network behind the scenes. The point is to see how the phone's resting place across a day drives which gateway the router picks and when it should reroute.</div>
       </div>
     </div>
   </div>
@@ -2210,6 +2249,190 @@ function amInit(){
   amDraw(); requestAnimationFrame(amTick);
 }
 
+/* ---------------- DWELL SUBVIEW — where the phone rests across a day ---------------- */
+var DW_W=920, DW_H=460, dwShowPath=true, dwPhase=0;
+var dwPlaces=[
+  {id:'home', name:'Home',    x:150, y:340, col:'#2979ff'},
+  {id:'work', name:'Work',    x:600, y:150, col:'#ffd740'},
+  {id:'current', name:'Current', x:800, y:360, col:'#00e676', live:false, lat:null, lon:null, acc:null}
+];
+function dwEl(id){return document.getElementById(id);}
+function dwFifths(){return {home:+dwEl('dwHome').value, work:+dwEl('dwWork').value, current:+dwEl('dwCur').value};}
+function dwMicro(){return {Desk:+dwEl('dwDesk').value, Locker:+dwEl('dwLock').value, Pocket:+dwEl('dwPock').value};}
+function dwOnInput(){
+  var f=dwFifths();
+  dwEl('dwHomeF').textContent=f.home+'/5'; dwEl('dwWorkF').textContent=f.work+'/5'; dwEl('dwCurF').textContent=f.current+'/5';
+  var m=dwMicro();
+  dwEl('dwDeskP').textContent=m.Desk+'%'; dwEl('dwLockP').textContent=m.Locker+'%'; dwEl('dwPockP').textContent=m.Pocket+'%';
+  dwRender();
+}
+function dwCanvasXY(ev){
+  var cv=dwEl('dwCanvas'), r=cv.getBoundingClientRect();
+  var cx=(ev.touches?ev.touches[0].clientX:ev.clientX)-r.left;
+  var cy=(ev.touches?ev.touches[0].clientY:ev.clientY)-r.top;
+  return {x:cx*(DW_W/r.width), y:cy*(DW_H/r.height)};
+}
+function dwTap(ev){
+  ev.preventDefault();
+  var p=dwCanvasXY(ev); var cur=dwPlaces[2];
+  cur.x=Math.max(20,Math.min(DW_W-20,p.x)); cur.y=Math.max(20,Math.min(DH_CLAMP(),p.y));
+  cur.live=false; dwDraw();
+}
+function DH_CLAMP(){return DW_H-20;}
+function dwBadge(t,cls){var b=dwEl('dwBadge');if(b){b.textContent=t;b.className='badge '+(cls||'run');}}
+
+function dwRender(){ dwStats(); dwDayBar(); dwDraw(); }
+
+/* hours-per-place from the fifths (a fifth of a 24h day = 4.8h). Normalised if they don't sum to 5. */
+function dwHours(){
+  var f=dwFifths(), tot=f.home+f.work+f.current;
+  if(tot<=0) return {home:0,work:0,current:0,tot:0};
+  return {home:f.home/tot*24, work:f.work/tot*24, current:f.current/tot*24, tot:tot};
+}
+function dwStats(){
+  var h=dwHours(), f=dwFifths();
+  /* longest dwell */
+  var arr=[['Home',h.home],['Work',h.work],['Current',h.current]].sort(function(a,b){return b[1]-a[1];});
+  dwEl('dwLongest').textContent = h.tot? arr[0][0]+' · '+arr[0][1].toFixed(1)+' h/day' : '—';
+  /* most-likely spot now: biggest place; if Work is biggest, name the biggest micro-spot */
+  var now='—';
+  if(h.tot){
+    if(arr[0][0]==='Work'){
+      var m=dwMicro(); var mm=[['Desk',m.Desk],['Locker',m.Locker],['Pocket',m.Pocket]].sort(function(a,b){return b[1]-a[1];});
+      now='Work · '+mm[0][0].toLowerCase();
+    } else now=arr[0][0].toLowerCase();
+  }
+  dwEl('dwNow').textContent=now;
+  /* day covered — how close the fifths sum to a full 5/5 day */
+  var cov=Math.round((f.home+f.work+f.current)/5*100);
+  dwEl('dwCover').innerHTML=(f.home+f.work+f.current)+'/5 <small>('+cov+'% of day)</small>';
+}
+function dwDayBar(){
+  var bar=dwEl('dwDayBar'); if(!bar)return; bar.innerHTML='';
+  var h=dwHours(); if(!h.tot){bar.innerHTML='<div style="flex:1;background:#0c140d;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:10px">set a dwell above</div>';return;}
+  function seg(label,frac,col,sub){
+    if(frac<=0)return;
+    var d=document.createElement('div');
+    d.style.cssText='flex:'+frac+';background:'+col+';display:flex;align-items:center;justify-content:center;color:#0a0f0a;font:bold 10px Courier New;overflow:hidden;white-space:nowrap;border-right:1px solid rgba(0,0,0,.3)';
+    d.title=label; d.textContent=frac>0.6?label:'';
+    if(sub){ d.style.background='transparent'; d.style.display='flex'; }
+    bar.appendChild(d);
+  }
+  seg('HOME', h.home, 'rgba(41,121,255,0.85)');
+  /* work block split into desk/locker/pocket */
+  if(h.work>0){
+    var m=dwMicro(), ms=m.Desk+m.Locker+m.Pocket; if(ms<=0)ms=1;
+    var wrap=document.createElement('div'); wrap.style.cssText='flex:'+h.work+';display:flex;overflow:hidden';
+    [['DESK',m.Desk,'rgba(255,215,64,0.9)'],['LOCKER',m.Locker,'rgba(255,180,40,0.75)'],['POCKET',m.Pocket,'rgba(255,150,30,0.6)']].forEach(function(x){
+      if(x[1]<=0)return;
+      var s=document.createElement('div');
+      s.style.cssText='flex:'+x[1]+';background:'+x[2]+';display:flex;align-items:center;justify-content:center;color:#0a0f0a;font:bold 9px Courier New;overflow:hidden;white-space:nowrap;border-right:1px solid rgba(0,0,0,.25)';
+      s.title='Work · '+x[0]; s.textContent=(x[1]/ms*h.work)>1.4?x[0]:''; wrap.appendChild(s);
+    });
+    bar.appendChild(wrap);
+  }
+  seg('NOW', h.current, 'rgba(0,230,118,0.85)');
+}
+function dwDraw(){
+  var cv=dwEl('dwCanvas'); if(!cv)return; var c=cv.getContext('2d');
+  c.clearRect(0,0,DW_W,DW_H);
+  /* faint grid */
+  c.strokeStyle='rgba(31,51,32,0.5)'; c.lineWidth=1;
+  for(var gx=0;gx<=DW_W;gx+=46){c.beginPath();c.moveTo(gx,0);c.lineTo(gx,DW_H);c.stroke();}
+  for(var gy=0;gy<=DW_H;gy+=46){c.beginPath();c.moveTo(0,gy);c.lineTo(DW_W,gy);c.stroke();}
+  var h=dwHours();
+  /* path home -> work -> current (day order) */
+  if(dwShowPath){
+    var order=[dwPlaces[0],dwPlaces[1],dwPlaces[2]];
+    c.strokeStyle='rgba(120,220,255,0.55)'; c.lineWidth=2; c.setLineDash([6,5]);
+    c.beginPath(); c.moveTo(order[0].x,order[0].y);
+    for(var i=1;i<order.length;i++)c.lineTo(order[i].x,order[i].y);
+    c.stroke(); c.setLineDash([]);
+    /* moving packet along the path to show direction */
+    for(var s=0;s<order.length-1;s++){
+      var a=order[s],b=order[s+1],t=(dwPhase+s*0.33)%1;
+      c.beginPath();c.arc(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,3,0,7);c.fillStyle='rgba(120,220,255,0.95)';c.fill();
+    }
+  }
+  var hoursById={home:h.home,work:h.work,current:h.current};
+  /* dwell blobs — radius grows with hours dwelt */
+  dwPlaces.forEach(function(p){
+    var hrs=hoursById[p.id]||0;
+    var rad=14+Math.sqrt(hrs)*11;               /* 0h -> 14px, 24h -> ~68px */
+    c.beginPath();c.arc(p.x,p.y,rad,0,7);
+    c.fillStyle=hexA(p.col,0.14);
+    c.fill();
+    c.lineWidth=2;c.strokeStyle=p.col;c.setLineDash([2,3]);c.stroke();c.setLineDash([]);
+    /* core dot */
+    c.beginPath();c.arc(p.x,p.y,7,0,7);c.fillStyle=p.col;c.fill();
+    c.lineWidth=2;c.strokeStyle='#0a0f0a';c.stroke();
+    /* label */
+    c.fillStyle='var(--white)';c.font='bold 12px Courier New';
+    var lbl=p.name+(hrs>0?'  '+hrs.toFixed(1)+'h':'');
+    if(p.id==='current'&&p.live&&p.lat!=null)lbl='Current (GPS)  '+hrs.toFixed(1)+'h';
+    c.fillText(lbl,p.x+rad+4,p.y-2);
+  });
+  /* work micro-spots (locker/desk/pocket) clustered around the work blob */
+  var w=dwPlaces[1], m=dwMicro();
+  var micro=[['Desk',m.Desk,-1,-1],['Locker',m.Locker,1,-1],['Pocket',m.Pocket,0,1]];
+  micro.forEach(function(mm){
+    if(mm[1]<=0)return;
+    var mx=w.x+mm[2]*40, my=w.y+mm[3]*38;
+    c.beginPath();c.arc(mx,my,4+mm[1]/100*7,0,7);c.fillStyle='rgba(255,215,64,0.85)';c.fill();
+    c.lineWidth=1;c.strokeStyle='#0a0f0a';c.stroke();
+    c.fillStyle='rgba(255,224,130,0.9)';c.font='10px Courier New';c.fillText(mm[0]+' '+mm[1]+'%',mx+7,my+3);
+  });
+  /* legend */
+  c.fillStyle='rgba(159,214,168,0.75)';c.font='11px Courier New';
+  c.fillText('bigger circle = more of the day spent there · dashed line = daily path',12,DW_H-12);
+}
+function hexA(hex,a){
+  var h=hex.replace('#',''); if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  var n=parseInt(h,16); return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')';
+}
+function dwDemo(){
+  dwEl('dwHome').value=1; dwEl('dwWork').value=3; dwEl('dwCur').value=1;
+  dwEl('dwDesk').value=60; dwEl('dwLock').value=15; dwEl('dwPock').value=25;
+  dwPlaces[0].x=150;dwPlaces[0].y=340; dwPlaces[1].x=600;dwPlaces[1].y=150; dwPlaces[2].x=800;dwPlaces[2].y=360;
+  dwPlaces[2].live=false; dwEl('dwGps').textContent='not read';
+  dwShowPath=true; dwOnInput(); dwBadge('MODELLED — DEMO DAY','run');
+}
+function dwClear(){
+  dwEl('dwHome').value=1; dwEl('dwWork').value=3; dwEl('dwCur').value=1;
+  dwEl('dwDesk').value=60; dwEl('dwLock').value=15; dwEl('dwPock').value=25;
+  dwPlaces[2].live=false; dwPlaces[2].lat=dwPlaces[2].lon=null; dwEl('dwGps').textContent='not read';
+  dwOnInput(); dwBadge('MODELLED','run');
+}
+function dwTogglePath(){ dwShowPath=!dwShowPath; dwDraw(); dwBadge(dwShowPath?'PATH ON':'PATH OFF','info'); }
+function dwUseLocation(){
+  if(!navigator.geolocation){ dwEl('dwGps').textContent='no GPS API on this device'; return; }
+  dwEl('dwGps').textContent='asking permission…'; dwBadge('READING GPS…','info');
+  navigator.geolocation.getCurrentPosition(function(pos){
+    var la=pos.coords.latitude, lo=pos.coords.longitude, ac=pos.coords.accuracy;
+    var cur=dwPlaces[2]; cur.live=true; cur.lat=la; cur.lon=lo; cur.acc=ac;
+    dwEl('dwGps').innerHTML=la.toFixed(5)+', '+lo.toFixed(5)+' <small>±'+Math.round(ac)+' m</small>';
+    dwBadge('CURRENT = REAL GPS FIX','pass'); dwDraw();
+  }, function(err){
+    dwEl('dwGps').textContent = err.code===1?'permission denied':'GPS unavailable';
+    dwBadge('MODELLED','run');
+  }, {enableHighAccuracy:true, timeout:8000, maximumAge:0});
+}
+function dwTick(){
+  var panel=dwEl('p-devview');
+  if(panel && panel.classList.contains('active')){ dwPhase=(dwPhase+0.01)%1; if(dwShowPath)dwDraw(); }
+  requestAnimationFrame(dwTick);
+}
+var dwInited=false;
+function dwInit(){
+  var cv=dwEl('dwCanvas'); if(!cv)return;
+  if(!dwInited){
+    cv.addEventListener('click',dwTap);
+    cv.addEventListener('touchstart',dwTap,{passive:false});
+    dwInited=true; requestAnimationFrame(dwTick);
+  }
+  dwOnInput();
+}
+
 /* ---------------- UK ROUTES — director routing view ---------------- */
 var RT_CITY={
  'London EC2':{lon:-0.087,lat:51.517,ip:'195.66.224.21',addr:'LINX LON1, 6-7 Harbour Exchange Sq, London EC2',pri:1},
@@ -2794,7 +3017,7 @@ function gotoTab(name){
   document.querySelectorAll('.panel').forEach(function(x){x.classList.remove('active');});
   var tab=document.querySelector('.tab[data-p="'+name+'"]'); if(tab)tab.classList.add('active');
   var pan=document.getElementById('p-'+name); if(pan)pan.classList.add('active');
-  if(name==='devview'){try{renderDevView();}catch(e){}}
+  if(name==='devview'){try{renderDevView();}catch(e){} try{dwInit();}catch(e){}}
   if(name==='content'){try{ctInit();}catch(e){}}
   if(name==='fair'){try{updateFair();}catch(e){}}
   if(name==='routes' && !rtSrcConfirmed){try{rtOpenGate();}catch(e){}}
@@ -2872,7 +3095,7 @@ document.querySelectorAll('.tab').forEach(function(t){
     t.classList.add('active');
     document.getElementById('p-'+t.getAttribute('data-p')).classList.add('active');
     if(t.getAttribute('data-p')==='routes' && !rtSrcConfirmed){ rtOpenGate(); }
-    if(t.getAttribute('data-p')==='devview'){ renderDevView(); }
+    if(t.getAttribute('data-p')==='devview'){ renderDevView(); try{dwInit();}catch(e){} }
     if(t.getAttribute('data-p')==='content'){ ctInit(); }
     if(t.getAttribute('data-p')==='fair'){ updateFair(); }
   };
