@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">6GGW Router</string>
+    <string name="title_activity_main">6GGW Router</string>
+    <string name="package_name">com.ai2orbit.ggw6</string>
+    <string name="custom_url_scheme">com.ai2orbit.ggw6</string>
+</resources>
