@@ -1,0 +1,94 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>6GGW — Sources &amp; Test Guide</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm; }
+  * { box-sizing: border-box; }
+  body { font: 12px/1.5 -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color: #14181f; }
+  h1 { font-size: 22px; margin: 0 0 2px; }
+  h2 { font-size: 15px; margin: 20px 0 6px; padding-bottom: 3px; border-bottom: 2px solid #10b981; color: #0b3; }
+  h2 { color: #0a7d55; }
+  h3 { font-size: 13px; margin: 13px 0 4px; }
+  .sub { color: #5b6472; margin: 0 0 14px; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  code { background: #f2f4f7; padding: 1px 5px; border-radius: 3px; font-size: 11px; }
+  pre { background: #0f1620; color: #d7e2ee; padding: 10px 12px; border-radius: 5px; font-size: 11px; overflow-x: auto; white-space: pre-wrap; }
+  table { border-collapse: collapse; width: 100%; margin: 6px 0; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid #e3e7ed; vertical-align: top; }
+  th { background: #f6f8fa; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #5b6472; }
+  .pill { display: inline-block; background: #eafaf3; color: #0a7d55; border: 1px solid #b8ecd6; border-radius: 20px; padding: 1px 9px; font-size: 11px; margin-right: 5px; }
+  .box { border: 1px solid #e3e7ed; border-radius: 6px; padding: 10px 12px; margin: 8px 0; }
+  .k { color: #5b6472; }
+  ol, ul { margin: 4px 0 4px 18px; padding: 0; }
+  li { margin: 2px 0; }
+  .foot { margin-top: 22px; padding-top: 8px; border-top: 1px solid #e3e7ed; color: #8b95a3; font-size: 10px; }
+</style></head>
+<body>
+  <h1>6GGW — 5G Gateway Router</h1>
+  <p class="sub">Sources &amp; Test Guide &nbsp;·&nbsp; Client v2.49.0 &nbsp;·&nbsp; Server v0.4.0 &nbsp;·&nbsp; <span class="k">for testers</span></p>
+
+  <p>The product ships in two halves. The <b>client</b> is an installable app (PWA) that runs on any
+  phone, tablet or computer with a browser — nothing to install from a store. The <b>server</b> is a
+  small zero-dependency Node program that runs on a real box (HCL / Fujitsu / a laptop) and does the
+  measurements a browser physically can't. One server can also serve the client, so a single box
+  ships both halves.</p>
+
+  <h2>What you were sent (three parts, separately)</h2>
+  <table>
+    <tr><th>Part</th><th>File</th><th>What it is</th></tr>
+    <tr><td><span class="pill">Client</span></td><td><code>6ggw-client-v2.49.0.zip</code></td><td>The app: <code>index.html</code>, <code>sw.js</code>, <code>manifest.webmanifest</code>, icons. Open <code>index.html</code> in a browser — that's it.</td></tr>
+    <tr><td><span class="pill">Server</span></td><td><code>6ggw-server-v0.4.0.zip</code></td><td>The <code>server/</code> folder: <code>server.js</code>, <code>backup.js</code>, <code>restore.js</code>, <code>README.md</code>. Needs Node 16+.</td></tr>
+    <tr><td><span class="pill">Docs</span></td><td><code>6ggw-docs.zip</code></td><td>Architecture write-up + diagram, this guide.</td></tr>
+  </table>
+  <p class="k">Latest sources are also on GitHub (public): the repo link is in the chat message. Same code, same commit.</p>
+
+  <h2>Test the CLIENT today (no server needed)</h2>
+  <ol>
+    <li>Unzip the client and open <code>index.html</code> in Chrome (phone or desktop). On a phone you can tap <i>Add to Home screen</i> to install it as an app.</li>
+    <li>Walk the tabs. The live ones to check first:
+      <ul>
+        <li><b>CPU·GPU</b> — RAM / CPU / Chrome-heap live meter (the "Process system isn't responding" jam guard).</li>
+        <li><b>NET DATA</b> — Stream Delivery Estimate: pick a service (Spotify / Tidal / BBC), set % online at peak and split-for-cache, and read the origin vs edge node counts.</li>
+        <li><b>6G GATEWAY</b> — route / line-length view.</li>
+      </ul>
+    </li>
+    <li>In <b>CPU·GPU → HEALTH SNAPSHOT</b>, each tester can capture their device's real stats and (tomorrow, once the server is up) send them to it.</li>
+  </ol>
+  <div class="box"><b>Three testers:</b> each just opens the same client on their own device — phone, tablet, laptop. No accounts, no install. Their device stats differ, so it's a good spread.</div>
+
+  <h2>Run the SERVER tomorrow (rc build)</h2>
+  <p>On the test box, unzip the server folder and run it as the release candidate. Give each location its own device id.</p>
+  <pre>cd server
+CHANNEL=rc DB_KEY="pick-a-secret" node server.js        # listens on :8090
+# open http://&lt;server-ip&gt;:8090/  — it serves the client too</pre>
+  <p>In the client (CPU·GPU tab) set <b>Maintenance server URL</b> to <code>http://&lt;server-ip&gt;:8090</code> and a
+  <b>device id</b> (e.g. <code>site-A</code>, <code>site-B</code> per location), then <b>SEND SNAPSHOT TO SERVER</b>.
+  Each device's snapshots are stored in its own <b>AES-256 encrypted</b> DB on the server.</p>
+
+  <h2>Security watch &amp; firewall check</h2>
+  <p>The moment the server starts, a round-the-clock watch runs on a two-hand clock: a fast tick samples
+  request/error rate and the listener, a slow tick rolls up and runs a real <b>firewall / egress self-test</b>.
+  Everything is logged to <code>data/security/security-&lt;date&gt;.log</code>.</p>
+  <pre>curl http://&lt;server-ip&gt;:8090/api/security          # fw_ok, counters, recent alerts
+curl "http://&lt;server-ip&gt;:8090/api/security/log?n=50"</pre>
+  <p>Or read it in the app: <b>CPU·GPU → SECURITY WATCH (SERVER)</b>.</p>
+
+  <h2>Back up the network data (tape / LTO / offsite)</h2>
+  <pre>node backup.js                                     # -> data/backups/backup-rc-&lt;ts&gt;.6ggwbak.gz (+ .sha256)
+node restore.js data/backups/backup-....6ggwbak.gz --verify   # verify an archive</pre>
+  <p>Blobs stay encrypted inside the archive, so it's safe to copy straight onto tape. After the test run,
+  <code>node backup.js</code> gives you one file to send back.</p>
+
+  <h2>API reference</h2>
+  <table>
+    <tr><th>Endpoint</th><th>Purpose</th></tr>
+    <tr><td><code>GET /api/health</code></td><td>Server's live health + security summary</td></tr>
+    <tr><td><code>GET /api/distance?host=bbc.co.uk</code></td><td>Real TCP-handshake RTT → signal-path cable length</td></tr>
+    <tr><td><code>GET /api/estimate?users=&amp;bitrate=&amp;server=</code></td><td>Broadband delivery capacity for N addresses</td></tr>
+    <tr><td><code>POST /api/device/health</code></td><td>Store a device snapshot (per-device encrypted DB)</td></tr>
+    <tr><td><code>GET /api/device/history?id=</code> · <code>/api/devices</code></td><td>Read a device's history · list devices</td></tr>
+    <tr><td><code>POST /api/backup</code> · <code>GET /api/backups</code></td><td>Make / list backup archives</td></tr>
+    <tr><td><code>GET /api/security</code> · <code>/api/security/log?n=</code></td><td>Security watch status · tail the log</td></tr>
+  </table>
+
+  <div class="foot">6GGW · AI2ORBIT Co. 2026 · client v2.49.0 / server v0.4.0. Everything here is real, measured code — no modelled numbers on the server side, and modelled values in the client are labelled as such.</div>
+</body></html>
