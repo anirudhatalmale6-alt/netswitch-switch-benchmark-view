@@ -155,7 +155,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
     <h1>6GGW</h1>
     <div class="tagline">5G GATEWAY ROUTER</div>
     <div class="sub">SWITCH · PERFORMANCE MONITOR · 6G GATEWAY · CPU·GPU · AREA MAP · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.46.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.47.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
   </div>
 
   <div class="gsearch" style="display:flex;gap:8px;margin:0 0 12px;align-items:stretch">
@@ -412,7 +412,27 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
           <div class="stat"><div class="k">Signal-path (line length)</div><div class="v" id="seLine">—</div></div>
         </div>
         <div class="field-grid" style="margin-top:10px">
-          <div><label>Codec / stream</label><select id="seCodec">
+          <div><label>Service preset (real bitrates)</label><select id="seService" onchange="seApplyService()">
+            <optgroup label="— custom —"><option value="">Custom codec (use next box)</option></optgroup>
+            <optgroup label="Spotify (audio)">
+              <option value="0.096">Spotify Normal — 96 kbps</option>
+              <option value="0.16">Spotify High — 160 kbps</option>
+              <option value="0.32">Spotify Very High / Premium — 320 kbps</option>
+            </optgroup>
+            <optgroup label="Tidal (audio)">
+              <option value="0.32">Tidal Low (AAC) — 320 kbps</option>
+              <option value="1.411">Tidal HiFi (FLAC/CD) — 1.411 Mbps</option>
+              <option value="9.216">Tidal Max (hi-res FLAC) — ~9.2 Mbps</option>
+            </optgroup>
+            <optgroup label="BBC">
+              <option value="0.32">BBC Sounds radio — 320 kbps</option>
+              <option value="1.5">BBC iPlayer SD — 1.5 Mbps</option>
+              <option value="2.8">BBC iPlayer HD 720p — 2.8 Mbps</option>
+              <option value="5">BBC iPlayer / Live TV 1080p — 5 Mbps</option>
+              <option value="24">BBC iPlayer UHD 4K — 24 Mbps</option>
+            </optgroup>
+          </select></div>
+          <div><label>Codec / stream (custom)</label><select id="seCodec">
             <option value="0.32">Music (AAC) — 0.32 Mbps</option>
             <option value="1.5" selected>MPEG-4 SD — 1.5 Mbps</option>
             <option value="4">MPEG-4 HD 720p — 4 Mbps</option>
@@ -1500,15 +1520,27 @@ function seMeasureLink(){
   }catch(e){ seFill(); }
   seFill();
 }
+function seApplyService(){
+  var sv=document.getElementById('seService'); if(!sv) return;
+  if(sv.value){ document.getElementById('seCodec').disabled=true; } else { document.getElementById('seCodec').disabled=false; }
+  streamEstimate();
+}
+function seServiceLabel(){
+  var sv=document.getElementById('seService');
+  if(sv && sv.value){ return sv.options[sv.selectedIndex].text.replace(/ — .*/,''); }
+  return null;
+}
 function streamEstimate(){
   seMeasureLink();
-  var bitrate=parseFloat(document.getElementById('seCodec').value)||1.5;      // Mbps / stream
+  var svEl=document.getElementById('seService'); var svVal=svEl?parseFloat(svEl.value):NaN;
+  var bitrate=(svEl && svEl.value)?svVal:(parseFloat(document.getElementById('seCodec').value)||1.5); // Mbps / stream
   var users=Math.max(1,parseInt(document.getElementById('seUsers').value,10)||30000);
   var serverGbps=Math.max(0.1,parseFloat(document.getElementById('seServer').value)||10);
   var serverMbps=serverGbps*1000;
   var demand=bitrate*users, cap=Math.floor(serverMbps/bitrate);
   var cover=Math.min(100, cap/users*100), need=Math.ceil(demand/serverMbps);
-  document.getElementById('seDemand').textContent=(demand>=1000?(demand/1000).toFixed(1)+' Gbps':demand.toFixed(0)+' Mbps');
+  var svc=seServiceLabel();
+  document.getElementById('seDemand').textContent=(demand>=1000?(demand/1000).toFixed(1)+' Gbps':demand.toFixed(0)+' Mbps')+(svc?' · '+svc:'');
   document.getElementById('seCap').textContent=cap.toLocaleString()+' streams';
   document.getElementById('seCover').textContent=cover.toFixed(1)+' %';
   document.getElementById('seNeed').textContent=need+' server'+(need>1?'s':'')+' @ '+serverGbps+' Gbps';
@@ -1519,7 +1551,18 @@ function streamEstimate(){
   acc.forEach(function(a){
     rows+='<tr style="border-top:1px solid var(--border)"><td style="padding:6px 8px">'+a.n+(a.me?' <span class="hl">(measured)</span>':' <span style="opacity:.6">(typical)</span>')+'</td><td>'+a.d+' Mbps</td><td>'+Math.floor(a.d/bitrate)+'</td><td>'+(a.d>=bitrate?'yes':'no')+'</td></tr>';
   });
-  document.getElementById('seCmp').innerHTML=rows+'</table>';
+  var model='';
+  if(svc){
+    var live=/BBC (iPlayer\/ )?Live|Live TV/i.test(svc) || /Sounds/i.test(svc);
+    var edges=Math.ceil(need); var perEdge=Math.floor(serverMbps/bitrate);
+    model='<div class="note" style="margin-top:8px"><b>'+svc+' delivery model —</b> '+
+      (live
+        ? 'live/linear: one source can <span class="hl">multicast / CDN-fan-out</span>, so egress does not grow 1:1 per viewer — the number below is the worst case (pure unicast).'
+        : 'on-demand: each listener/viewer pulls their own <span class="hl">unicast</span> stream, so egress grows linearly with concurrent users.')+
+      ' At '+bitrate+' Mbps/stream, one '+serverGbps+' Gbps node sustains <b>'+perEdge.toLocaleString()+'</b> streams, so '+users.toLocaleString()+
+      ' concurrent addresses need <b>'+edges+'</b> node'+(edges>1?'s':'')+' ('+(demand/1000).toFixed(1)+' Gbps aggregate egress). Real services cut this with edge caching, adaptive bitrate and peak-concurrency &lt; total subscribers.</div>';
+  }
+  document.getElementById('seCmp').innerHTML=rows+'</table>'+model;
   var b=document.getElementById('seBadge'); b.textContent=(cover>=100?'SERVED':'CAPACITY '+cover.toFixed(0)+'%'); b.className='badge '+(cover>=100?'pass':'run');
 }
 
