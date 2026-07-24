@@ -1,0 +1,45 @@
+6GGW IPR compositor — verification 2026-07-24 09:27 UTC
+
+### depth=close (insets 1.0x) ###
+IPR compositor — canvas 1280x720, depth=close (far=0.5x, close=1.0x), inside-only enforced
+
+region        anchor   placed x,y wxh    scale   inside
+--------------------------------------------------------------
+VIDEO (main)  centre      282,159  716x402    1.00      yes
+IPR-1 image   TL           24,24   320x240    1.00      yes
+IPR-2 image   TR          936,24   320x240    1.00      yes
+IPR-3 image   BL           24,456  320x240    1.00      yes
+IPR-4 text    BR          936,456  320x240    1.00      yes
+--------------------------------------------------------------
+frame colour spread: 24.6% (informational; the roadmap's 2.3% is a per-region
+  tolerance to apply when the AI redraws a bezel/facet, not a whole-frame target)
+wrote /tmp/x.ppm  (convert: ffmpeg -y -i /tmp/x.ppm /tmp/x.ppm.png)
+
+bandwidth tiers over the Rural->City / Wifi8->6G log curve (roadmap page 4):
+  env      radio      tier         kbps
+  ----------------------------------------
+  Rural    Wifi8      LOW            32
+  Suburb   5G Wifi    MEDIUM       1200
+  City     6G 2028    HIGH         3000
+
+### depth=far (insets 0.5x — placement ratioing) ###
+IPR compositor — canvas 1280x720, depth=far (far=0.5x, close=1.0x), inside-only enforced
+
+region        anchor   placed x,y wxh    scale   inside
+--------------------------------------------------------------
+VIDEO (main)  centre      282,159  716x402    1.00      yes
+IPR-1 image   TL           24,24   160x120    0.50      yes
+IPR-2 image   TR         1096,24   160x120    0.50      yes
+IPR-3 image   BL           24,576  160x120    0.50      yes
+IPR-4 text    BR         1096,576  160x120    0.50      yes
+--------------------------------------------------------------
+frame colour spread: 20.7% (informational; the roadmap's 2.3% is a per-region
+  tolerance to apply when the AI redraws a bezel/facet, not a whole-frame target)
+wrote /tmp/x2.ppm  (convert: ffmpeg -y -i /tmp/x2.ppm /tmp/x2.ppm.png)
+
+bandwidth tiers over the Rural->City / Wifi8->6G log curve (roadmap page 4):
+  env      radio      tier         kbps
+  ----------------------------------------
+  Rural    Wifi8      LOW            32
+  Suburb   5G Wifi    MEDIUM       1200
+  City     6G 2028    HIGH         3000

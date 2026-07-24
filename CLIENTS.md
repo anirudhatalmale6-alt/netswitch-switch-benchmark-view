@@ -36,6 +36,7 @@ app; the desktop/CLI faces are the new Qt and command-line clients.
 | `client-cli/` | **CLI** client (Win/Linux/macOS) | `g++` / mingw / MSVC | ✓ all commands, live |
 | `stream-qc/` | **stream quality control** — pixelation / blocking watch (C++) | `g++` / mingw / MSVC | ✓ real H.264 streams |
 | `stream-ctl/` | **stream delivery control** — bitrate tiers, pipe-fill, battery, split (C++) | `g++` / mingw / MSVC | ✓ RKF45=Laplace, byte-exact split |
+| `ipr/` | **IPR compositor** — image-in-picture layout (multicornered, depth ratioing, bezels) | `g++` / mingw / MSVC | ✓ rendered 1280×720 |
 
 ## The one API they all speak
 
@@ -93,6 +94,15 @@ rerouting engine.
   low. A DROP from `stream-qc` is another reason to step down / reroute.
 - **split** — cut an uncontainerized MPEG-4 elementary stream into cache segments at **1 2 7 15 40
   59 80 %**; segments rejoin byte-for-byte.
+
+## IPR — image-in-picture (roadmap concept)
+
+`ipr/` is the first cut of the **IPR** system from the 6GGW 2026 roadmap: multiple images composited
+**inside** the video. Multicornered 320×240 insets around a centre video, **Far↔Close depth ratioing**
+(far 0.5× / close 1.0×), the **inside-only** rule (clamped in, `NO-FIT` if it can't fit), **bezel**
+frames, and an audio strip. Renders a real 1280×720 frame. It plugs into the other stream modules:
+feed the main region from decoded video and the insets from their sources, run it through
+`stream-ctl` (tiers/pipe-fill) and `stream-qc` (pixelation watch), then encode.
 
 ## What is and isn't buildable on my box vs yours
 

@@ -1,0 +1,6 @@
+# build output
+ggw_ipr
+# throwaway render output
+*.ppm
+# keep prebuilt Windows binary + reference PNGs
+!ggw_ipr.exe
