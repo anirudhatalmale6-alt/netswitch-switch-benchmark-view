@@ -1,0 +1,3 @@
+build/
+ggw_cli
+*.o
