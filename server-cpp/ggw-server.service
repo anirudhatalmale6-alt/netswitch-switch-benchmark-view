@@ -1,0 +1,23 @@
+[Unit]
+Description=6GGW server component (native C++)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# --- edit these to your box ---
+WorkingDirectory=/opt/6ggw/server-cpp
+ExecStart=/opt/6ggw/server-cpp/ggw_server
+Environment=PORT=8090
+Environment=CHANNEL=rc
+# set a real secret at rc/prod (do NOT leave the dev default):
+# Environment=DB_KEY=change-me-to-a-long-random-secret
+Restart=always
+RestartSec=3
+# light hardening
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
