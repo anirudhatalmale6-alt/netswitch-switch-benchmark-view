@@ -34,6 +34,7 @@ app; the desktop/CLI faces are the new Qt and command-line clients.
 | `server/` | Node.js server — reference build, same API | `node server.js` | ✓ parity-checked |
 | `client-qt/` | **Qt** desktop client (Win/Linux/macOS + iOS/Android) | Qt Creator / CMake / qmake | ✓ all 4 tabs, live |
 | `client-cli/` | **CLI** client (Win/Linux/macOS) | `g++` / mingw / MSVC | ✓ all commands, live |
+| `stream-qc/` | **stream quality control** — pixelation / blocking watch (C++) | `g++` / mingw / MSVC | ✓ real H.264 streams |
 
 ## The one API they all speak
 
@@ -58,6 +59,24 @@ Both new clients implement the rerouting view the same way:
 
 RTT, ping and distance are hard measurements. `load%` is a clearly-labelled utilisation indicator
 used only to weight the score — no invented "measurements".
+
+## Stream quality control (pixelation watch)
+
+As the gateway distributes a stream and the codec re-encodes it at low bitrate, `stream-qc/`
+measures the picture damage on a **logarithmic (dB)** scale, built for the **32 kbps,
+audio-priority, motion-secondary** case:
+
+- **PSNR (dB)** — overall fidelity, `10·log10(255²/MSE)`.
+- **blockiness (dB)** — the pixelation index on the codec's 8×8 grid (local Wang/Bovik measure,
+  **no reference needed** — the gateway reads it off its own outgoing stream). More negative = clean,
+  toward 0 dB = severe.
+- **motion** — mean frame-to-frame luma change, used only to relax the pixelation gate (motion
+  masks blocking; audio is never gated).
+
+Thresholds are your spec and all tunable: `good −40 / warn −30 / bad −15` dB. Verified end to end on
+real H.264: a 40 kbps stream reads ~−32 dB (OK*/WARN); a broken 15 kbps deblock-off stream reads
+−14.5 dB → **DROP** on every frame with a **reroute** recommendation — tying straight back into the
+rerouting engine.
 
 ## What is and isn't buildable on my box vs yours
 

@@ -1,0 +1,7 @@
+# build output
+ggw_streamqc
+# throwaway test media (regenerate with gen_test.sh)
+*.yuv
+*.mp4
+# keep the prebuilt Windows binary in the repo:
+!ggw_streamqc.exe

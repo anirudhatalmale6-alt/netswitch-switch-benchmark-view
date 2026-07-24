@@ -1,0 +1,88 @@
+6GGW / NetSwitch — stream quality control (pixelation watch)
+verification run, 2026-07-24 07:32 UTC
+
+======================================================================
+1) SELF-TEST  (synthetic frame, rising compression = falling bitrate)
+   proof the metric tracks real degradation, monotonically
+======================================================================
+self-test: 256x256 synthetic frame, increasing compression (falling bitrate)
+thresholds: good=-40  warn=-30  bad=-15 dB (blockiness)
+
+compress       PSNR(dB) blockiness(dB)  verdict
+--------------------------------------------------------
+0.05              64.19        -39.41      OK*
+0.15              50.72        -28.53     WARN
+0.30              45.17        -22.62     WARN
+0.50              40.84        -18.20     WARN
+0.70              37.96        -15.29     WARN
+0.85              36.28        -13.59     DROP
+0.97              35.12        -12.44     DROP
+--------------------------------------------------------
+monotonic (PSNR down, blockiness up as bitrate drops): YES
+
+======================================================================
+2) REAL H.264 STREAM @ 40 kbps  (normal low-bitrate distribution)
+======================================================================
+frame   PSNR(dB) blockiness(dB)   motion  verdict
+------------------------------------------------------------
+0          29.97        -28.08     0.00     WARN
+1          29.76        -29.75     0.76     WARN
+2          29.40        -31.23     0.68      OK*
+3          29.40        -32.25     0.71      OK*
+4          29.45        -32.03     0.74      OK*
+5          29.25        -33.25     1.13      OK*
+6          29.12        -33.81     0.92      OK*
+7          29.06        -33.82     1.03      OK*
+8          29.29        -32.70     0.98      OK*
+9          29.09        -34.02     1.05      OK*
+10         29.00        -34.30     0.92      OK*
+11         29.13        -33.76     0.95      OK*
+12         29.54        -32.92     0.98      OK*
+13         29.20        -34.00     1.13      OK*
+14         29.09        -33.50     0.99      OK*
+15         29.22        -32.44     1.00      OK*
+16         29.86        -30.81     1.03      OK*
+17         29.39        -32.27     1.22      OK*
+18         29.42        -32.85     1.11      OK*
+19         29.44        -32.45     1.23      OK*
+20         30.39        -30.35     1.30      OK*
+21         29.54        -31.68     1.20      OK*
+22         29.31        -32.62     1.24      OK*
+23         29.56        -31.48     1.25      OK*
+------------------------------------------------------------
+frames=24  mean PSNR=29.41 dB  mean blockiness=-32.35 dB  WARN=2  DROP=0
+recommendation: pixelation within budget for a 32 kbps audio-priority stream.
+
+======================================================================
+3) BROKEN H.264 @ 15 kbps, deblocking OFF  (severe pixelation)
+   the gate must fire -> DROP + reroute recommendation
+======================================================================
+frame   PSNR(dB) blockiness(dB)   motion  verdict
+------------------------------------------------------------
+0          26.62        -14.09     0.00     DROP
+1          26.56        -14.09     0.07     DROP
+2          26.37        -14.08     0.08     DROP
+3          26.14        -14.06     0.07     DROP
+4          25.94        -14.04     0.08     DROP
+5          25.97        -14.32     0.46     DROP
+6          25.91        -14.53     0.45     DROP
+7          25.82        -14.62     0.46     DROP
+8          25.60        -14.60     0.46     DROP
+9          25.70        -14.77     0.62     DROP
+10         25.64        -14.87     0.62     DROP
+11         25.51        -14.83     0.64     DROP
+12         25.25        -14.76     0.65     DROP
+13         25.48        -14.82     0.82     DROP
+14         25.55        -14.71     0.81     DROP
+15         25.47        -14.56     0.82     DROP
+16         25.16        -14.27     0.81     DROP
+17         25.38        -14.51     0.77     DROP
+18         25.42        -14.62     0.77     DROP
+19         25.37        -14.52     0.77     DROP
+20         25.10        -14.28     0.76     DROP
+21         25.24        -14.50     0.78     DROP
+22         25.20        -14.55     0.79     DROP
+23         24.95        -14.37     0.79     DROP
+------------------------------------------------------------
+frames=24  mean PSNR=25.64 dB  mean blockiness=-14.47 dB  WARN=0  DROP=24
+recommendation: 24 frame(s) exceed the pixelation limit -> reroute / lower resolution / raise the picture bitrate (audio kept at priority).
