@@ -1,0 +1,184 @@
+6GGW / NetSwitch — stream delivery control (battery / pipe-fill / split)
+verification run, 2026-07-24 08:28 UTC
+
+tiers: HIGH 3000 kbps  MEDIUM 1200 kbps  LOW 32 kbps
+
+######################################################################
+# SELF-TEST (RKF45 vs analytic Laplace, pipe -3% floor, tiers, split) #
+######################################################################
+=== SELF-TEST ===
+
+[1] battery: RKF45 numeric vs analytic Laplace solution
+battery saturation  (RC analogue: R=2.00 ohm, C=15.00, tau=R*C=30.0s, S_inf=1.00, SoC0=0.10)
+  no-network drain I=0.0006/s -> ceiling 0.982     network drain I=0.0200/s -> ceiling 0.400
+
+   t (s) | no-network SoC         | network SoC           
+         |      RKF45    Laplace |      RKF45    Laplace
+---------+-----------------------+-----------------------
+     0.0 |    0.10000    0.10000 |    0.10000    0.10000
+     6.0 |    0.25988    0.25988 |    0.15438    0.15438
+    12.0 |    0.39078    0.39078 |    0.19890    0.19890
+    18.0 |    0.49795    0.49795 |    0.23536    0.23536
+    24.0 |    0.58569    0.58569 |    0.26520    0.26520
+    30.0 |    0.65753    0.65753 |    0.28964    0.28964
+    36.0 |    0.71635    0.71635 |    0.30964    0.30964
+    42.0 |    0.76450    0.76450 |    0.32602    0.32602
+    48.0 |    0.80393    0.80393 |    0.33943    0.33943
+    54.0 |    0.83621    0.83621 |    0.35041    0.35041
+    60.0 |    0.86263    0.86263 |    0.35940    0.35940
+---------+-----------------------+-----------------------
+max |RKF45 - Laplace| = 3.44e-15  (integrator vs analytic first-order solution)
+    -> PASS (agree to <1e-4)
+
+[2] pipe fill converges onto the -3% floor (ADSL 8000 kbps)
+    settled 7760.0 kbps, target 7760.0 kbps -> PASS
+
+[3] tier selection over links (battery full):
+    lightcable/fibre   cap   100000 -> HIGH    ok
+    adsl               cap     8000 -> HIGH    ok
+    lowend-32k         cap       32 -> LOW     ok
+    fibre + battery 10%     -> MEDIUM  ok (expect MEDIUM, power save)
+    -> PASS
+
+[4] split offsets of 1,000,000 bytes:
+MPEG-4 uncontainerized cache split of 1000000 bytes at 7 points (1 2 7 15 40 59 80%):
+
+segment      at %     start byte         length
+------------------------------------------------------
+0              0%              0          10000
+1              1%          10000          10000
+2              2%          20000          50000
+3              7%          70000          80000
+4             15%         150000         250000
+5             40%         400000         190000
+6             59%         590000         210000
+7             80%         800000         200000
+------------------------------------------------------
+(offsets only; pass --in FILE --out BASE to actually cut a raw .m4v)
+    -> PASS
+
+=== ALL PASS ===
+
+######################################################################
+# BATTERY saturation over 120s (network vs no-network)               #
+######################################################################
+battery saturation  (RC analogue: R=2.00 ohm, C=15.00, tau=R*C=30.0s, S_inf=1.00, SoC0=0.10)
+  no-network drain I=0.0006/s -> ceiling 0.982     network drain I=0.0200/s -> ceiling 0.400
+
+   t (s) | no-network SoC         | network SoC           
+         |      RKF45    Laplace |      RKF45    Laplace
+---------+-----------------------+-----------------------
+     0.0 |    0.10000    0.10000 |    0.10000    0.10000
+    12.0 |    0.39078    0.39078 |    0.19890    0.19890
+    24.0 |    0.58569    0.58569 |    0.26520    0.26520
+    36.0 |    0.71635    0.71635 |    0.30964    0.30964
+    48.0 |    0.80393    0.80393 |    0.33943    0.33943
+    60.0 |    0.86263    0.86263 |    0.35940    0.35940
+    72.0 |    0.90199    0.90199 |    0.37278    0.37278
+    84.0 |    0.92837    0.92837 |    0.38176    0.38176
+    96.0 |    0.94605    0.94605 |    0.38777    0.38777
+   108.0 |    0.95790    0.95790 |    0.39180    0.39180
+   120.0 |    0.96585    0.96585 |    0.39451    0.39451
+---------+-----------------------+-----------------------
+max |RKF45 - Laplace| = 2.85e-14  (integrator vs analytic first-order solution)
+
+######################################################################
+# PIPE FILL — fibre, ADSL(battery 12%), spectrum 0.2MHz*2, 32k       #
+######################################################################
+pipe fill -> capacity 100000 kbps, hold on -3% floor = 97000 kbps
+
+   t (s) |  fill (kbps) |   %cap
+---------+--------------+-------
+     0.0 |          0.0 |   0.0%
+     1.2 |      49784.5 |  49.8%
+     2.4 |      74017.2 |  74.0%
+     3.6 |      85813.0 |  85.8%
+     4.8 |      91554.7 |  91.6%
+     6.0 |      94349.5 |  94.3%
+     7.2 |      95709.9 |  95.7%
+     8.4 |      96372.0 |  96.4%
+     9.6 |      96694.3 |  96.7%
+    10.8 |      96851.2 |  96.9%
+    12.0 |      96927.6 |  96.9%
+---------+--------------+-------
+settled at 96927.6 kbps = 96.9% of capacity (target 97%, i.e. the -3% floor)
+chosen tier: HIGH (3000 kbps)
+tiers available under the floor: HIGH MEDIUM LOW
+
+pipe fill -> capacity 8000 kbps, hold on -3% floor = 7760 kbps
+
+   t (s) |  fill (kbps) |   %cap
+---------+--------------+-------
+     0.0 |          0.0 |   0.0%
+     1.2 |       3982.8 |  49.8%
+     2.4 |       5921.4 |  74.0%
+     3.6 |       6865.1 |  85.8%
+     4.8 |       7324.4 |  91.6%
+     6.0 |       7548.0 |  94.3%
+     7.2 |       7656.8 |  95.7%
+     8.4 |       7709.8 |  96.4%
+     9.6 |       7735.5 |  96.7%
+    10.8 |       7748.1 |  96.9%
+    12.0 |       7754.2 |  96.9%
+---------+--------------+-------
+settled at 7754.2 kbps = 96.9% of capacity (target 97%, i.e. the -3% floor)
+chosen tier: MEDIUM (1200 kbps)  [stepped down one tier: battery 12% low]
+tiers available under the floor: HIGH MEDIUM LOW
+
+pipe fill -> capacity 400 kbps, hold on -3% floor = 388 kbps
+
+   t (s) |  fill (kbps) |   %cap
+---------+--------------+-------
+     0.0 |          0.0 |   0.0%
+     1.2 |        199.1 |  49.8%
+     2.4 |        296.1 |  74.0%
+     3.6 |        343.3 |  85.8%
+     4.8 |        366.2 |  91.6%
+     6.0 |        377.4 |  94.3%
+     7.2 |        382.8 |  95.7%
+     8.4 |        385.5 |  96.4%
+     9.6 |        386.8 |  96.7%
+    10.8 |        387.4 |  96.9%
+    12.0 |        387.7 |  96.9%
+---------+--------------+-------
+settled at 387.7 kbps = 96.9% of capacity (target 97%, i.e. the -3% floor)
+chosen tier: LOW (32 kbps)
+tiers available under the floor: LOW
+
+pipe fill -> capacity 32 kbps, hold on -3% floor = 31 kbps
+
+   t (s) |  fill (kbps) |   %cap
+---------+--------------+-------
+     0.0 |          0.0 |   0.0%
+     1.2 |         15.9 |  49.8%
+     2.4 |         23.7 |  74.0%
+     3.6 |         27.5 |  85.8%
+     4.8 |         29.3 |  91.6%
+     6.0 |         30.2 |  94.3%
+     7.2 |         30.6 |  95.7%
+     8.4 |         30.8 |  96.4%
+     9.6 |         30.9 |  96.7%
+    10.8 |         31.0 |  96.9%
+    12.0 |         31.0 |  96.9%
+---------+--------------+-------
+settled at 31.0 kbps = 96.9% of capacity (target 97%, i.e. the -3% floor)
+chosen tier: LOW (32 kbps)
+tiers available under the floor:
+
+######################################################################
+# SPLIT offsets (1,000,000 bytes) at 1 2 7 15 40 59 80%             #
+######################################################################
+MPEG-4 uncontainerized cache split of 1000000 bytes at 7 points (1 2 7 15 40 59 80%):
+
+segment      at %     start byte         length
+------------------------------------------------------
+0              0%              0          10000
+1              1%          10000          10000
+2              2%          20000          50000
+3              7%          70000          80000
+4             15%         150000         250000
+5             40%         400000         190000
+6             59%         590000         210000
+7             80%         800000         200000
+------------------------------------------------------
+(offsets only; pass --in FILE --out BASE to actually cut a raw .m4v)

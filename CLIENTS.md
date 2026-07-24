@@ -35,6 +35,7 @@ app; the desktop/CLI faces are the new Qt and command-line clients.
 | `client-qt/` | **Qt** desktop client (Win/Linux/macOS + iOS/Android) | Qt Creator / CMake / qmake | ✓ all 4 tabs, live |
 | `client-cli/` | **CLI** client (Win/Linux/macOS) | `g++` / mingw / MSVC | ✓ all commands, live |
 | `stream-qc/` | **stream quality control** — pixelation / blocking watch (C++) | `g++` / mingw / MSVC | ✓ real H.264 streams |
+| `stream-ctl/` | **stream delivery control** — bitrate tiers, pipe-fill, battery, split (C++) | `g++` / mingw / MSVC | ✓ RKF45=Laplace, byte-exact split |
 
 ## The one API they all speak
 
@@ -77,6 +78,21 @@ Thresholds are your spec and all tunable: `good −40 / warn −30 / bad −15` 
 real H.264: a 40 kbps stream reads ~−32 dB (OK*/WARN); a broken 15 kbps deblock-off stream reads
 −14.5 dB → **DROP** on every frame with a **reroute** recommendation — tying straight back into the
 rerouting engine.
+
+## Stream delivery control (tiers, pipe-fill, battery, split)
+
+`stream-ctl/` decides *how* the gateway fills the pipe and holds the stream, on the bitrate tiers
+**HIGH 3000 / MEDIUM 1200 / LOW 32 kbps**:
+
+- **battery** — accu-battery saturation (RC analogue, "basic R" internal resistance), network vs
+  no-network drain. Integrated with **RKF45** and cross-checked against the analytic **Laplace**
+  first-order solution — they agree to ~1e-15.
+- **pipe** — "fill the waterpipe" to the link capacity and hold it on a **−3% floor** (3% headroom,
+  never saturate). Capacity from a link preset (fibre / ADSL / 32k) or from **bandwidth × MHz**
+  (spectral efficiency). Then picks the highest tier under the floor; steps down when the battery is
+  low. A DROP from `stream-qc` is another reason to step down / reroute.
+- **split** — cut an uncontainerized MPEG-4 elementary stream into cache segments at **1 2 7 15 40
+  59 80 %**; segments rejoin byte-for-byte.
 
 ## What is and isn't buildable on my box vs yours
 

@@ -1,0 +1,7 @@
+# build output
+ggw_streamctl
+# throwaway split/test media
+*.m4v
+*.yuv
+# keep the prebuilt Windows binary:
+!ggw_streamctl.exe
