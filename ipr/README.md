@@ -20,16 +20,31 @@ RGB frame you can view.
 - **Bandwidth tiers on the log curve** — prints the Rural→Suburb→City / Wifi8→5G→6G map from page 4
   onto your tiers: Rural/Wifi8 → LOW 32, Suburb/5G → MEDIUM 1200, City/6G → HIGH 3000 kbps.
 
+## Immaterial-rights (IPR) violation notice
+
+IPR is also the **immaterial rights** (intellectual property rights) notice: "if you listen to music
+with an image it says Immaterial rights violation", and "if the stream is watched on audio it says
+the same in English, repeated." The tool renders that too, with a built-in zero-dependency 5×7 font:
+
+- `--rights` overlays the notice on the music+image frame — a bold red/yellow banner plus the same
+  text repeated across the whole frame, in English.
+- `--mode audio` renders the audio-only stream frame: no video/insets, just the audio strip and the
+  repeated rights notice (always shown for audio-only).
+- `--notice "TEXT"` sets the wording (default `IMMATERIAL RIGHTS VIOLATION`).
+
 ## Build & view
 
 ```
 g++ -std=c++17 -O2 ggw_ipr.cpp -o ggw_ipr
 x86_64-w64-mingw32-g++ -std=c++17 -O2 ggw_ipr.cpp -o ggw_ipr.exe -static     # Windows
 
-./ggw_ipr --out ipr.ppm --depth close
+./ggw_ipr --out ipr.ppm --depth close                 # IPR layout
+./ggw_ipr --out ipr_rights.ppm --rights               # music+image + rights notice
+./ggw_ipr --out ipr_audio.ppm  --mode audio           # audio-only + rights notice
 ffmpeg -y -i ipr.ppm ipr.png        # view (writes a portable .ppm; convert to PNG to look at it)
 ```
-Options: `--w --h` (canvas), `--depth far|close`, `--margin PX`, `--out FILE.ppm`.
+Options: `--w --h` (canvas), `--depth far|close`, `--margin PX`, `--out FILE.ppm`,
+`--mode video|audio`, `--rights`, `--notice "TEXT"`.
 
 ## Verified here
 

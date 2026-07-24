@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <cctype>
 #include <cmath>
 #include <string>
 #include <vector>
@@ -55,6 +56,66 @@ struct Canvas {
         f.write((const char*)px.data(), (std::streamsize)px.size()*3);
     }
 };
+
+// ---- Zero-dependency 5x7 bitmap font (uppercase + space) --------------------------------------
+// Enough of the alphabet to spell the immaterial-rights notice. 1 = pixel on, 5 wide, 7 tall.
+static const char* glyph(char c) {
+    switch (std::toupper((unsigned char)c)) {
+        case 'A': return "01110""10001""10001""11111""10001""10001""10001";
+        case 'B': return "11110""10001""10001""11110""10001""10001""11110";
+        case 'C': return "01110""10001""10000""10000""10000""10001""01110";
+        case 'D': return "11100""10010""10001""10001""10001""10010""11100";
+        case 'E': return "11111""10000""10000""11110""10000""10000""11111";
+        case 'F': return "11111""10000""10000""11110""10000""10000""10000";
+        case 'G': return "01110""10001""10000""10111""10001""10001""01110";
+        case 'H': return "10001""10001""10001""11111""10001""10001""10001";
+        case 'I': return "11111""00100""00100""00100""00100""00100""11111";
+        case 'L': return "10000""10000""10000""10000""10000""10000""11111";
+        case 'M': return "10001""11011""10101""10101""10001""10001""10001";
+        case 'N': return "10001""11001""10101""10011""10001""10001""10001";
+        case 'O': return "01110""10001""10001""10001""10001""10001""01110";
+        case 'P': return "11110""10001""10001""11110""10000""10000""10000";
+        case 'R': return "11110""10001""10001""11110""10100""10010""10001";
+        case 'S': return "01111""10000""10000""01110""00001""00001""11110";
+        case 'T': return "11111""00100""00100""00100""00100""00100""00100";
+        case 'U': return "10001""10001""10001""10001""10001""10001""01110";
+        case 'V': return "10001""10001""10001""10001""10001""01010""00100";
+        case 'W': return "10001""10001""10001""10101""10101""11011""10001";
+        case 'Y': return "10001""10001""01010""00100""00100""00100""00100";
+        default:  return nullptr;                 // space / unknown -> blank advance
+    }
+}
+static int drawText(Canvas& cv, int x, int y, int scale, const std::string& s, RGB fg) {
+    int cx = x;
+    for (char ch : s) {
+        const char* g = glyph(ch);
+        if (g) {
+            for (int ry = 0; ry < 7; ++ry)
+                for (int rx = 0; rx < 5; ++rx)
+                    if (g[ry*5 + rx] == '1') cv.fill(cx + rx*scale, y + ry*scale, scale, scale, fg);
+        }
+        cx += 6 * scale;                          // 5 px glyph + 1 px gap
+    }
+    return cx - x;                                // pixel width drawn
+}
+
+// The immaterial-rights (intellectual property rights) violation notice, tiled/repeated across the
+// frame in English — both when music plays with an image and when the stream is watched audio-only.
+static void rightsOverlay(Canvas& cv, const std::string& notice) {
+    int scale = std::max(1, cv.w / 320);          // readable at any canvas size
+    int tw = (int)notice.size() * 6 * scale, th = 7 * scale;
+    // a prominent centred banner...
+    int bx = (cv.w - tw)/2, by = cv.h/2 - th/2;
+    cv.fill(bx - 12, by - 10, tw + 24, th + 20, RGB{140,0,0});
+    cv.bezel(bx - 12, by - 10, tw + 24, th + 20, 3, RGB{255,220,0});
+    drawText(cv, bx, by, scale, notice, RGB{255,255,255});
+    // ...plus the same notice repeated faintly on a grid, so it reads on any region of the frame.
+    int sscale = std::max(1, scale/2), sw = (int)notice.size()*6*sscale, sh = 7*sscale;
+    for (int ry = 30; ry < cv.h - sh; ry += sh + 46)
+        for (int rx = 20; rx < cv.w - sw; rx += sw + 40)
+            if (std::abs(ry - by) > th + 30)      // don't clutter the banner
+                drawText(cv, rx, ry, sscale, notice, RGB{120,120,130});
+}
 
 // An IPR inset: base size, which corner/centre it anchors to, and a Far..Close depth in [0,1].
 struct Inset {
@@ -102,7 +163,9 @@ static void tierMap() {
 
 int main(int argc, char** argv) {
     int W = 1280, H = 720, margin = 24, bezel = 4;
-    std::string out = "ipr.ppm", depth = "close";
+    std::string out = "ipr.ppm", depth = "close", mode = "video";
+    std::string notice = "IMMATERIAL RIGHTS VIOLATION";
+    bool rights = false;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         auto val = [&](const char* d){ return (i+1<argc) ? argv[++i] : d; };
@@ -111,9 +174,15 @@ int main(int argc, char** argv) {
         else if (a == "--out") out = val("ipr.ppm");
         else if (a == "--depth") depth = val("close");   // far | close
         else if (a == "--margin") margin = std::atoi(val("24"));
+        else if (a == "--mode") mode = val("video");     // video | audio
+        else if (a == "--rights") rights = true;         // overlay the IPR violation notice
+        else if (a == "--notice") notice = val(notice.c_str());
         else if (a == "--help"||a=="-h") {
-            printf("ggw_ipr — IPR image-in-picture compositor\n"
+            printf("ggw_ipr — IPR (image-in-picture + immaterial-rights) compositor\n"
                    "  --w --h --out FILE.ppm --depth far|close --margin PX\n"
+                   "  --mode video|audio   audio = audio-only stream frame\n"
+                   "  --rights             overlay the immaterial-rights violation notice (repeated)\n"
+                   "  --notice \"TEXT\"      notice wording (default: IMMATERIAL RIGHTS VIOLATION)\n"
                    "Composites 320x240 IPR insets inside the video (multicornered, inside-only,\n"
                    "depth ratioing, bezels). Writes a .ppm; convert with: ffmpeg -i FILE.ppm FILE.png\n");
             return 0;
@@ -121,6 +190,19 @@ int main(int argc, char** argv) {
     }
     double closeVal = (depth == "far") ? 0.0 : 1.0;
     Canvas cv(W, H);
+
+    // Audio-only stream: no video/insets — just the audio strip and the repeated rights notice.
+    // "If stream is watched on audio it says same in english language and repeated."
+    if (mode == "audio") {
+        cv.fill(0, 0, W, H, RGB{10,10,14});
+        for (int i=0;i<28;++i){ int bh=6+(int)(24*std::fabs(std::sin(i*0.6))); cv.fill(margin+8+i*((W-2*margin-16)/28), H-margin-4-bh, 6, bh, RGB{80,200,160}); }
+        cv.fill(margin, H-margin-14, W-2*margin, 14, RGB{40,44,54});
+        rightsOverlay(cv, notice);   // always shown for audio-only, per your note
+        cv.writePPM(out);
+        printf("IPR audio-only frame — canvas %dx%d, immaterial-rights notice overlaid (English, repeated)\n", W, H);
+        printf("wrote %s  (convert: ffmpeg -y -i %s %s.png)\n", out.c_str(), out.c_str(), out.c_str());
+        return 0;
+    }
 
     // Main VIDEO region — centre, large, a content gradient (this is the "video" the roadmap centres).
     int vw = (int)(W*0.56), vh = vw*9/16, vx = (W-vw)/2, vy = (H-vh)/2;
@@ -153,8 +235,13 @@ int main(int argc, char** argv) {
     cv.fill(margin, H-margin-14, W-2*margin, 14, RGB{40,44,54});
     for (int i=0;i<28;++i){ int bh=6+(int)(24*std::fabs(std::sin(i*0.6))); cv.fill(margin+8+i*((W-2*margin-16)/28), H-margin-4-bh, 6, bh, RGB{80,200,160}); }
 
+    // Immaterial-rights notice over the music+image frame: "if you listen to music with image it
+    // says Immaterial rights violation" — English, repeated across the frame.
+    if (rights) rightsOverlay(cv, notice);
+
     cv.writePPM(out);
     printf("--------------------------------------------------------------\n");
+    if (rights) printf("immaterial-rights notice overlaid (English, repeated): \"%s\"\n", notice.c_str());
     printf("frame colour spread: %.1f%% (informational; the roadmap's 2.3%% is a per-region\n"
            "  tolerance to apply when the AI redraws a bezel/facet, not a whole-frame target)\n",
            colorVariancePct(cv));

@@ -43,3 +43,16 @@ bandwidth tiers over the Rural->City / Wifi8->6G log curve (roadmap page 4):
   Rural    Wifi8      LOW            32
   Suburb   5G Wifi    MEDIUM       1200
   City     6G 2028    HIGH         3000
+
+### immaterial-rights (IPR) violation notice — 2026-07-24 10:50 UTC ###
+# built-in zero-dependency 5x7 bitmap font; notice rendered in English, repeated.
+
+$ ./ggw_ipr --out ipr_rights.ppm --depth close --rights
+  -> music+image frame: IPR composite + bold red/yellow "IMMATERIAL RIGHTS VIOLATION" banner
+     centred, plus the same notice repeated faintly across the whole frame (ipr_rights.png).
+
+$ ./ggw_ipr --out ipr_audio.ppm --mode audio
+  -> audio-only frame: dark canvas + audio-level strip + the repeated rights notice, always on
+     (ipr_audio.png). Matches "if the stream is watched on audio it says the same, repeated".
+
+Both viewed at 1280x720 (under 2000px). Text legible; banner + tiled repeat both correct.
