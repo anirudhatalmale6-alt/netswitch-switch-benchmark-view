@@ -1,0 +1,41 @@
+6GGW secure transport — verification 2026-07-25 05:06 UTC
+
+### certs (short-term, $0, self-signed) ###
+== summary ==
+  ec256     id-ecPublicKey             256-bit  expires Aug  1 05:06:51 2026 GMT
+            sha256 84:8E:1D:44:FF:8B:D9:F9:BC:AE:53:53:A4:5D:7F:9D:FA:E9:CB:55:E9:86:C5:3E:A9:3F:AC:FD:51:A5:29:67
+  rsa1467   rsaEncryption             1467-bit  expires Aug  1 05:06:51 2026 GMT
+            sha256 6B:FA:48:F8:38:CD:40:2B:03:93:40:E1:6A:C6:5B:A6:9D:57:22:1D:37:9A:41:90:C1:64:1B:8C:7C:F4:1A:3F
+  rsa2048   rsaEncryption             2048-bit  expires Aug  1 05:06:52 2026 GMT
+            sha256 6C:DB:75:CB:60:6A:84:1A:22:A2:5C:5F:56:7B:12:27:84:AD:02:04:A6:EE:49:73:DC:56:63:16:E9:3C:E1:B1
+
+wrote certs/  (self-signed, $0, 7-day). Use with: ./ggw_secure --selftest --cert certs/ec256.crt --key certs/ec256.key
+
+### TLS self-test — EC-256 (recommended) ###
+TLS self-test on 127.0.0.1:40147  (cert=certs/ec256.crt)
+  handshake     : OK
+  protocol      : TLSv1.3
+  cipher        : TLS_AES_256_GCM_SHA384
+  peer verify   : VALID (0)
+  server saw    : 6GGW-CLIENT: hello over TLS
+  client got    : 6GGW-SWITCH: secure channel up
+  => PASS
+
+### TLS self-test — RSA-2048 (standard) ###
+TLS self-test on 127.0.0.1:39741  (cert=certs/rsa2048.crt)
+  handshake     : OK
+  protocol      : TLSv1.3
+  cipher        : TLS_AES_256_GCM_SHA384
+  peer verify   : VALID (0)
+  server saw    : 6GGW-CLIENT: hello over TLS
+  client got    : 6GGW-SWITCH: secure channel up
+  => PASS
+
+### TLS self-test — RSA-1467 (your spec) at default security ###
+ERROR: load cert
+C0F69F775D780000:error:0A00018F:SSL routines:SSL_CTX_use_certificate:ee key too small:../ssl/ssl_rsa.c:221:
+  -> rejected: 'ee key too small' (below the RSA-2048 TLS floor)
+### RSA-1467 only completes with --seclevel 0 (INSECURE, shown for proof) ###
+  server saw    : 6GGW-CLIENT: hello over TLS
+  client got    : 6GGW-SWITCH: secure channel up
+  => PASS

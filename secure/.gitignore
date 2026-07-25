@@ -1,0 +1,5 @@
+ggw_secure
+ggw_secure.exe
+certs/
+keys/
+*.log

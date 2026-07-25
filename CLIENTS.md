@@ -37,6 +37,7 @@ app; the desktop/CLI faces are the new Qt and command-line clients.
 | `stream-qc/` | **stream quality control** — pixelation / blocking watch (C++) | `g++` / mingw / MSVC | ✓ real H.264 streams |
 | `stream-ctl/` | **stream delivery control** — bitrate tiers, pipe-fill, battery, split (C++) | `g++` / mingw / MSVC | ✓ RKF45=Laplace, byte-exact split |
 | `ipr/` | **IPR compositor** — image-in-picture layout (multicornered, depth ratioing, bezels) | `g++` / mingw / MSVC | ✓ rendered 1280×720 |
+| `secure/` | **secure transport** — TLS/SSL (EC-256 / RSA), SSH tunnelling, short-term $0 certs (C++) | `g++` + OpenSSL | ✓ TLS 1.3 handshake + verify, 2-process |
 
 ## The one API they all speak
 

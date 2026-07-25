@@ -30,6 +30,13 @@ build_std client-cli client-cli/ggw_cli.cpp
 
 echo
 echo "== dependency builds (attempted, skipped if toolkit missing) =="
+if [ -f secure/ggw_secure.cpp ]; then
+  if g++ -std=c++17 -O2 secure/ggw_secure.cpp -o secure/ggw_secure -lssl -lcrypto 2>/tmp/ggw_build_secure.log; then
+    echo "OK    secure (TLS/SSL transport, OpenSSL)"; ok=$((ok+1))
+  else
+    echo "SKIP  secure (needs libssl-dev — see /tmp/ggw_build_secure.log)"; skip=$((skip+1))
+  fi
+fi
 if [ -x server-cpp/build.sh ]; then
   if sh server-cpp/build.sh >/tmp/ggw_build_server.log 2>&1; then
     echo "OK    server-cpp (native C++ server, OpenSSL+zlib)"; ok=$((ok+1))
