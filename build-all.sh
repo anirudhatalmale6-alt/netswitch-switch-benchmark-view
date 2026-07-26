@@ -26,7 +26,9 @@ build_std stream-qc  stream-qc/ggw_streamqc.cpp
 build_std stream-ctl stream-ctl/ggw_streamctl.cpp
 build_std ipr        ipr/ggw_ipr.cpp
 build_std client-cli client-cli/ggw_cli.cpp
-# note: dramm/ (cpu_benchmark) is a library component compiled into server-cpp, not a standalone tool.
+build_std dramm      dramm/ggw_dramm.cpp
+# note: dramm/cpu_benchmark.{cpp,h} is the library unit compiled into server-cpp; ggw_dramm.cpp is the
+#       standalone tight-kernel benchmark (its CUDA-C twin ggw_dramm.cu needs nvcc — built on the GPU box).
 
 echo
 echo "== dependency builds (attempted, skipped if toolkit missing) =="

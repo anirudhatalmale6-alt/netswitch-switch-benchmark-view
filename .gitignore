@@ -1,0 +1,4 @@
+# build artifacts / local binaries (Linux ELF, CMake dirs) — Windows .exe deliverables are kept
+dramm/ggw_dramm
+dramm/build/
+*.zip
