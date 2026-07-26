@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  example.switchc  -  a 6GGW / NetSwitch configuration file.
+
+  Media type : application/vnd.6ggw-switch   (extension .switchc)
+  Encoding   : 8-bit text, UTF-8 (self-declared above, so it survives any transport)
+  Shape      : Juniper Junos-OS / NETCONF style XML  -  a <configuration> tree of
+               named stanzas the switch reads at boot and can be re-applied live.
+
+  Everything in this file maps to a module that already exists in the repo, or is on
+  the November schedule (see SCHEDULE-NOV.md). Values shown are the real defaults our
+  C++ modules use today, so this is a working example, not a mock-up.
+-->
+<configuration version="6ggw-2026.11" xmlns="urn:6ggw:switch:1">
+
+  <!-- who this switch is, and its own "BIOS"/identity block -->
+  <system>
+    <host-name>netswitch-london-01</host-name>
+    <bios>
+      <build>6GGW-2026.11</build>
+      <config-language>junos-xml</config-language>
+      <config-media-type>application/vnd.6ggw-switch</config-media-type>
+      <language>en</language>            <!-- rights-notice / UI language: en | fi -->
+      <boot-blink seconds="0.1"/>        <!-- 0,1 s boot blink pulse on the phone screen -->
+    </bios>
+  </system>
+
+  <!-- L3: dual-stack, and the switch keeps running across an address change -->
+  <interfaces>
+    <interface name="wan0">
+      <family>
+        <inet>                                  <!-- IPv4 -->
+          <address>0.0.0.0/0</address>          <!-- 0.0.0.0 = obtain via DHCP -->
+          <broadcast-marking>on</broadcast-marking>
+        </inet>
+        <inet6>                                 <!-- IPv6 -->
+          <address>auto</address>               <!-- SLAAC / RA -->
+          <accept-ra>on</accept-ra>
+        </inet6>
+      </family>
+      <on-address-change>rebind</on-address-change>  <!-- survive an IP change, don't drop the session -->
+      <self-run>on</self-run>                         <!-- run standalone, no external controller needed -->
+    </interface>
+  </interfaces>
+
+  <!-- rerouting: config sets the POP list + load weights; the switch MEASURES the RTT itself -->
+  <routing-options>
+    <rerouting mode="least-cost">
+      <!-- cost = measured_RTT * (1 + load/100); lowest reachable POP wins -->
+      <pop name="London"    load="10"/>
+      <pop name="Helsinki"  load="20"/>
+      <pop name="Tallinn"   load="15"/>
+      <pop name="Stockholm" load="25"/>
+      <pop name="Frankfurt" load="30"/>
+      <pop name="New-York"  load="40"/>
+      <!-- ...full around-the-world list in the engine; trimmed here for the example -->
+    </rerouting>
+    <!-- a re-inserted config CAN change routing, so applying one is gated (see <security>) -->
+    <apply-policy>signed-and-load-checked</apply-policy>
+  </routing-options>
+
+  <!-- stream delivery: the real tiers, pipe floor and split points our stream-ctl uses -->
+  <streams>
+    <tiers>
+      <tier name="HIGH"   kbps="3000"/>
+      <tier name="MEDIUM" kbps="1200"/>
+      <tier name="LOW"    kbps="32"/>       <!-- 32k audio-priority case -->
+    </tiers>
+    <pipe floor-percent="-3"/>              <!-- fill the pipe, hold 3% headroom, never saturate -->
+    <split percent="1 2 7 15 40 59 80"/>   <!-- cache-segment cut points; rejoin byte-for-byte -->
+
+    <!-- quality-control gate (stream-qc), dB scale, tunable -->
+    <quality good-db="-40" warn-db="-30" bad-db="-15"/>
+
+    <!-- content-referral: a .switchc can point at external media the switch carries/relays.
+         The config itself stays text; these are references, not embedded blobs. -->
+    <content-referral>
+      <codec>HEVC</codec><codec>HEIC</codec><codec>MPEG-4</codec>
+      <image>PNG</image><image>SVG</image><image>JPEG</image>
+      <audio href="rtp://stream/audio"/>
+      <video href="rtp://stream/video" container="mpeg4"/>
+      <uncontainerized header-bytes="232" note="elementary stream, header may be skipped"/>
+    </content-referral>
+  </streams>
+
+  <!-- IPR compositor: image-in-picture layout -->
+  <ipr>
+    <inset width="320" height="240" depth-ratio="0.5"/>   <!-- far -->
+    <inset width="320" height="240" depth-ratio="1.0"/>   <!-- close -->
+    <fit-rule>inside-only</fit-rule>                       <!-- NO-FIT if it can't fit -->
+    <bezel>on</bezel>
+  </ipr>
+
+  <!-- security & transport: this is also what BLOCKS a hostile config from hijacking routing -->
+  <security>
+    <tls suite="EC-256" version="1.3"/>          <!-- small+fast default; RSA-2048 is the RSA floor -->
+    <transport>DTLS</transport>                  <!-- RFC 6347 (obsoletes 4347); config travels over DTLS -->
+    <config-trust>
+      <require-signature>on</require-signature>  <!-- only signed .switchc files are applied -->
+      <reject-if-over-capacity>on</reject-if-over-capacity>  <!-- load-gate: refuse a config that would exceed the pipe -->
+    </config-trust>
+  </security>
+
+  <!-- performance telemetry: the ongoing CPU/GPU/thermal/memory + screen-update topic -->
+  <performance>
+    <compute-kernel unit="dramm"/>               <!-- the tight allocation-free hot loop -->
+    <monitor cpu="on" gpu="on" thermal="on" memory="on"/>
+    <screen-update hz="35"/>                      <!-- 35 redraws/sec  (confirm: redraw vs blink pattern) -->
+  </performance>
+
+</configuration>
