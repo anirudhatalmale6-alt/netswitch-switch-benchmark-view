@@ -4,3 +4,7 @@ dramm/build/
 *.zip
 diskbench/ggw_diskbench
 diskbench/*.tmp
+
+netswitch-sql/netswitch_sql.exe
+netswitch-sql/NetSwitch-SQL-Setup.exe
+netswitch-sql/*.log

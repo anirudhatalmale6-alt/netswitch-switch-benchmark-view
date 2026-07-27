@@ -40,6 +40,7 @@ app; the desktop/CLI faces are the new Qt and command-line clients.
 | `secure/` | **secure transport** — TLS/SSL (EC-256 / RSA), SSH tunnelling, short-term $0 certs (C++) | `g++` + OpenSSL | ✓ TLS 1.3 handshake + verify, 2-process |
 | `dramm/` | **tight compute kernel** — allocation-free hot loop + honest micro-benchmark; CUDA-C twin | `g++` / CMake / nvcc | ✓ CPU: tight 3.3× naive; CUDA runs on GPU box |
 | `diskbench/` | **portable disk benchmark** — seq/random read/write, IOPS + MB/s + latency (DiskSpd companion) | `g++` / mingw | ✓ Linux + Windows .exe, fsync-honest |
+| `netswitch-sql/` | **NetSwitch (MS SQL Server) client + Windows installer** — ODBC connect, forced first-use password change, timed SQL round-trip | mingw + NSIS | ✓ Windows .exe + Setup.exe built; live SQL connect runs on client's box |
 
 ## The one API they all speak
 

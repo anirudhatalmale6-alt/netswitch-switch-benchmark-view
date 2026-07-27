@@ -55,6 +55,27 @@ if [ -x client-qt/build.sh ]; then
     echo "SKIP  client-qt (needs Qt5 dev — see /tmp/ggw_build_qt.log)"; skip=$((skip+1))
   fi
 fi
+# NetSwitch (Microsoft SQL Server) client — Windows-only (uses windows.h + the ODBC subsystem),
+# so it builds only with mingw, not native g++. The NSIS installer is built if makensis is present.
+if [ -f netswitch-sql/netswitch_sql.cpp ]; then
+  if command -v x86_64-w64-mingw32-g++ >/dev/null 2>&1; then
+    if x86_64-w64-mingw32-g++ -std=c++17 -O2 netswitch-sql/netswitch_sql.cpp \
+         -o netswitch-sql/netswitch_sql.exe -static -lodbc32 2>/tmp/ggw_build_nsql.log; then
+      echo "OK    netswitch-sql (Windows SQL Server client, ODBC) -> netswitch-sql/netswitch_sql.exe"; ok=$((ok+1))
+      if command -v makensis >/dev/null 2>&1; then
+        if ( cd netswitch-sql && makensis installer.nsi >/tmp/ggw_build_nsql_nsis.log 2>&1 ); then
+          echo "      + installer netswitch-sql/NetSwitch-SQL-Setup.exe"
+        else
+          echo "      (installer skipped — see /tmp/ggw_build_nsql_nsis.log)"
+        fi
+      fi
+    else
+      echo "FAIL  netswitch-sql (see /tmp/ggw_build_nsql.log)"; fail=$((fail+1))
+    fi
+  else
+    echo "SKIP  netswitch-sql (needs mingw x86_64-w64-mingw32-g++)"; skip=$((skip+1))
+  fi
+fi
 
 echo
 echo "built $ok, skipped $skip, failed $fail"
