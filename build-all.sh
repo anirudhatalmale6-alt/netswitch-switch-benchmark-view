@@ -27,8 +27,10 @@ build_std stream-ctl stream-ctl/ggw_streamctl.cpp
 build_std ipr        ipr/ggw_ipr.cpp
 build_std client-cli client-cli/ggw_cli.cpp
 build_std dramm      dramm/ggw_dramm.cpp
+build_std diskbench  diskbench/ggw_diskbench.cpp
 # note: dramm/cpu_benchmark.{cpp,h} is the library unit compiled into server-cpp; ggw_dramm.cpp is the
 #       standalone tight-kernel benchmark (its CUDA-C twin ggw_dramm.cu needs nvcc — built on the GPU box).
+#       diskbench is the portable disk-I/O companion (DiskSpd-aligned), builds Linux + Windows.
 
 echo
 echo "== dependency builds (attempted, skipped if toolkit missing) =="

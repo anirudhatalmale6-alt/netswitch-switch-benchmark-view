@@ -2,3 +2,5 @@
 dramm/ggw_dramm
 dramm/build/
 *.zip
+diskbench/ggw_diskbench
+diskbench/*.tmp
