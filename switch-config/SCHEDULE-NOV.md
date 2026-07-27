@@ -46,6 +46,7 @@
 | **Oct** | Reroute-by-config + guardrails | config sets POP list/weights; signature + load-gate block a rogue config; tests |
 | **Oct** | IPv4/IPv6 dual-stack + rebind | run through an IP change without dropping; broadcast-marking; IPv6 path |
 | **Oct → Nov** | Performance/telemetry | dramm on the box; CPU/GPU/thermal/memory readout; 35 Hz screen-update piece + short video cast |
+| **Oct → Nov** | **Thermals (industry-facing)** | per-core CPU temp, GPU temp, throttle/thermal-headroom watch on the performance panel — live gauge + logged history, so the stage shows the system staying inside its thermal envelope under load. This is the "impress the industry" telemetry piece. |
 | **Nov** | Demo polish | one-command build of every module; the config drives a live reroute + stream on screen at the fair |
 | **Winter (post-Nov)** | Protocol breadth | GPS / Bluetooth / Wi-Fi variants (NetSwitch Wi-Fi), "all modern protocols" — roadmap, not Nov-blocking |
 
