@@ -42,7 +42,7 @@ app; the desktop/CLI faces are the new Qt and command-line clients.
 | `diskbench/` | **portable disk benchmark** — seq/random read/write, IOPS + MB/s + latency (DiskSpd companion) | `g++` / mingw | ✓ Linux + Windows .exe, fsync-honest |
 | `netswitch-sql/` | **NetSwitch (MS SQL Server) client + Windows installer** — ODBC connect, forced first-use password change, timed SQL round-trip | mingw + NSIS | ✓ Windows .exe + Setup.exe built; live SQL connect runs on client's box |
 | `ui-panels/` | **operator UI panels** (4) — corrected-geography rerouting, health/ping/distance/estimate, SQL connector, performance (MFLOPS/disk/thermal) | HTML, no build | ✓ Playwright screenshots |
-| `thermal/` | **thermal telemetry** — per-part temps (CPU/GPU/battery/modem-RF/board/screen zones), trip headroom + throttle watch, heat-pattern learn (which parts swing most under load) | `g++` (Linux/Android sysfs) | ✓ vs synthetic sensor tree; live no-sensor path graceful |
+| `thermal/` | **thermal telemetry CLI** — per-part temps (CPU/GPU/battery/modem-RF/board/screen zones), trip headroom + throttle watch, heat-pattern learn (which parts swing most under load) | `g++` (Linux/Android sysfs) **+ mingw/MSVC** (Windows PC via WMI) | ✓ Linux vs synthetic tree; Windows .exe built + WMI path run-tested; no-sensor path graceful |
 
 ## The one API they all speak
 

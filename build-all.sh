@@ -28,9 +28,21 @@ build_std ipr        ipr/ggw_ipr.cpp
 build_std client-cli client-cli/ggw_cli.cpp
 build_std dramm      dramm/ggw_dramm.cpp
 build_std diskbench  diskbench/ggw_diskbench.cpp
-build_std thermal    thermal/ggw_thermal.cpp
-# note: thermal reads /sys/class/thermal + hwmon (Linux/Android). It builds under mingw too
-#       but on Windows that path is empty — Windows uses WMI; see thermal/README.md.
+# thermal has two real backends in one file: Linux/Android (sysfs, plain g++) and
+# Windows PC (WMI, needs -lwbemuuid -lole32 -loleaut32). So it's NOT build_std —
+# the mingw build links the WMI libs, the native build doesn't. See thermal/README.md.
+if [ -f thermal/ggw_thermal.cpp ]; then
+  if g++ -std=c++17 -O2 thermal/ggw_thermal.cpp -o thermal/ggw_thermal 2>/tmp/ggw_build_thermal.log; then
+    echo "OK    thermal (Linux/Android sysfs) -> thermal/ggw_thermal"; ok=$((ok+1))
+    if command -v x86_64-w64-mingw32-g++ >/dev/null 2>&1; then
+      x86_64-w64-mingw32-g++ -std=c++17 -O2 thermal/ggw_thermal.cpp -o thermal/ggw_thermal.exe \
+        -static -lwbemuuid -lole32 -loleaut32 2>>/tmp/ggw_build_thermal.log \
+        && echo "      + windows (WMI) thermal/ggw_thermal.exe"
+    fi
+  else
+    echo "FAIL  thermal (see /tmp/ggw_build_thermal.log)"; fail=$((fail+1))
+  fi
+fi
 # note: dramm/cpu_benchmark.{cpp,h} is the library unit compiled into server-cpp; ggw_dramm.cpp is the
 #       standalone tight-kernel benchmark (its CUDA-C twin ggw_dramm.cu needs nvcc — built on the GPU box).
 #       diskbench is the portable disk-I/O companion (DiskSpd-aligned), builds Linux + Windows.

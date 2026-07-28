@@ -31,14 +31,31 @@ CAD model.
 
 ## Build & run
 
+One CLI, two real backends — Windows PC (WMI) and Linux/Android (sysfs).
+
+Linux / Android:
 ```
 g++ -std=c++17 -O2 ggw_thermal.cpp -o ggw_thermal
-
-./ggw_thermal                         # one live snapshot of every sensor
-./ggw_thermal --watch 20              # learn the heat pattern over 20 samples
-./ggw_thermal --watch 20 --interval 500   # sample every 500 ms
-./ggw_thermal --root ./sample_sys     # read a test / captured sensor tree
 ```
+
+Windows PC (cross-compiled here with mingw; native MSVC/mingw works too):
+```
+x86_64-w64-mingw32-g++ -std=c++17 -O2 ggw_thermal.cpp -o ggw_thermal.exe \
+    -static -lwbemuuid -lole32 -loleaut32
+```
+
+Run (same flags on both):
+```
+ggw_thermal                         # one live snapshot of every sensor
+ggw_thermal --watch 20              # learn the heat pattern over 20 samples
+ggw_thermal --watch 20 --interval 500   # sample every 500 ms
+ggw_thermal --root ./sample_sys     # read a test / captured sensor tree
+```
+
+On **Windows** run it from an **Administrator** console — WMI's `root\WMI`
+thermal-zone class needs elevation. A plain desktop exposes the ACPI board
+zones; per-core CPU and GPU temps need a vendor sensor driver
+(LibreHardwareMonitor-style) installed, same as every PC temp tool.
 
 ## What it looks like (verified against sample_sys/)
 
@@ -73,10 +90,13 @@ This is the engine behind the **thermal** section of the performance panel and t
 November "staying inside the thermal envelope under load" demo. On the stage it becomes a
 live gauge + logged history; the data source is this reader.
 
-## Platforms
+## Platforms (both are real backends in this one file)
 
-- **Linux / Android** — `/sys/class/thermal` + `/sys/class/hwmon` (this file).
-- **Windows** — the equivalent source is WMI `MSAcpi_ThermalZoneTemperature` (ACPI zones)
-  or a vendor sensor driver (LibreHardwareMonitor-style) for per-core/GPU. That's a
-  separate backend behind the same table; noted here rather than shipped as a misleading
-  `/sys`-reading .exe that would find nothing on Windows.
+- **Linux / Android** — reads `/sys/class/thermal` + `/sys/class/hwmon` (coretemp =
+  per-core CPU, k10temp = AMD, amdgpu / nouveau = GPU, nvme, acpitz).
+- **Windows PC** — reads real ACPI thermal zones over **WMI**
+  (`root\WMI` → `MSAcpi_ThermalZoneTemperature`: `CurrentTemperature`,
+  `PassiveTripPoint`, `CriticalTripPoint`), same table and same flags. Built and run-tested
+  here as a static `.exe` (the WMI COM path executes; on a box with no ACPI zones it prints
+  the honest "needs a sensor driver" line instead of crashing). Live per-zone °C is only
+  visible on a real Windows machine — I can't fake ACPI readings on the Linux build box.
