@@ -31,6 +31,7 @@
 #include <vector>
 #include <chrono>
 #include <thread>
+#include <atomic>
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -82,6 +83,27 @@ static double hot_kernel_opt(std::uint64_t iters, double C) noexcept {
     return x;
 }
 
+// The DRAMM reads are independent of each other, so they run in parallel across
+// cores. (The recurrence *inside* one read stays serial — x depends on the prior
+// x — but N separate reads don't wait on each other.) This is the second speed
+// lever on top of the closed-form arithmetic, and it changes no result.
+static double run_parallel_opt(int reads, std::uint64_t work, double C, unsigned threads) {
+    std::vector<std::thread> pool;
+    std::atomic<int> next{0};
+    std::vector<double> sinks(threads, 0.0);
+    auto worker = [&](unsigned id) {
+        double s = 0.0;
+        for (;;) { int r = next.fetch_add(1); if (r >= reads) break; s += hot_kernel_opt(work, C); }
+        sinks[id] = s;
+    };
+    auto t0 = clk::now();
+    for (unsigned i = 0; i < threads; ++i) pool.emplace_back(worker, i);
+    for (auto& t : pool) t.join();
+    double s = secs_since(t0);
+    volatile double sink = 0; for (double v : sinks) sink += v; (void)sink;
+    return s;
+}
+
 struct Row {
     std::string name;
     bool present;          // did the machine actually run it?
@@ -126,16 +148,20 @@ int main(int argc, char** argv) {
     int    dramm_reads = 40;          // "Read DRAMM 40x"
     double budget_s    = 0.5;         // per bounded loop
     bool   full        = false;
+    bool   push        = false;       // performance-push summary (arithmetic + parallel)
     for (int i = 1; i < argc; ++i) {
         if (!std::strcmp(argv[i], "--dramm") && i + 1 < argc) dramm_reads = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--seconds") && i + 1 < argc) budget_s = std::atof(argv[++i]);
         else if (!std::strcmp(argv[i], "--full")) full = true;
+        else if (!std::strcmp(argv[i], "--push")) push = true;
         else if (!std::strcmp(argv[i], "--help") || !std::strcmp(argv[i], "-h")) {
             std::printf("6GGW loop benchmark runner\n"
-                        "  ggw_loopbench [--dramm N] [--seconds S] [--full]\n"
+                        "  ggw_loopbench [--dramm N] [--seconds S] [--full] [--push]\n"
                         "  --dramm N    read the DRAMM kernel N times (default 40)\n"
                         "  --seconds S  time budget per bounded loop (default 0.5)\n"
-                        "  --full       use your 29000 x 42000000 CPU iteration count (long run)\n");
+                        "  --full       use your 29000 x 42000000 CPU iteration count (long run)\n"
+                        "  --push       performance push: baseline vs optimized-arithmetic vs\n"
+                        "               optimized+all-cores, as %% of current performance\n");
             return 0;
         }
     }
@@ -202,6 +228,38 @@ int main(int argc, char** argv) {
                     "  constant C = sum_{k=1..40} 1/sqrt(k) = %.12f  (precomputed once)\n",
                     t_ref, (double)reads * work * FLOPS_PER_STEP / t_ref / 1e6,
                     t_opt, t_ref / t_opt, x_ref, x_opt, reldiff, C);
+    }
+
+    // 1c) Performance push — "400% * current performance". Two honest levers,
+    //     both leave the result unchanged: (a) closed-form arithmetic, (b) run the
+    //     independent reads across every core. Reported as % of current (baseline)
+    //     performance so it maps to your target directly.
+    if (push) {
+        const std::uint64_t work = 300000;
+        const int reads = std::max(dramm_reads, 96);   // enough reads to fill the cores
+        unsigned th = cores ? cores : 1;
+
+        auto ta = clk::now(); volatile double s0 = 0;
+        for (int r = 0; r < reads; ++r) s0 += hot_kernel(work);
+        double t_base = secs_since(ta);                 // baseline = current path
+
+        auto tb = clk::now(); volatile double s1 = 0;
+        for (int r = 0; r < reads; ++r) s1 += hot_kernel_opt(work, C);
+        double t_opt1 = secs_since(tb);                 // + arithmetic
+
+        double t_par = run_parallel_opt(reads, work, C, th);  // + all cores
+        (void)s0; (void)s1;
+
+        double x_base = hot_kernel(work), x_opt = hot_kernel_opt(work, C);
+        std::printf("\nperformance push (baseline = your current single-thread kernel = 100%%):\n");
+        std::printf("  baseline single-thread        : %.4f s   100%% (1.00x)\n", t_base);
+        std::printf("  + optimized arithmetic (1 core): %.4f s   %.0f%% (%.2fx)\n",
+                    t_opt1, t_base / t_opt1 * 100.0, t_base / t_opt1);
+        std::printf("  + all %u cores (arith+parallel) : %.4f s   %.0f%% (%.2fx)\n",
+                    th, t_par, t_base / t_par * 100.0, t_base / t_par);
+        std::printf("  result unchanged: baseline x=%.15g  optimized x=%.15g\n", x_base, x_opt);
+        std::printf("  (%d independent reads x %llu steps; the recurrence inside each read stays serial)\n",
+                    reads, (unsigned long long)work);
     }
 
     // 2) CPU loop — full speed, no pause. Default a few hundred M; --full uses his count.

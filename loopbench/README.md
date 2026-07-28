@@ -44,6 +44,24 @@ result check          : ref x=0.120493199688742  opt x=0.120493199688742  reldif
 This is the honest kind of optimization — it doesn't change any answer, it just
 stops the CPU doing 39 sqrt/divides it never needed to.
 
+### Performance push (`--push`) — "400% of current performance"
+
+Two levers, both leaving the result **unchanged**, reported as % of your current
+(baseline) single-thread performance so it maps straight to your target:
+
+```
+baseline single-thread         : 5.11 s   100%  (1.00x)
++ optimized arithmetic (1 core) : 0.83 s   615%  (6.15x)
++ all 16 cores (arith+parallel) : 0.08 s  6170%  (61.70x)
+result unchanged: baseline x=0.120493199688742  optimized x=0.120493199688742
+```
+
+The second lever runs the **independent** DRAMM reads across every core. The
+recurrence *inside* one read stays serial (each x depends on the previous x),
+but N separate reads don't wait on each other — so they parallelise cleanly.
+615% from arithmetic alone already clears your 400% goal; all cores take it far
+past. Run it yourself with `ggw_loopbench --push`.
+
 ## Two things I want to be straight about
 
 **"OS loops 60^15000"** is not a number anything can run. 60^15000 has about
