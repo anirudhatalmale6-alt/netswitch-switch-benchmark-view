@@ -30,6 +30,7 @@ build_std dramm      dramm/ggw_dramm.cpp
 build_std diskbench  diskbench/ggw_diskbench.cpp
 build_std cputimer   cputimer/ggw_cputimer.cpp
 build_std radiosig   cputimer/ggw_radiosig.cpp
+build_std loopbench  loopbench/ggw_loopbench.cpp  -pthread
 # note: cputimer is header-only (cpu_mhz_timer.h) + a demo; the header is the shared
 #       MHz timebase meant to be #included across modules. radiosig runs the client's
 #       radio-parameter reduction on that timebase. Both build Linux + Windows.
