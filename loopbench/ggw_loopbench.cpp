@@ -59,6 +59,29 @@ static double hot_kernel(std::uint64_t iters) noexcept {
     return x;
 }
 
+// ---- optimized arithmetic (the "AI numbers" optimisation) -------------------
+// The 40-term inner sum has a closed form:
+//   acc = Σ_{k=1..40} sqrt(v/k) = sqrt(v) · Σ_{k=1..40} 1/sqrt(k) = sqrt(v)·C
+// C is a constant, so it's precomputed ONCE. That turns 40 sqrt + 40 divides
+// per step into a single sqrt + a single multiply — the number that comes out
+// is the same (to floating-point rounding), the arithmetic is ~10x less work.
+static double dramm_sum_const() {
+    double c = 0.0;
+    for (int k = 1; k <= TERMS; ++k) c += 1.0 / std::sqrt((double)k);
+    return c;
+}
+static constexpr double FLOPS_PER_STEP_OPT = 1.0 + 1.0 + 2.0 + 3.0;  // log + sqrt + mul/div + tail ≈ 7
+static inline double step_opt(double x, int i, double C) noexcept {
+    double v = std::log(x + 1.0) + 1.0;
+    double norm = std::sqrt(v) * C / (double)TERMS;      // exact rewrite of the 40-term sum
+    return 1.0 / (norm + (double)((i & 7) + 1));
+}
+static double hot_kernel_opt(std::uint64_t iters, double C) noexcept {
+    double x = 0.5;
+    for (std::uint64_t i = 0; i < iters; ++i) x = step_opt(x, (int)i, C);
+    return x;
+}
+
 struct Row {
     std::string name;
     bool present;          // did the machine actually run it?
@@ -142,6 +165,45 @@ int main(int argc, char** argv) {
         r.note = nb; rows.push_back(r);
     }
 
+    // 1b) Optimized arithmetic — the closed-form 40-term sum. Same result, less work.
+    double C = dramm_sum_const();
+    {
+        const std::uint64_t work = 300000;
+        const int reads = dramm_reads;
+
+        // correctness first: identical input, compare the final x from each kernel
+        double x_ref = hot_kernel(work);
+        double x_opt = hot_kernel_opt(work, C);
+        double reldiff = std::fabs(x_ref - x_opt) / (std::fabs(x_ref) + 1e-300);
+
+        // time both over the same total work
+        auto ta = clk::now(); volatile double s1 = 0;
+        for (int r = 0; r < reads; ++r) s1 += hot_kernel(work);
+        double t_ref = secs_since(ta);
+        auto tb = clk::now(); volatile double s2 = 0;
+        for (int r = 0; r < reads; ++r) s2 += hot_kernel_opt(work, C);
+        double t_opt = secs_since(tb);
+        (void)s1; (void)s2;
+
+        // report as original-workload-equivalent throughput so it's apples-to-apples
+        double eff_mflops = (double)reads * work * FLOPS_PER_STEP / t_opt / 1e6;
+        Row r; r.name = "DRAMM (optimized)"; r.present = true; r.seconds = t_opt;
+        r.rate = eff_mflops; r.unit = "MFLOP/s (orig-equiv)";
+        char nb[160];
+        std::snprintf(nb, sizeof nb, "closed-form 40-term sum: %.2fx faster, result matches (reldiff %.1e)",
+                      t_ref / t_opt, reldiff);
+        r.note = nb; rows.push_back(r);
+
+        std::printf("\narithmetic optimization (\"optimize AI numbers\"):\n"
+                    "  original 40-term sum  : %.4f s  (%.0f MFLOP/s)\n"
+                    "  optimized closed form : %.4f s  (%.2fx faster)\n"
+                    "  result check          : ref x=%.15g  opt x=%.15g\n"
+                    "                          reldiff=%.2e (floating-point rounding only)\n"
+                    "  constant C = sum_{k=1..40} 1/sqrt(k) = %.12f  (precomputed once)\n",
+                    t_ref, (double)reads * work * FLOPS_PER_STEP / t_ref / 1e6,
+                    t_opt, t_ref / t_opt, x_ref, x_opt, reldiff, C);
+    }
+
     // 2) CPU loop — full speed, no pause. Default a few hundred M; --full uses his count.
     {
         std::uint64_t iters = full ? (std::uint64_t)29000 * 42000000ull : 250000000ull;
@@ -197,6 +259,8 @@ int main(int argc, char** argv) {
                 "    real bounded OS-scheduler yield loop instead. If you meant 60 loops x 15000, or\n"
                 "    a 5-hour timed run, say which and I'll set it exactly.\n"
                 "  * --full uses your 29000 x 42000000 = 1.218e12 CPU count; the default extrapolates\n"
-                "    the time so you don't wait 20+ min unless you ask for it.\n");
+                "    the time so you don't wait 20+ min unless you ask for it.\n"
+                "  * DRAMM (optimized) rewrites the 40-term sum in closed form (sqrt(v)*C). It's a\n"
+                "    real arithmetic optimization: same result to float rounding, several x faster.\n");
     return 0;
 }

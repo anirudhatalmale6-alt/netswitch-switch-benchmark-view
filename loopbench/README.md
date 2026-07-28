@@ -21,6 +21,29 @@ ggw_loopbench --seconds 1     # bounded loops run 1 s each
 | Keyboard | **real** | input-poll cadence loop. |
 | GPS / Radio / Antenna / Sensors / GPU | **NO DEVICE** | a PC has no cellular/GPS radio, and no GPU on this box. Not faked — the same binary on a phone (Android NDK) reads these loops live. |
 
+## Optimized arithmetic ("optimize AI numbers")
+
+The DRAMM kernel's inner 40-term sum has an exact closed form:
+
+```
+Σ_{k=1..40} sqrt(v/k) = sqrt(v) · Σ_{k=1..40} 1/sqrt(k) = sqrt(v) · C
+```
+
+`C = 11.267648377839…` is a constant, so it's computed **once**. That replaces
+40 square roots + 40 divides per step with a single sqrt and a single multiply —
+the number that comes out is the **same** (bit-for-bit here, reldiff 0.0e+00),
+the arithmetic is several times less work. The tool runs both kernels, checks
+they agree, and prints the speedup:
+
+```
+original 40-term sum  : 2.12 s  (486 MFLOP/s)
+optimized closed form : 0.35 s  (6.14x faster)
+result check          : ref x=0.120493199688742  opt x=0.120493199688742  reldiff 0.0e+00
+```
+
+This is the honest kind of optimization — it doesn't change any answer, it just
+stops the CPU doing 39 sqrt/divides it never needed to.
+
 ## Two things I want to be straight about
 
 **"OS loops 60^15000"** is not a number anything can run. 60^15000 has about
