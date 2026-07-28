@@ -14,3 +14,5 @@ thermal/sample_sys/
 thermal/ggw_thermal.exe
 cputimer/ggw_cputimer
 cputimer/ggw_cputimer.exe
+cputimer/ggw_radiosig
+cputimer/ggw_radiosig.exe

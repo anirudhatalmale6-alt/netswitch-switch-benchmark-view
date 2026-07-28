@@ -59,11 +59,37 @@ auditable constants, and computes the CPU-radius expansion you gave:
 tracks. These feed the thermal model; nothing here is fabricated beyond your own
 figures.
 
+## Radio timing signature (ggw_radiosig)
+
+`ggw_radiosig` runs your "all radio in mobile phone" parameter set through your
+reduction chain, sampling once per second, on top of the same measured MHz
+timebase:
+
+```
+parameters: antenna 171.4  box 12.9  delay 0.00004498 s  cpu 44.8
+chain:      / sqrt(47.9985)  * 3.251734420901306  / 1.25  / 44.449  / sqrt(4.4)
+[AI] sample every 1 second
+```
+
+Every stage is one auditable line in the code, so any stage I read wrong is a
+one-line change. The delay is treated as a supplied echo (no ping is made). With
+`--shrink` it also divides by sqrt(22) until < 1e-9 (your earlier rule). A few
+tokens in your note (KAZURIMA, PESORIMA, TPAU, TELLUS, the `LOG T-498.000`,
+`PID 15,4M`, `minima/maxima`) I did **not** guess — the tool prints them as
+"need a definition"; tell me the operation each is and it drops straight in.
+
+```
+ggw_radiosig               # 5 one-second samples
+ggw_radiosig --samples 10
+ggw_radiosig --shrink
+```
+
 ## Build & run
 
 ```
 # Linux
 g++ -std=c++17 -O2 ggw_cputimer.cpp -o ggw_cputimer
+g++ -std=c++17 -O2 ggw_radiosig.cpp -o ggw_radiosig
 
 # Windows (mingw; MSVC works too — header-only, no libs)
 x86_64-w64-mingw32-g++ -std=c++17 -O2 ggw_cputimer.cpp -o ggw_cputimer.exe -static
