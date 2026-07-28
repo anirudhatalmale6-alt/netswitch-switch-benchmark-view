@@ -28,6 +28,9 @@ build_std ipr        ipr/ggw_ipr.cpp
 build_std client-cli client-cli/ggw_cli.cpp
 build_std dramm      dramm/ggw_dramm.cpp
 build_std diskbench  diskbench/ggw_diskbench.cpp
+build_std cputimer   cputimer/ggw_cputimer.cpp
+# note: cputimer is header-only (cpu_mhz_timer.h) + a demo; the header is the shared
+#       MHz timebase meant to be #included across modules. Builds Linux + Windows.
 # thermal has two real backends in one file: Linux/Android (sysfs, plain g++) and
 # Windows PC (WMI, needs -lwbemuuid -lole32 -loleaut32). So it's NOT build_std —
 # the mingw build links the WMI libs, the native build doesn't. See thermal/README.md.
