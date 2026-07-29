@@ -69,6 +69,7 @@ GO
 -- moment weight/exponent. LogLogRad is your radian log-log term. Give me the real
 -- T1/T2/LogLogRad and this reproduces your number exactly; meanwhile the cached
 -- constant below returns the value you stated, computed ONCE and reused.
+-- [M13] precompute-once constant
 CREATE OR ALTER FUNCTION dbo.ddtm_constant()
 RETURNS FLOAT AS
 BEGIN
@@ -76,6 +77,7 @@ BEGIN
 END;
 GO
 
+-- [M14] your formula: LOG10(SQRT((T1*MG*LLR)/POWER(POWER(T2,T1),MG2))/120W)
 CREATE OR ALTER FUNCTION dbo.ddtm_constant_calc
     (@T1 FLOAT, @T2 FLOAT, @LogLogRad FLOAT, @mg1 FLOAT = 0.777777778, @mg2 FLOAT = 0.166666667, @watts FLOAT = 120.0)
 RETURNS FLOAT AS
@@ -93,6 +95,7 @@ GO
 -- -----------------------------------------------------------------------------
 -- Hypervisor downscaler: rescale a coefficient by a downscale factor
 -- -----------------------------------------------------------------------------
+-- [M15] hypervisor downscaler c/f
 CREATE OR ALTER FUNCTION dbo.hyper_downscale(@coef FLOAT, @factor FLOAT)
 RETURNS FLOAT AS
 BEGIN
@@ -105,6 +108,7 @@ GO
 -- -----------------------------------------------------------------------------
 -- power(above again) = multiply by |constant|. PID-style: the three sines act as
 -- the three terms; here summed with per-wave amplitude.
+-- [M16] three sines scaled by the constant
 CREATE OR ALTER FUNCTION dbo.thrice_sinwave
     (@t FLOAT, @k FLOAT,
      @f1 FLOAT = 440.0, @f2 FLOAT = 660.0, @f3 FLOAT = 880.0,
@@ -122,6 +126,7 @@ GO
 -- -----------------------------------------------------------------------------
 -- lnlog: ln of ln — your "LLOG / lnlog of the SW program value"
 -- -----------------------------------------------------------------------------
+-- [M17] ln of ln
 CREATE OR ALTER FUNCTION dbo.lnlog(@x FLOAT)
 RETURNS FLOAT AS
 BEGIN
@@ -131,6 +136,7 @@ END;
 GO
 
 -- binary(BINARY) -> lnlog of a program/word value: show the bits AND the lnlog
+-- [M18] bits of a word + its lnlog
 CREATE OR ALTER FUNCTION dbo.binary_lnlog(@word BIGINT)
 RETURNS NVARCHAR(128) AS
 BEGIN
@@ -144,6 +150,7 @@ GO
 -- best scaler choice: max dB-quality per bit above a quality floor
 -- (ggw_ddtm writes the candidate rows; MS SQL picks, the way you want the DB to scale)
 -- -----------------------------------------------------------------------------
+-- [M19] DB-side best-scaler pick
 CREATE OR ALTER PROCEDURE dbo.choose_best_scaler @block_id INT, @psnr_floor FLOAT = 30.0
 AS
 BEGIN

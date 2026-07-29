@@ -43,6 +43,7 @@ static constexpr double PI = 3.14159265358979323846;
 // ---------------------------------------------------------------------------
 // 8x8 DCT-II (forward) and DCT-III (inverse) — the standard JPEG/H.26x transform
 // ---------------------------------------------------------------------------
+// [M6] forward 8x8 DCT-II
 static void dct2(const double in[N][N], double out[N][N]) {
     for (int u = 0; u < N; ++u) for (int v = 0; v < N; ++v) {
         double s = 0.0;
@@ -55,6 +56,7 @@ static void dct2(const double in[N][N], double out[N][N]) {
         out[u][v] = cu*cv*s;
     }
 }
+// [M7] inverse 8x8 DCT-III (reconstruct)
 static void idct2(const double in[N][N], double out[N][N]) {
     for (int x = 0; x < N; ++x) for (int y = 0; y < N; ++y) {
         double s = 0.0;
@@ -92,7 +94,7 @@ static bool load_block(const std::string& path, double b[N][N]) {
 
 struct QResult { double Q, mse, psnr_db, rate_bits, rate_nats, eff; int nonzero; };
 
-// entropy of the quantized coefficient magnitudes — the real rate measure
+// [M9] entropy of the quantized coefficient magnitudes — bits and nats(ln)
 static void entropy(const std::vector<int>& q, double& bits, double& nats, int& nonzero) {
     std::vector<int> mags; nonzero = 0;
     for (int v : q) { mags.push_back(std::abs(v)); if (v!=0) ++nonzero; }
