@@ -99,6 +99,19 @@
       <require-signature>on</require-signature>  <!-- only signed .switchc files are applied -->
       <reject-if-over-capacity>on</reject-if-over-capacity>  <!-- load-gate: refuse a config that would exceed the pipe -->
     </config-trust>
+
+    <!-- account backup / recovery codes: 500 one-time codes to verify the user
+         when the normal factor is unavailable. The file holds only SALTED
+         SHA-256 HASHES (never the codes) so a stolen .switchc can't log in; the
+         500 plaintext codes are shown to the user once, to keep. Each code is
+         single-use: verifying it flips used="0" -> used="1" (burned).
+         Generate/verify with backup-codes/ggw_backupcodes. Trimmed to 3 here;
+         the real block carries all 500. -->
+    <backup-codes algo="SHA-256" count="500" salt="7d4f62cf3d33d8fcf841ff73c8619ff1">
+      <code i="1" used="0">39503b788727aa2cac030d9c541e01f1341aa914e0183684452d8946581a9615</code>
+      <code i="2" used="0">757c6f3f1faf1d30d91a73475e31f59121ba759a9f286f5b70bf0f4da384897b</code>
+      <code i="3" used="0">…6 lines trimmed… (497 more &lt;code&gt; entries in the generated block)</code>
+    </backup-codes>
   </security>
 
   <!-- performance telemetry: the ongoing CPU/GPU/thermal/memory + screen-update topic -->
