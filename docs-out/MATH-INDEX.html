@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>MATH-INDEX</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    html{-webkit-text-size-adjust:100%}
+    body{font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+         max-width:860px;margin:0 auto;padding:28px 20px;color:#1c2128;line-height:1.55;
+         font-size:15px}
+    h1{font-size:24px;border-bottom:3px solid #2563eb;padding-bottom:8px;margin-top:0}
+    h2{font-size:18px;color:#1d4ed8;margin-top:34px;border-bottom:1px solid #d0d7de;padding-bottom:5px}
+    h3{font-size:15px;margin-top:22px}
+    table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.5px;display:block;overflow-x:auto}
+    th,td{border:1px solid #d0d7de;padding:7px 10px;text-align:left;vertical-align:top}
+    th{background:#f0f4f9;font-weight:600}
+    tr:nth-child(even) td{background:#fafbfc}
+    code{background:#eff1f3;padding:1px 5px;border-radius:4px;font-size:13px;
+         font-family:"SF Mono",Consolas,Menlo,monospace}
+    pre{background:#0f1419;color:#e6edf3;padding:14px 16px;border-radius:8px;overflow-x:auto;
+        font-size:12.5px;line-height:1.45}
+    pre code{background:none;color:inherit;padding:0}
+    blockquote{border-left:4px solid #2563eb;margin:14px 0;padding:2px 16px;background:#f0f6ff;color:#31404f}
+    a{color:#2563eb}
+    @media print{body{padding:0;max-width:none}pre{white-space:pre-wrap;word-wrap:break-word}
+                 h2{page-break-after:avoid}table{page-break-inside:avoid}}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">MATH-INDEX</h1>
+</header>
+<h1 id="ggw-netswitch-numbered-math-index">6GGW / NetSwitch — numbered
+math index</h1>
+<p>Every math function in the suite, numbered <code>M1…Mn</code>, with
+its file, signature, and what it computes. This index is the
+authoritative numbering; the newest source files also carry matching
+<code>// [Mxx]</code> tags at the function (see <code>ddtm</code>,
+<code>approve</code>, <code>netswitch-sql/scaling</code>). Ask and I’ll
+stamp the tags into any other file too.</p>
+<h2 id="compute-kernel-dramm-loopbench-approve">Compute kernel —
+<code>dramm/</code>, <code>loopbench/</code>, <code>approve/</code></h2>
+<table>
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 56%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>File · function</th>
+<th>Computes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>M1</td>
+<td><code>dramm/cpu_benchmark.cpp · step(x,i)</code></td>
+<td>one DRAMM step:
+<code>v=ln(x+1)+1; acc=Σ_{k=1..40} sqrt(v/k); return 1/(acc/40 + ((i&amp;7)+1))</code></td>
+</tr>
+<tr class="even">
+<td>M2</td>
+<td><code>loopbench/ggw_loopbench.cpp · step_opt / dramm_sum_const</code></td>
+<td>closed form: <code>Σ sqrt(v/k)=sqrt(v)·C</code>,
+<code>C=Σ1/√k=11.267648377839</code> (precompute once)</td>
+</tr>
+<tr class="odd">
+<td>M3</td>
+<td><code>approve/ggw_approve.cpp · workload(iters)</code></td>
+<td>deterministic iterate of M2’s <code>step_opt</code> → the
+reproducible result <code>0.120493199688742</code></td>
+</tr>
+<tr class="even">
+<td>M4</td>
+<td><code>approve/ggw_approve.cpp · result_hash(r)</code></td>
+<td>64-bit fmix of the IEEE-754 bits (murmur finalizer) — same binary ⇒
+same hash</td>
+</tr>
+<tr class="odd">
+<td>M5</td>
+<td><code>approve/ggw_approve.cpp · approval_ratio(a,b)</code></td>
+<td><code>SQRT((a/b + b/a)/2)</code> — 1.0 iff timings equal, grows on
+divergence</td>
+</tr>
+</tbody>
+</table>
+<h2 id="transform-scaling-ddtm-netswitch-sqlscaling">Transform / scaling
+— <code>ddtm/</code>, <code>netswitch-sql/scaling/</code></h2>
+<table>
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 56%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>File · function</th>
+<th>Computes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>M6</td>
+<td><code>ddtm/ggw_ddtm.cpp · dct2</code></td>
+<td>forward 8×8 DCT-II with <code>C(0)=√(1/N)</code>, else
+<code>√(2/N)</code></td>
+</tr>
+<tr class="even">
+<td>M7</td>
+<td><code>ddtm/ggw_ddtm.cpp · idct2</code></td>
+<td>inverse 8×8 DCT-III (reconstruct the block)</td>
+</tr>
+<tr class="odd">
+<td>M8</td>
+<td><code>ddtm/ggw_ddtm.cpp · (powered split)</code></td>
+<td><code>|C[u,v]| ≥ 0.01·peak</code> → powered; else unpowered</td>
+</tr>
+<tr class="even">
+<td>M9</td>
+<td><code>ddtm/ggw_ddtm.cpp · entropy(q)</code></td>
+<td>Shannon entropy of quantized magnitudes, in <strong>bits</strong>
+and <strong>nats (ln)</strong></td>
+</tr>
+<tr class="odd">
+<td>M10</td>
+<td><code>ddtm/ggw_ddtm.cpp · (requant + PSNR)</code></td>
+<td><code>q=round(C/Q)</code>, <code>C'=q·Q</code>,
+<code>PSNR=10·log10(range²/MSE)</code></td>
+</tr>
+<tr class="even">
+<td>M11</td>
+<td><code>ddtm/ggw_ddtm.cpp · (best scaler)</code></td>
+<td>argmax of <code>PSNR / (bits/64)</code> above a 30 dB floor</td>
+</tr>
+<tr class="odd">
+<td>M12</td>
+<td><code>ddtm/ggw_ddtm.cpp · (MHz banding)</code></td>
+<td>spectral efficiency <code>bits·blocks_per_s / bandwidth</code> →
+Mbps per MHz</td>
+</tr>
+<tr class="even">
+<td>M13</td>
+<td><code>scaling/ggw_scaling.sql · dbo.ddtm_constant()</code></td>
+<td>precompute-once constant <code>-0.090908889</code> (LLOG)</td>
+</tr>
+<tr class="odd">
+<td>M14</td>
+<td><code>scaling/ggw_scaling.sql · dbo.ddtm_constant_calc(...)</code></td>
+<td><code>LOG10( SQRT((T1·MG(7/9)·LogLogRad)/POWER(POWER(T2,T1),MG(1/6))) / 120W )</code></td>
+</tr>
+<tr class="even">
+<td>M15</td>
+<td><code>scaling/ggw_scaling.sql · dbo.hyper_downscale(c,f)</code></td>
+<td><code>c/f</code> — the hypervisor downscaler</td>
+</tr>
+<tr class="odd">
+<td>M16</td>
+<td><code>scaling/ggw_scaling.sql · dbo.thrice_sinwave(t,k,…)</code></td>
+<td><code>|k|·Σ_{i=1..3} aᵢ·sin(2π·fᵢ·t)</code></td>
+</tr>
+<tr class="even">
+<td>M17</td>
+<td><code>scaling/ggw_scaling.sql · dbo.lnlog(x)</code></td>
+<td><code>LOG(LOG(x))</code> — ln of ln; <code>lnlog(e^e)=1</code></td>
+</tr>
+<tr class="odd">
+<td>M18</td>
+<td><code>scaling/ggw_scaling.sql · dbo.binary_lnlog(w)</code></td>
+<td>hex bits of <code>w</code> plus its lnlog</td>
+</tr>
+<tr class="even">
+<td>M19</td>
+<td><code>scaling/ggw_scaling.sql · dbo.choose_best_scaler</code></td>
+<td>DB-side max <code>PSNR/(bits/64)</code> above floor</td>
+</tr>
+</tbody>
+</table>
+<h2 id="media-voice-edge-stream-qc-stream-ctl-ipr">Media —
+<code>voice-edge/</code>, <code>stream-qc/</code>,
+<code>stream-ctl/</code>, <code>ipr/</code></h2>
+<table>
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 56%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>File · function</th>
+<th>Computes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>M20</td>
+<td><code>voice-edge/ggw_voice_edge.cpp · ulaw(pcm)</code></td>
+<td>G.711 µ-law encode (sign, 8 exponent bands, mantissa)</td>
+</tr>
+<tr class="even">
+<td>M21</td>
+<td><code>voice-edge/ggw_voice_edge.cpp · make_rtp(...)</code></td>
+<td>440 Hz sine → PCMU, RFC 3550 RTP header pack</td>
+</tr>
+<tr class="odd">
+<td>M22</td>
+<td><code>stream-qc/ggw_streamqc.cpp · PSNR</code></td>
+<td><code>10·log10(255²/MSE)</code> fidelity in dB</td>
+</tr>
+<tr class="even">
+<td>M23</td>
+<td><code>stream-qc/ggw_streamqc.cpp · blockiness</code></td>
+<td>Wang/Bovik 8×8-grid pixelation index (dB), no reference</td>
+</tr>
+<tr class="odd">
+<td>M24</td>
+<td><code>stream-ctl/ggw_streamctl.cpp · battery (RKF45)</code></td>
+<td>RC saturation ODE by Runge–Kutta–Fehlberg 4(5)</td>
+</tr>
+<tr class="even">
+<td>M25</td>
+<td><code>stream-ctl/ggw_streamctl.cpp · battery (Laplace)</code></td>
+<td>analytic first-order check; agrees with M24 to ~1e-15</td>
+</tr>
+<tr class="odd">
+<td>M26</td>
+<td><code>stream-ctl/ggw_streamctl.cpp · pipe capacity</code></td>
+<td><code>bandwidth × MHz</code> spectral efficiency, −3% floor tier
+pick</td>
+</tr>
+<tr class="even">
+<td>M27</td>
+<td><code>stream-ctl/ggw_streamctl.cpp · split</code></td>
+<td>cut points at 1 2 7 15 40 59 80 %, byte-exact rejoin</td>
+</tr>
+<tr class="odd">
+<td>M28</td>
+<td><code>ipr/ggw_ipr.cpp · depth ratioing</code></td>
+<td>far 0.5× / close 1.0× inset scale, inside-only clamp</td>
+</tr>
+</tbody>
+</table>
+<h2 id="measure-sysmon-cputimer-diskbench-thermal">Measure —
+<code>sysmon/</code>, <code>cputimer/</code>, <code>diskbench/</code>,
+<code>thermal/</code></h2>
+<table>
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 56%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>File · function</th>
+<th>Computes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>M29</td>
+<td><code>sysmon/ggw_sysmon.cpp · measure_cpu_ops_bln</code></td>
+<td>per-core FMA ops ÷ wall time → billions ops/s</td>
+</tr>
+<tr class="even">
+<td>M30</td>
+<td><code>sysmon/ggw_sysmon.cpp · measure_fps</code></td>
+<td>offscreen frames rendered ÷ time → FPS</td>
+</tr>
+<tr class="odd">
+<td>M31</td>
+<td><code>cputimer/cpu_mhz_timer.h · calibrated RDTSC</code></td>
+<td>CPU timebase MHz from calibrated cycle count</td>
+</tr>
+<tr class="even">
+<td>M32</td>
+<td><code>cputimer/ggw_radiosig.cpp · reduction chain</code></td>
+<td>antenna/box/delay/cpu √47.9985 reduction at 1 Hz</td>
+</tr>
+<tr class="odd">
+<td>M33</td>
+<td><code>diskbench/ggw_diskbench.cpp · IOPS/MB-s/latency</code></td>
+<td>fsync-honest seq/random throughput + percentiles</td>
+</tr>
+<tr class="even">
+<td>M34</td>
+<td><code>thermal/ggw_thermal.cpp · trip headroom</code></td>
+<td>per-part temp vs trip, throttle-swing learn</td>
+</tr>
+</tbody>
+</table>
+<h2 id="control-server-cpp-registrar-backup-codes-secure">Control —
+<code>server-cpp/</code>, <code>registrar/</code>,
+<code>backup-codes/</code>, <code>secure/</code></h2>
+<table>
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 56%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>File · function</th>
+<th>Computes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>M35</td>
+<td><code>server-cpp/ggw_server.cpp · rerouting cost</code></td>
+<td><code>cost = RTT × (1 + load/100)</code>, least-cost reachable
+POP</td>
+</tr>
+<tr class="even">
+<td>M36</td>
+<td><code>server-cpp/ggw_server.cpp · distance</code></td>
+<td><code>d = 0.0001607 m/ps × TCP-handshake RTT</code> → signal-path
+km</td>
+</tr>
+<tr class="odd">
+<td>M37</td>
+<td><code>backup-codes/ggw_backupcodes.cpp · sha256</code></td>
+<td>FIPS 180-4 SHA-256 (also in registrar, voice-edge)</td>
+</tr>
+<tr class="even">
+<td>M38</td>
+<td><code>backup-codes/ggw_backupcodes.cpp · code gen</code></td>
+<td>Crockford base32, <code>byte%32</code> unbiased, 50 bits/code</td>
+</tr>
+<tr class="odd">
+<td>M39</td>
+<td><code>registrar/ggw_registrar.cpp · prefix_to_mask</code></td>
+<td>CIDR prefix → dotted netmask</td>
+</tr>
+<tr class="even">
+<td>M40</td>
+<td><code>secure/ggw_secure.cpp · EC-256 / RSA handshake</code></td>
+<td>TLS 1.3 key exchange + cert verify (OpenSSL)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p>Total: <strong>40 math functions</strong> across 20 source files. The
+three newest modules (<code>ddtm</code>, <code>approve</code>,
+<code>scaling</code>) carry inline <code>// [Mxx]</code> tags matching
+this table; say the word and I’ll stamp the rest.</p>
+</body>
+</html>

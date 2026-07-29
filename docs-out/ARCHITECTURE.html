@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>ARCHITECTURE</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    html{-webkit-text-size-adjust:100%}
+    body{font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+         max-width:860px;margin:0 auto;padding:28px 20px;color:#1c2128;line-height:1.55;
+         font-size:15px}
+    h1{font-size:24px;border-bottom:3px solid #2563eb;padding-bottom:8px;margin-top:0}
+    h2{font-size:18px;color:#1d4ed8;margin-top:34px;border-bottom:1px solid #d0d7de;padding-bottom:5px}
+    h3{font-size:15px;margin-top:22px}
+    table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.5px;display:block;overflow-x:auto}
+    th,td{border:1px solid #d0d7de;padding:7px 10px;text-align:left;vertical-align:top}
+    th{background:#f0f4f9;font-weight:600}
+    tr:nth-child(even) td{background:#fafbfc}
+    code{background:#eff1f3;padding:1px 5px;border-radius:4px;font-size:13px;
+         font-family:"SF Mono",Consolas,Menlo,monospace}
+    pre{background:#0f1419;color:#e6edf3;padding:14px 16px;border-radius:8px;overflow-x:auto;
+        font-size:12.5px;line-height:1.45}
+    pre code{background:none;color:inherit;padding:0}
+    blockquote{border-left:4px solid #2563eb;margin:14px 0;padding:2px 16px;background:#f0f6ff;color:#31404f}
+    a{color:#2563eb}
+    @media print{body{padding:0;max-width:none}pre{white-space:pre-wrap;word-wrap:break-word}
+                 h2{page-break-after:avoid}table{page-break-inside:avoid}}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">ARCHITECTURE</h1>
+</header>
+<h1 id="ggw-netswitch-architecture-component-map">6GGW / NetSwitch —
+architecture &amp; component map</h1>
+<p>One product: a serverless installable app plus a suite of native C++
+modules and an MS SQL data plane. Everything below speaks one
+HTTP/SIP/SQL wire, so the four client faces (PWA, Qt, CLI, thin-client)
+are interchangeable. This document is the box graph, the data flows, and
+a catalogue of every component and its files. Companion docs:
+<code>CLIENTS.md</code> (prose per-component),
+<code>MATH-INDEX.md</code> (every math function, numbered).</p>
+<h2 id="box-graph">Box graph</h2>
+<pre><code>                              ┌──────────────────────── CLIENT FACES ───────────────────────┐
+                              │  PWA (index.html)   Qt (client-qt)   CLI (client-cli)        │
+                              │  thin-client = ggw_approve (same binary as server)           │
+                              └───────▲──────────────▲──────────────▲──────────────▲─────────┘
+                                      │ HTTP         │ SIP/RTP       │ HTTP         │ approve
+        ┌─────────────────────────────┴──────────────┴──────────────┴──────────────┴──────────────────┐
+        │                                     CONTROL PLANE                                             │
+        │  server-cpp (primary) / server (Node ref) ── one API: health ping distance estimate device…   │
+        │  registrar ── backup-code-gated device enrol, logs IP/GW/MASK/DNS/DHCP                         │
+        │  backup-codes ── 500 one-time codes, salted SHA-256, single-use burn                           │
+        │  approve ── single binary both sides; SQRT(a/b,b/a) timing = system approval                   │
+        │  secure ── TLS 1.3 (EC-256/RSA), SSH tunnel, short-term certs                                  │
+        └───────▲───────────────────▲───────────────────▲───────────────────────────▲───────────────────┘
+                │ rerouting          │ media steer        │ sessions + scaling         │ measures
+    ┌───────────┴────────┐ ┌─────────┴─────────┐ ┌─────────┴──────────────┐ ┌──────────┴─────────────────┐
+    │  ROUTING            │ │  MEDIA PLANE      │ │  DATA PLANE (MS SQL)    │ │  MEASURE / COMPUTE          │
+    │  least-cost POP by  │ │  voice-edge SIP+  │ │  netswitch-sql (ODBC)   │ │  dramm  (hot kernel)        │
+    │  measured RTT       │ │  RTP media edge   │ │  scaling/ ggw_scaling   │ │  loopbench (loop battery)   │
+    │  cost=RTT(1+load)   │ │  stream-ctl tiers │ │   .sql: constant, hyper │ │  cputimer (MHz/RDTSC)       │
+    │                     │ │  stream-qc dB     │ │   downscale, thrice-sin │ │  sysmon (FPS/RAM/CPU/GPU)   │
+    │                     │ │  ipr in-picture   │ │   lnlog, best-scaler,    │ │  diskbench (IOPS/MB/s)      │
+    │                     │ │                   │ │   device_session store   │ │  thermal (per-part temps)   │
+    │                     │ │                   │ │                          │ │  ddtm (8x8 DCT requant)     │
+    └─────────────────────┘ └───────────────────┘ └──────────────────────────┘ └────────────────────────────┘
+            switch-config/example.switchc  ── one XML config the switch reads at boot (all of the above as stanzas)</code></pre>
+<h2 id="the-end-to-end-flow-a-device-joining-and-making-a-call">The
+end-to-end flow (a device joining and making a call)</h2>
+<pre><code>1. user opens the thin client (PWA / ggw_approve)
+2. REGISTER with a one-time backup code   ── backup-codes verifies + burns it
+3. registrar logs the device               ── IP/GW/MASK/DNS/DNS2/DNS-periph/DHCP  → MS SQL device_session
+4. approve                                  ── same binary on server+client, timing ratio ~1.0 = APPROVED
+5. rerouting engine picks the edge          ── measured RTT, cost = RTT·(1+load/100)
+6. SIP INVITE → voice-edge media edge        ── RTP (G.711 µ-law) relayed at the chosen POP
+7. SCCM block scaled                         ── ddtm 8x8 DCT + requant; MS SQL scaling picks best scaler
+8. stream-ctl / stream-qc                    ── bitrate tiers, pipe floor, dB pixelation gate</code></pre>
+<h2 id="component-catalogue">Component catalogue</h2>
+<table>
+<colgroup>
+<col style="width: 6%" />
+<col style="width: 22%" />
+<col style="width: 12%" />
+<col style="width: 34%" />
+<col style="width: 24%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Component</th>
+<th>Kind</th>
+<th>Primary file(s)</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td><code>index.html</code> <code>sw.js</code>
+<code>manifest</code></td>
+<td>PWA</td>
+<td>web</td>
+<td>installable phone app base</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td><code>server-cpp</code></td>
+<td>C++</td>
+<td><code>ggw_server.cpp</code></td>
+<td>primary native server; the one API</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td><code>server</code></td>
+<td>Node</td>
+<td><code>server.js</code> <code>backup.js</code>
+<code>restore.js</code></td>
+<td>reference server, same API</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td><code>client-qt</code></td>
+<td>Qt C++</td>
+<td><code>main.cpp</code></td>
+<td>desktop/mobile client, 4 tabs</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td><code>client-cli</code></td>
+<td>C++</td>
+<td><code>ggw_cli.cpp</code></td>
+<td>CLI client (Win/Lin/mac)</td>
+</tr>
+<tr class="even">
+<td>6</td>
+<td><code>secure</code></td>
+<td>C++/OpenSSL</td>
+<td><code>ggw_secure.cpp</code></td>
+<td>TLS 1.3, SSH tunnel, short-term certs</td>
+</tr>
+<tr class="odd">
+<td>7</td>
+<td><code>dramm</code></td>
+<td>C++/CUDA</td>
+<td><code>cpu_benchmark.*</code> <code>ggw_dramm.cpp</code></td>
+<td>tight compute kernel + benchmark</td>
+</tr>
+<tr class="even">
+<td>8</td>
+<td><code>diskbench</code></td>
+<td>C++</td>
+<td><code>ggw_diskbench.cpp</code></td>
+<td>seq/random disk IOPS + MB/s + latency</td>
+</tr>
+<tr class="odd">
+<td>9</td>
+<td><code>cputimer</code></td>
+<td>C++ hdr</td>
+<td><code>cpu_mhz_timer.h</code> <code>ggw_cputimer.cpp</code>
+<code>ggw_radiosig.cpp</code></td>
+<td>RDTSC MHz timer; radio-param reduction</td>
+</tr>
+<tr class="even">
+<td>10</td>
+<td><code>stream-qc</code></td>
+<td>C++</td>
+<td><code>ggw_streamqc.cpp</code></td>
+<td>PSNR/blockiness pixelation watch (dB)</td>
+</tr>
+<tr class="odd">
+<td>11</td>
+<td><code>stream-ctl</code></td>
+<td>C++</td>
+<td><code>ggw_streamctl.cpp</code></td>
+<td>bitrate tiers, pipe-fill, battery, split</td>
+</tr>
+<tr class="even">
+<td>12</td>
+<td><code>ipr</code></td>
+<td>C++</td>
+<td><code>ggw_ipr.cpp</code></td>
+<td>image-in-picture compositor</td>
+</tr>
+<tr class="odd">
+<td>13</td>
+<td><code>netswitch-sql</code></td>
+<td>C++/ODBC</td>
+<td><code>netswitch_sql.cpp</code></td>
+<td>MS SQL client, forced pw change, timed RTT</td>
+</tr>
+<tr class="even">
+<td>14</td>
+<td><code>netswitch-sql/scaling</code></td>
+<td>T-SQL</td>
+<td><code>ggw_scaling.sql</code></td>
+<td>scaling math native in MS SQL (see below)</td>
+</tr>
+<tr class="odd">
+<td>15</td>
+<td><code>ui-panels</code></td>
+<td>HTML</td>
+<td><code>index.html</code></td>
+<td>4 operator UI panels</td>
+</tr>
+<tr class="even">
+<td>16</td>
+<td><code>thermal</code></td>
+<td>C++</td>
+<td><code>ggw_thermal.cpp</code></td>
+<td>per-part temps, throttle watch</td>
+</tr>
+<tr class="odd">
+<td>17</td>
+<td><code>loopbench</code></td>
+<td>C++</td>
+<td><code>ggw_loopbench.cpp</code></td>
+<td>loop battery; optimized-arith + push</td>
+</tr>
+<tr class="even">
+<td>18</td>
+<td><code>sysmon</code></td>
+<td>C++</td>
+<td><code>ggw_sysmon.cpp</code></td>
+<td>live FPS/ROM/RAM/CPU%/GPU% monitor</td>
+</tr>
+<tr class="odd">
+<td>19</td>
+<td><code>backup-codes</code></td>
+<td>C++</td>
+<td><code>ggw_backupcodes.cpp</code></td>
+<td>500 one-time codes, salted SHA-256</td>
+</tr>
+<tr class="even">
+<td>20</td>
+<td><code>registrar</code></td>
+<td>C++</td>
+<td><code>ggw_registrar.cpp</code></td>
+<td>code-gated device enrol + net log</td>
+</tr>
+<tr class="odd">
+<td>21</td>
+<td><code>voice-edge</code></td>
+<td>C++</td>
+<td><code>ggw_voice_edge.cpp</code></td>
+<td>SIP register + RTP through a media edge</td>
+</tr>
+<tr class="even">
+<td>22</td>
+<td><code>ddtm</code></td>
+<td>C++</td>
+<td><code>ggw_ddtm.cpp</code></td>
+<td>8x8 DCT, powered/unpowered, requant scaler</td>
+</tr>
+<tr class="odd">
+<td>23</td>
+<td><code>approve</code></td>
+<td>C++</td>
+<td><code>ggw_approve.cpp</code></td>
+<td>single-binary system-approval by timing</td>
+</tr>
+<tr class="even">
+<td>24</td>
+<td><code>switch-config</code></td>
+<td>XML</td>
+<td><code>example.switchc</code></td>
+<td>the one boot config, all modules as stanzas</td>
+</tr>
+</tbody>
+</table>
+<h2 id="portability-server-choices">Portability (server choices)</h2>
+<ul>
+<li><strong>Data plane</strong> targets <strong>Microsoft SQL Server
+2026</strong> (T-SQL, tested syntax); the scaling functions use only
+standard SQL maths, so an Oracle/PostgreSQL port is a small dialect
+change (<code>LOG</code>/<code>POWER</code>/<code>SIN</code> exist in
+all three).</li>
+<li><strong>HTTP front</strong> is server-agnostic:
+<code>server-cpp</code> runs standalone, or sit it behind <strong>Nginx
+/ Apache</strong> as a reverse proxy — no code change.</li>
+<li>Every C++ module builds on Linux (g++) and Windows (mingw/MSVC); the
+phone builds come from the same sources with the NDK / Qt mobile
+kits.</li>
+</ul>
+<h2 id="where-the-money-math-lives">Where the money-math lives</h2>
+<p><code>120 W</code> is the fixed power reference in the DDTM/scaling
+constant (<code>ggw_scaling.sql</code> →
+<code>ddtm_constant_calc</code>, <code>/ @watts</code> default
+<code>120.0</code>). It is present and set to 120 W as specified.
+```</p>
+</body>
+</html>

@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>INSTALL-COMPATIBILITY</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    html{-webkit-text-size-adjust:100%}
+    body{font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+         max-width:860px;margin:0 auto;padding:28px 20px;color:#1c2128;line-height:1.55;
+         font-size:15px}
+    h1{font-size:24px;border-bottom:3px solid #2563eb;padding-bottom:8px;margin-top:0}
+    h2{font-size:18px;color:#1d4ed8;margin-top:34px;border-bottom:1px solid #d0d7de;padding-bottom:5px}
+    h3{font-size:15px;margin-top:22px}
+    table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.5px;display:block;overflow-x:auto}
+    th,td{border:1px solid #d0d7de;padding:7px 10px;text-align:left;vertical-align:top}
+    th{background:#f0f4f9;font-weight:600}
+    tr:nth-child(even) td{background:#fafbfc}
+    code{background:#eff1f3;padding:1px 5px;border-radius:4px;font-size:13px;
+         font-family:"SF Mono",Consolas,Menlo,monospace}
+    pre{background:#0f1419;color:#e6edf3;padding:14px 16px;border-radius:8px;overflow-x:auto;
+        font-size:12.5px;line-height:1.45}
+    pre code{background:none;color:inherit;padding:0}
+    blockquote{border-left:4px solid #2563eb;margin:14px 0;padding:2px 16px;background:#f0f6ff;color:#31404f}
+    a{color:#2563eb}
+    @media print{body{padding:0;max-width:none}pre{white-space:pre-wrap;word-wrap:break-word}
+                 h2{page-break-after:avoid}table{page-break-inside:avoid}}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">INSTALL-COMPATIBILITY</h1>
+</header>
+<h1 id="ggw-netswitch-installation-hardwaresoftware-compatibility">6GGW
+/ NetSwitch — installation, hardware/software &amp; compatibility</h1>
+<p>Everything needed to stand the system up on a Linux
+(RHEL/CentOS/Rocky/Alma/Fedora/ Gentoo/Debian/Ubuntu) or Windows Server
+(2016–2025 Datacenter) box, plus the compatibility matrix,
+ports/sockets, patch guidance, and the hotlink-protection URL-rewrite
+rules you asked for.</p>
+<blockquote>
+<p><strong>MFLOPS.</strong> Every “MFLOPS HERE NEEDED” is filled by the
+<strong>report engine</strong> (<code>ggw_report</code>). Run it on the
+target box and it writes a report with that box’s real double-precision
+MFLOPS (dense matmul + sustained FMA), CPU/RAM/disk, and an OS
+compatibility verdict. Reference figure from my build box (AMD
+EPYC-Genoa, one thread, <code>-O2</code>): <strong>~3,400 MFLOPS matmul
+/ ~7,200 MFLOPS FMA</strong>. Your hardware will print its own — that is
+the number to quote per machine.</p>
+</blockquote>
+<h2 id="hardware-requirements">Hardware requirements</h2>
+<table>
+<colgroup>
+<col style="width: 22%" />
+<col style="width: 18%" />
+<col style="width: 18%" />
+<col style="width: 22%" />
+<col style="width: 18%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tier</th>
+<th>CPU</th>
+<th>RAM</th>
+<th>Disk</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Thin client (phone/PC)</td>
+<td>2 cores, x86-64 or ARM64</td>
+<td>2 GB</td>
+<td>200 MB</td>
+<td>PWA + approve binary</td>
+</tr>
+<tr class="even">
+<td>Server (single)</td>
+<td>4 cores</td>
+<td>8 GB</td>
+<td>20 GB SSD</td>
+<td>control plane + SQL small</td>
+</tr>
+<tr class="odd">
+<td>Server (gamehouse demo)</td>
+<td>8+ cores</td>
+<td>16–32 GB</td>
+<td>100 GB SSD</td>
+<td>SQL + media edge + measures</td>
+</tr>
+<tr class="even">
+<td>SQL data plane</td>
+<td>4+ cores</td>
+<td>8 GB min (16 GB recommended)</td>
+<td>50 GB SSD</td>
+<td>MS SQL 2016–2025</td>
+</tr>
+</tbody>
+</table>
+<p>No GPU is required; when a GPU is present the measures use it,
+otherwise they report <code>NO DEVICE</code> and run on CPU.</p>
+<h2 id="software-requirements">Software requirements</h2>
+<table>
+<colgroup>
+<col style="width: 45%" />
+<col style="width: 54%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Component</th>
+<th>Requirement</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>C++ modules</td>
+<td>build once with GCC/Clang (Linux) or MinGW/MSVC (Windows); no
+runtime deps (static)</td>
+</tr>
+<tr class="even">
+<td>Data plane</td>
+<td>Microsoft SQL Server 2016 / 2017 / 2019 / 2022 / 2025,
+Express→Enterprise</td>
+</tr>
+<tr class="odd">
+<td>ODBC</td>
+<td>Microsoft ODBC Driver 18 for SQL Server</td>
+</tr>
+<tr class="even">
+<td>Web front (optional)</td>
+<td>Nginx or Apache or IIS as reverse proxy (URL-rewrite rules
+below)</td>
+</tr>
+<tr class="odd">
+<td>PWA</td>
+<td>any modern browser; installs to home screen, no store required</td>
+</tr>
+</tbody>
+</table>
+<h2 id="os-compatibility-matrix">OS compatibility matrix</h2>
+<table>
+<colgroup>
+<col style="width: 14%" />
+<col style="width: 32%" />
+<col style="width: 28%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>OS</th>
+<th>Version</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>RHEL</td>
+<td>8 / 9</td>
+<td>Supported</td>
+<td>primary Linux target</td>
+</tr>
+<tr class="even">
+<td>CentOS / Rocky / AlmaLinux</td>
+<td>8 / 9</td>
+<td>Supported</td>
+<td>RHEL-compatible</td>
+</tr>
+<tr class="odd">
+<td>Fedora</td>
+<td>38+</td>
+<td>Supported</td>
+<td></td>
+</tr>
+<tr class="even">
+<td>Gentoo</td>
+<td>current</td>
+<td>Supported</td>
+<td>source build, <code>-O2 -march=native</code></td>
+</tr>
+<tr class="odd">
+<td>Debian / Ubuntu</td>
+<td>11+ / 22.04+</td>
+<td>Supported</td>
+<td>build box is Ubuntu 24.04</td>
+</tr>
+<tr class="even">
+<td>Windows Server</td>
+<td>2016 / 2019 / 2022 / 2025 Datacenter</td>
+<td>Supported</td>
+<td>detected via RtlGetVersion</td>
+</tr>
+<tr class="odd">
+<td>Windows</td>
+<td>10 / 11</td>
+<td>Supported</td>
+<td>dev + thin client</td>
+</tr>
+</tbody>
+</table>
+<p>The report engine detects the running OS and prints the verdict
+automatically.</p>
+<h2 id="linux-installer-rhel-centos-gentoo">Linux installer (RHEL /
+CentOS / Gentoo)</h2>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. build (RHEL/CentOS: dnf install gcc-c++ ; Gentoo: emerge sys-devel/gcc)</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">g++</span> <span class="at">-std</span><span class="op">=</span>c++17 <span class="at">-O2</span> <span class="at">-march</span><span class="op">=</span>native ggw_report.cpp <span class="at">-o</span> /usr/local/bin/ggw_report</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co">#    ...repeat for each module, or run build-all.sh</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. ISO / drive mount (SCSI and compatible controllers)</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co">#    the installer ISO mounts read-only; sd* = SATA/SCSI/USB, works out of the box:</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">mount</span> <span class="at">-o</span> ro /dev/sr0 /mnt/iso        <span class="co"># optical / ISO image</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">mount</span> <span class="at">-o</span> ro /dev/sdb1 /mnt/media     <span class="co"># SCSI / USB media</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co">#    verify the block device first:</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="ex">lsblk</span> <span class="at">-o</span> NAME,TYPE,SIZE,TRAN         <span class="co"># TRAN shows sata/usb/scsi/nvme</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="co"># 3. ODBC for the data plane (RHEL family)</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="ex">dnf</span> install unixODBC msodbcsql18</span></code></pre></div>
+<h2 id="windows-server-installer">Windows Server installer</h2>
+<pre><code>1. Install &quot;Microsoft ODBC Driver 18 for SQL Server&quot; (msodbcsql.msi).
+2. Copy the pre-built ggw_*.exe (static, no VC++ redist needed) to C:\NetSwitch\.
+3. Install SQL Server (Express is fine for the demo) and run ggw_scaling.sql.
+4. Open port 1433 (SQL) and your HTTP port in Windows Firewall (below).</code></pre>
+<h2 id="ports-sockets-firewall">Ports, sockets &amp; firewall</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Service</th>
+<th>Port</th>
+<th>Proto</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>MS SQL</td>
+<td>1433</td>
+<td>TCP</td>
+<td>data plane</td>
+</tr>
+<tr class="even">
+<td>HTTP control</td>
+<td>8080 (or 80)</td>
+<td>TCP</td>
+<td>server-cpp / behind proxy</td>
+</tr>
+<tr class="odd">
+<td>HTTPS</td>
+<td>443</td>
+<td>TCP</td>
+<td>TLS 1.3 (secure module)</td>
+</tr>
+<tr class="even">
+<td>SIP</td>
+<td>5060</td>
+<td>UDP</td>
+<td>voice-edge signalling</td>
+</tr>
+<tr class="odd">
+<td>RTP media</td>
+<td>10000–20000</td>
+<td>UDP</td>
+<td>voice-edge media (range)</td>
+</tr>
+</tbody>
+</table>
+<p>Linux firewall (firewalld):</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">firewall-cmd</span> <span class="at">--permanent</span> <span class="at">--add-port</span><span class="op">=</span>1433/tcp <span class="at">--add-port</span><span class="op">=</span>443/tcp <span class="dt">\</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>             <span class="at">--add-port</span><span class="op">=</span>5060/udp <span class="at">--add-port</span><span class="op">=</span>10000-20000/udp</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="ex">firewall-cmd</span> <span class="at">--reload</span></span></code></pre></div>
+<p>Windows firewall:</p>
+<pre><code>netsh advfirewall firewall add rule name=&quot;MSSQL&quot; dir=in action=allow protocol=TCP localport=1433
+netsh advfirewall firewall add rule name=&quot;RTP&quot;   dir=in action=allow protocol=UDP localport=10000-20000</code></pre>
+<p>Socket automation: the C++ modules open/close their own sockets;
+nothing to schedule. On Linux you can wrap any module as a
+<code>systemd</code> socket-activated unit if you want the kernel to
+hold the listening socket and start the service on first connection.</p>
+<h2 id="service-packs-patches-shas-upgrades">Service packs, patches,
+SHAs, upgrades</h2>
+<ul>
+<li><p><strong>SQL Server</strong> follows Microsoft’s Cumulative Update
+(CU) cadence — apply the latest CU for your major version; there are no
+numbered SP1–SP5 on 2017+, they were replaced by CUs. Track them on
+Microsoft’s SQL Server build list.</p></li>
+<li><p><strong>Our modules</strong> are versioned by git commit; each
+release zip carries a <code>SHA256SUMS</code> file so you can verify
+integrity:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sha256sum</span> <span class="at">-c</span> SHA256SUMS      <span class="co"># Linux</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="ex">certutil</span> <span class="at">-hashfile</span> ggw_report.exe SHA256   <span class="co"># Windows</span></span></code></pre></div></li>
+<li><p>Upgrades are drop-in: replace the binary, no migration; the SQL
+side uses <code>CREATE OR ALTER</code> so re-running the script upgrades
+functions in place.</p></li>
+</ul>
+<h2 id="hotlink-protection-url-rewrite-on-http_referer">Hotlink
+protection — URL rewrite on HTTP_REFERER</h2>
+<p>Inspect the incoming <code>Referer</code> header, allow only your own
+domain or empty (direct/typed) traffic, and block the rest with
+<code>403</code> (or redirect to a warning image). Rules for all three
+front ends:</p>
+<p><strong>IIS (web.config, official URL Rewrite module)</strong></p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode xml"><code class="sourceCode xml"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>&lt;<span class="kw">system.webServer</span>&gt;&lt;<span class="kw">rewrite</span>&gt;&lt;<span class="kw">rules</span>&gt;</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  &lt;<span class="kw">rule</span><span class="ot"> name=</span><span class="st">&quot;block-hotlink&quot;</span><span class="ot"> stopProcessing=</span><span class="st">&quot;true&quot;</span>&gt;</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    &lt;<span class="kw">match</span><span class="ot"> url=</span><span class="st">&quot;.*&quot;</span> /&gt;</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    &lt;<span class="kw">conditions</span><span class="ot"> logicalGrouping=</span><span class="st">&quot;MatchAll&quot;</span>&gt;</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>      &lt;<span class="kw">add</span><span class="ot"> input=</span><span class="st">&quot;{HTTP_REFERER}&quot;</span><span class="ot"> pattern=</span><span class="st">&quot;^$&quot;</span><span class="ot"> negate=</span><span class="st">&quot;true&quot;</span> /&gt;</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>      &lt;<span class="kw">add</span><span class="ot"> input=</span><span class="st">&quot;{HTTP_REFERER}&quot;</span><span class="ot"> pattern=</span><span class="st">&quot;^https?://(www\.)?yourdomain\.com/&quot;</span><span class="ot"> negate=</span><span class="st">&quot;true&quot;</span> /&gt;</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    &lt;/<span class="kw">conditions</span>&gt;</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    &lt;<span class="kw">action</span><span class="ot"> type=</span><span class="st">&quot;CustomResponse&quot;</span><span class="ot"> statusCode=</span><span class="st">&quot;403&quot;</span><span class="ot"> statusReason=</span><span class="st">&quot;Forbidden&quot;</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="ot">            statusDescription=</span><span class="st">&quot;Hotlinking not allowed&quot;</span> /&gt;</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  &lt;/<span class="kw">rule</span>&gt;</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>&lt;/<span class="kw">rules</span>&gt;&lt;/<span class="kw">rewrite</span>&gt;&lt;/<span class="kw">system.webServer</span>&gt;</span></code></pre></div>
+<p><strong>Nginx</strong></p>
+<pre class="nginx"><code>location / {
+    valid_referers none blocked yourdomain.com *.yourdomain.com;
+    if ($invalid_referer) { return 403; }   # or: rewrite ^ /warning.png break;
+}</code></pre>
+<p><strong>Apache (mod_rewrite)</strong></p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode apache"><code class="sourceCode apache"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">RewriteEngine</span><span class="ch"> </span><span class="kw">On</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>RewriteCond<span class="st"> %{HTTP_REFERER} !^$</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>RewriteCond<span class="st"> %{HTTP_REFERER} !^https?://(www\.)?yourdomain\.com/ [NC]</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>RewriteRule<span class="st"> .* - [F]            </span><span class="er"># F = 403 Forbidden (or: RewriteRule .* /warning.png [L])</span></span></code></pre></div>
+<p>Swap <code>yourdomain.com</code> for your real domain. “Empty
+referrer allowed” covers people who type the URL directly or use a
+bookmark.</p>
+<h2
+id="on-the-region-vendor-list-google-arc-sap-euusjpkrapacauintr-latam">On
+the region / vendor list (Google ARC, SAP EU/US/JP/KR/APAC/AU/IN/TR,
+LATAM)</h2>
+<p>That is a very large integration surface. Nothing in the product
+talks to those networks today, and I won’t invent compatibility we
+haven’t built and tested. If you tell me which one is actually first on
+the roadmap (e.g. “SAP EU” or “one Azure region”), I’ll scope a real
+connector for that one and document it properly rather than list vendors
+we don’t integrate with yet.</p>
+</body>
+</html>
