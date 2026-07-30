@@ -278,7 +278,7 @@ static int do_selftest(double loss){
     sock_t sA=udp_bind(0);
     sockaddr_in toB=addr_of("127.0.0.1",portB);
     SendStats st;
-    std::printf("6GGW replication transport — selftest (loopback, loss=%.0f%%)\n\n", loss*100.0);
+    std::printf("6GGW replication transport -- selftest (loopback, loss=%.0f%%)\n\n", loss*100.0);
     bool ok=run_source(sA,toB,st);
     tb.join(); CLOSESOCK(sA); CLOSESOCK(sB);
 
@@ -299,7 +299,7 @@ static int do_selftest(double loss){
     std::printf("  retransmits     : %d   (reliable streams recovered every lost packet)\n", st.retx);
     std::printf("  throughput      : reliable %.1f Mbps, media %.1f Mbps\n", st.mbps_rel, st.mbps_media);
     bool all = ok && state_ok && file_ok && audio_ok && video_ok;
-    std::printf("\n  RESULT: %s\n", all?"PASS — all four streams replicated":"FAIL");
+    std::printf("\n  RESULT: %s\n", all?"PASS -- all four streams replicated":"FAIL");
     if(loss>0) std::printf("  (with loss the reliable STATE/FILE still verify exactly; AUDIO/VIDEO degrade, never block.)\n");
     return all?0:1;
 }
@@ -314,18 +314,18 @@ int main(int argc,char**argv){
     net_init();
     if(mode=="serve"){
         sock_t s=udp_bind(port); if(s==BADSOCK){ std::fprintf(stderr,"bind %d failed\n",port); return 2; }
-        std::printf("replica listening on udp %d — waiting for a source...\n",port);
+        std::printf("replica listening on udp %d -- waiting for a source...\n",port);
         Result R; run_replica(s,&R,loss); CLOSESOCK(s);
         std::printf("  applied %zu state keys, %d file chunks (sha %s), audio %d, video %d\n",
             R.state.size(),R.file_chunks,R.file_sha.c_str(),R.audio_recv,R.video_recv);
-        std::printf("  file sha %s expected\n", (R.file_sha==R.file_sha_expect)?"MATCHES":"differs — retry");
+        std::printf("  file sha %s expected\n", (R.file_sha==R.file_sha_expect)?"MATCHES":"differs -- retry");
         return 0;
     }
     if(mode=="send"){
         sock_t s=udp_bind(0); sockaddr_in to=addr_of(host.c_str(),port);
         SendStats st; std::printf("source -> %s:%d\n",host.c_str(),port);
         bool ok=run_source(s,to,st); CLOSESOCK(s);
-        std::printf("  sent: %d state, %d file chunks (sha %s), %d audio, %d video, %d retransmits — %s\n",
+        std::printf("  sent: %d state, %d file chunks (sha %s), %d audio, %d video, %d retransmits -- %s\n",
             st.state_n,st.file_chunks,st.file_sha.c_str(),st.audio_n,st.video_n,st.retx, ok?"done":"FAILED (no replica?)");
         return ok?0:1;
     }
