@@ -1,0 +1,9 @@
+metric,value,unit,period,segment,basis,source
+Postpaid ARPU,15.73,GBP/month,2023,postpaid,measured,Ofcom/Statista
+Prepaid ARPU,5.18,GBP/month,2023,prepaid,measured,Ofcom/Statista
+VMO2 total connections,45.7,million,2024,all,measured,Virgin Media O2
+5G SA population coverage,83.0,%,2025,all,measured,Ofcom Connected Nations 2025
+Mobile data usage growth,18.0,% YoY,2025,all,measured,Ofcom
+MVNO consumer share (Sky+Tesco),15.0,% (>),2025,MVNO,measured,market reports
+Marketing spend of revenue,12.0,% (est),2026,all,modelled,placeholder - awaiting client figure
+Cost per acquisition (SIM),18.0,GBP (est),2026,all,modelled,placeholder - awaiting client figure

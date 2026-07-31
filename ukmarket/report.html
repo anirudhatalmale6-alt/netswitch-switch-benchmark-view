@@ -1,0 +1,98 @@
+<meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font: 12px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+         color: #1a1f2b; margin: 0; }
+  h1 { font-size: 22px; margin: 0 0 2px; letter-spacing: -.3px; }
+  h2 { font-size: 14px; margin: 20px 0 6px; padding-bottom: 4px;
+       border-bottom: 2px solid #2b6cb0; color: #1a365d; }
+  .sub { color: #556; font-size: 11px; margin-bottom: 4px; }
+  .tag { display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 10px;
+         background: #ebf3fb; color: #1a4e8a; margin-right: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 6px 0 4px; font-size: 10.5px; }
+  th { background: #1a365d; color: #fff; text-align: left; padding: 4px 6px; font-weight: 600; }
+  td { padding: 3px 6px; border-bottom: 1px solid #e4e8ef; }
+  tr:nth-child(even) td { background: #f6f8fb; }
+  .r { text-align: right; }
+  .m { color: #8a6d00; font-weight: 600; }        /* modelled */
+  .note { font-size: 10px; color: #556; background: #fbfaf3; border-left: 3px solid #d9c76a;
+          padding: 6px 10px; margin: 8px 0; }
+  .foot { margin-top: 18px; font-size: 9.5px; color: #778; border-top: 1px solid #dde; padding-top: 6px; }
+  .kpi { display: flex; gap: 10px; margin: 8px 0; flex-wrap: wrap; }
+  .kpi div { flex: 1; min-width: 110px; background: #f2f6fb; border: 1px solid #dbe6f2;
+             border-radius: 6px; padding: 8px 10px; }
+  .kpi b { display: block; font-size: 17px; color: #1a4e8a; }
+  .kpi span { font-size: 10px; color: #667; }
+</style>
+
+<h1>UK Mobile Data Market — Brief &amp; Sample</h1>
+<div class="sub">Pricing · Handset ex-factory margins · Market &amp; marketing context &nbsp;|&nbsp; 6GGW / NetSwitch · prepared for Sami Leino · 31 Jul 2026</div>
+<span class="tag">measured = reported figure</span><span class="tag">modelled = computed from a stated assumption</span>
+
+<div class="kpi">
+  <div><b>£0.10–£1.67</b><span>SIM-only price per GB across the market</span></div>
+  <div><b>1.6–2.8×</b><span>handset RRP (ex-VAT) over bill-of-materials</span></div>
+  <div><b>£15.73</b><span>postpaid ARPU / month (2023)</span></div>
+  <div><b>83%</b><span>UK population on 5G standalone (2025)</span></div>
+</div>
+
+<h2>1 · SIM-only pricing (measured, mid-2026)</h2>
+<p class="sub">Headline list prices. Note how the four physical networks (EE, O2, Vodafone, Three) resell through MVNOs at a fraction of the per-GB rate.</p>
+<table>
+<tr><th>Operator</th><th>Type</th><th>Runs on</th><th>Plan</th><th class="r">Data</th><th class="r">£/mo</th><th class="r">£/GB</th></tr>
+<tr><td>Three</td><td>MNO</td><td>Three</td><td>Unlimited SIM</td><td class="r">∞</td><td class="r">22.00</td><td class="r">—</td></tr>
+<tr><td>Three</td><td>MNO</td><td>Three</td><td>10GB SIM</td><td class="r">10</td><td class="r">6.00</td><td class="r">0.60</td></tr>
+<tr><td>EE</td><td>MNO</td><td>EE</td><td>Unlimited SIM</td><td class="r">∞</td><td class="r">40.00</td><td class="r">—</td></tr>
+<tr><td>O2</td><td>MNO</td><td>O2</td><td>Entry SIM</td><td class="r">3</td><td class="r">5.80</td><td class="r">1.93</td></tr>
+<tr><td>Vodafone</td><td>MNO</td><td>Vodafone</td><td>Unlimited SIM</td><td class="r">∞</td><td class="r">26.00</td><td class="r">—</td></tr>
+<tr><td>Smarty</td><td>MVNO</td><td>Three</td><td>~30GB rolling</td><td class="r">30</td><td class="r">8.00</td><td class="r">0.27</td></tr>
+<tr><td>Smarty</td><td>MVNO</td><td>Three</td><td>Unlimited</td><td class="r">∞</td><td class="r">12.00</td><td class="r">—</td></tr>
+<tr><td>iD Mobile</td><td>MVNO</td><td>Three</td><td>120GB</td><td class="r">120</td><td class="r">12.00</td><td class="r">0.10</td></tr>
+<tr><td>iD Mobile</td><td>MVNO</td><td>Three</td><td>Unlimited</td><td class="r">∞</td><td class="r">16.00</td><td class="r">—</td></tr>
+<tr><td>Lebara</td><td>MVNO</td><td>Vodafone</td><td>5GB</td><td class="r">5</td><td class="r">5.00</td><td class="r">1.00</td></tr>
+<tr><td>Voxi</td><td>MVNO</td><td>Vodafone</td><td>Unlimited</td><td class="r">∞</td><td class="r">15.00</td><td class="r">—</td></tr>
+<tr><td>Tesco Mobile</td><td>MVNO</td><td>O2</td><td>5GB</td><td class="r">5</td><td class="r">7.50</td><td class="r">1.50</td></tr>
+<tr><td>ASDA Mobile</td><td>MVNO</td><td>Vodafone</td><td>3GB</td><td class="r">3</td><td class="r">5.00</td><td class="r">1.67</td></tr>
+</table>
+<p class="sub"><b>Read:</b> the cheapest effective data on the market is an MVNO large-bundle (iD Mobile 120GB ≈ £0.10/GB); MNO own-brand plans carry a 3–15× per-GB premium for brand + support + roaming certainty.</p>
+
+<h2>2 · Handset ex-factory margin waterfall</h2>
+<p class="sub">BOM = bill-of-materials (teardown estimate, measured). Ex-factory is <span class="m">modelled</span> as BOM × 1.30 (assembly, test, maker's margin). RRP shown ex-VAT as the trade value. FX 1 USD = £0.79.</p>
+<table>
+<tr><th>Model</th><th class="r">BOM £</th><th class="r">Ex-factory £*</th><th class="r">RRP ex-VAT £</th><th class="r">Gross margin</th><th class="r">Markup ×BOM</th></tr>
+<tr><td>iPhone 15 Pro Max</td><td class="r">440.82</td><td class="r">573.07</td><td class="r">999.17</td><td class="r">55.9%</td><td class="r">2.27×</td></tr>
+<tr><td>Galaxy S23 Ultra</td><td class="r">370.51</td><td class="r">481.66</td><td class="r">1040.83</td><td class="r">64.4%</td><td class="r">2.81×</td></tr>
+<tr><td class="m">Flagship (generic)</td><td class="r">410.80</td><td class="r">534.04</td><td class="r">958.33</td><td class="r">57.1%</td><td class="r">2.33×</td></tr>
+<tr><td class="m">Mid-range (generic)</td><td class="r">181.70</td><td class="r">236.21</td><td class="r">332.50</td><td class="r">45.4%</td><td class="r">1.83×</td></tr>
+<tr><td class="m">Budget (generic)</td><td class="r">82.95</td><td class="r">107.84</td><td class="r">132.50</td><td class="r">37.4%</td><td class="r">1.60×</td></tr>
+</table>
+<div class="note"><b>*Ex-factory is modelled, not a quoted number.</b> Real ex-factory prices are confidential. BOM excludes assembly, software, IP/royalties, logistics, warranty and marketing — the gross margin above is the pool those are paid from, not net profit. Change <code>EXFACTORY_MULT</code> in the generator to re-price the whole column.</div>
+
+<h2>3 · Market &amp; marketing context</h2>
+<table>
+<tr><th>Metric</th><th class="r">Value</th><th>Period</th><th>Segment</th><th>Basis</th></tr>
+<tr><td>Postpaid ARPU</td><td class="r">£15.73/mo</td><td>2023</td><td>postpaid</td><td>measured</td></tr>
+<tr><td>Prepaid ARPU</td><td class="r">£5.18/mo</td><td>2023</td><td>prepaid</td><td>measured</td></tr>
+<tr><td>VMO2 total connections</td><td class="r">45.7M</td><td>2024</td><td>all</td><td>measured</td></tr>
+<tr><td>5G SA population coverage</td><td class="r">83%</td><td>2025</td><td>all</td><td>measured</td></tr>
+<tr><td>Mobile data usage growth</td><td class="r">+18% YoY</td><td>2025</td><td>all</td><td>measured</td></tr>
+<tr><td>MVNO consumer share (Sky+Tesco)</td><td class="r">&gt;15%</td><td>2025</td><td>MVNO</td><td>measured</td></tr>
+<tr><td class="m">Marketing spend of revenue</td><td class="r">~12%</td><td>2026</td><td>all</td><td class="m">modelled</td></tr>
+<tr><td class="m">Cost per acquisition (SIM)</td><td class="r">~£18</td><td>2026</td><td>all</td><td class="m">modelled</td></tr>
+</table>
+<div class="note">The two marketing rows are <b>modelled placeholders</b> so the report has the dimension end-to-end. Send me your real marketing spend / CPA / ROI figures (or a source) and they drop straight in — nothing else changes.</div>
+
+<h2>How the sample feeds your report engine</h2>
+<p class="sub">The attached bundle is driven by one generator so the numbers are reproducible and easy to extend:</p>
+<table>
+<tr><th>File</th><th>What it is</th></tr>
+<tr><td>plans.csv / handsets.csv / market.csv</td><td>the three tidy tables above — feed these to the report engine</td></tr>
+<tr><td>uk_data_market_sample.json</td><td>all three tables + meta/assumptions in one JSON</td></tr>
+<tr><td>gen_sample.py</td><td>regenerates everything; <code>--check</code> verifies invariants; deterministic checksum</td></tr>
+<tr><td>data_dictionary.md</td><td>column-by-column schema + the modelling assumptions</td></tr>
+</table>
+
+<div class="foot">
+Sources: UK operator price lists &amp; comparison sites (mid-2026); handset BOM from TechInsights/IHS-style teardown estimates; Ofcom Connected Nations 2025 &amp; telecoms market data; Ofcom/Statista ARPU (2023). Measured figures are reported; modelled figures are computed from the stated assumptions (FX £0.79/USD, ex-factory ×1.30, VAT 20%) and are clearly flagged. This is a sample — say the word and I'll widen the plan set, add more handsets, or swap in your own marketing numbers.
+</div>
