@@ -1,0 +1,178 @@
+<meta charset="utf-8">
+<style>
+  @page { size: A4 portrait; margin: 16mm 15mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color:#222; margin:0; }
+  .page { page-break-after: always; }
+  .page:last-child { page-break-after: auto; }
+  h1 { color:#2f6ea5; font-size:24px; font-weight:800; margin:0 0 2px; }
+  .subtitle { color:#667; font-size:12px; margin-bottom:18px; }
+  h2 { color:#2f6ea5; font-size:16px; font-weight:800; margin:20px 0 3px; }
+  .lead { color:#5a6068; font-size:11px; margin:0 0 8px; }
+  .slabel { color:#3a6a94; font-size:12px; font-style:italic; font-weight:600; margin:8px 0 4px; }
+  table { width:100%; border-collapse:collapse; font-size:10.5px; margin:4px 0 6px;
+          border:1px solid #b8cfe0; }
+  th { background:#3d88c4; color:#fff; font-weight:700; text-align:center; padding:6px 7px;
+       border:1px solid #327ab5; line-height:1.25; }
+  th.l { text-align:left; }
+  td { padding:4px 7px; border:1px solid #dfe6ec; }
+  td.c { text-align:center; } td.r { text-align:right; }
+  tr:nth-child(even) td { background:#f4f8fb; }
+  .m { color:#e8833a; font-weight:700; }
+  img.chart { width:100%; margin:8px 0; }
+  .note { font-size:10.5px; color:#6a5a20; background:#fbf7e6; border-left:4px solid #e2c65a;
+          padding:8px 12px; border-radius:4px; margin:8px 0; }
+  ul.chk { margin:6px 0; padding-left:0; list-style:none; }
+  ul.chk li { font-size:11px; color:#3f4650; padding:3px 0 3px 20px; position:relative; }
+  ul.chk li:before { content:"▪"; color:#2f6ea5; position:absolute; left:2px; }
+  .foot { color:#9aa; font-size:9px; border-top:1px solid #e2e6ea; margin-top:14px; padding-top:5px; }
+  .kpirow { display:flex; gap:10px; margin:8px 0; }
+  .kpi { flex:1; border:1px solid #cfe0ee; border-radius:5px; padding:8px 10px; background:#f6fafd; }
+  .kpi b { display:block; color:#2f6ea5; font-size:20px; }
+  .kpi span { color:#667; font-size:10px; }
+</style>
+
+<!-- ===== PAGE 1 ===== -->
+<div class="page">
+  <h1>AI2ORBIT — UK Mobile Data Market Report</h1>
+  <div class="subtitle">Pricing · Handset Ex-Factory Margins · Marketing &amp; Market Context&nbsp;&nbsp;|&nbsp;&nbsp;2026-08-01</div>
+
+  <h2>SIM-Only Tariffs — UK Market</h2>
+  <div class="lead">Headline list prices, mid-2026. Every figure measured. ∞ = unlimited; £/GB blank where unlimited.</div>
+  <table>
+    <tr><th class="l">Operator</th><th>Type</th><th>Runs on</th><th class="l">Plan</th><th>Data<br>(GB)</th><th>Price<br>(£/mo)</th><th>Per GB<br>(£)</th><th>Contract<br>(months)</th><th>Roam<br>EU</th></tr>
+    <tr><td>Three</td><td class="c">MNO</td><td class="c">Three</td><td>Unlimited SIM</td><td class="c">∞</td><td class="r">22.00</td><td class="r">—</td><td class="c">24</td><td class="c">yes</td></tr>
+    <tr><td>Three</td><td class="c">MNO</td><td class="c">Three</td><td>10GB SIM</td><td class="c">10</td><td class="r">6.00</td><td class="r">0.60</td><td class="c">1</td><td class="c">yes</td></tr>
+    <tr><td>EE</td><td class="c">MNO</td><td class="c">EE</td><td>Unlimited SIM</td><td class="c">∞</td><td class="r">40.00</td><td class="r">—</td><td class="c">24</td><td class="c">yes</td></tr>
+    <tr><td>O2</td><td class="c">MNO</td><td class="c">O2</td><td>Entry SIM</td><td class="c">3</td><td class="r">5.80</td><td class="r">1.93</td><td class="c">1</td><td class="c">yes</td></tr>
+    <tr><td>Vodafone</td><td class="c">MNO</td><td class="c">Vodafone</td><td>Unlimited SIM</td><td class="c">∞</td><td class="r">26.00</td><td class="r">—</td><td class="c">24</td><td class="c">yes</td></tr>
+    <tr><td>Smarty</td><td class="c">MVNO</td><td class="c">Three</td><td>3GB rolling</td><td class="c">3</td><td class="r">3.90</td><td class="r">1.30</td><td class="c">1</td><td class="c">yes</td></tr>
+    <tr><td>Smarty</td><td class="c">MVNO</td><td class="c">Three</td><td>~30GB rolling</td><td class="c">30</td><td class="r">8.00</td><td class="r">0.27</td><td class="c">1</td><td class="c">yes</td></tr>
+    <tr><td>Smarty</td><td class="c">MVNO</td><td class="c">Three</td><td>Unlimited</td><td class="c">∞</td><td class="r">12.00</td><td class="r">—</td><td class="c">12</td><td class="c">yes</td></tr>
+    <tr><td>iD Mobile</td><td class="c">MVNO</td><td class="c">Three</td><td>120GB</td><td class="c">120</td><td class="r">12.00</td><td class="r">0.10</td><td class="c">1</td><td class="c">yes</td></tr>
+    <tr><td>iD Mobile</td><td class="c">MVNO</td><td class="c">Three</td><td>Unlimited</td><td class="c">∞</td><td class="r">16.00</td><td class="r">—</td><td class="c">1</td><td class="c">yes</td></tr>
+    <tr><td>Lebara</td><td class="c">MVNO</td><td class="c">Vodafone</td><td>5GB</td><td class="c">5</td><td class="r">5.00</td><td class="r">1.00</td><td class="c">1</td><td class="c">yes</td></tr>
+    <tr><td>Voxi</td><td class="c">MVNO</td><td class="c">Vodafone</td><td>Unlimited</td><td class="c">∞</td><td class="r">15.00</td><td class="r">—</td><td class="c">1</td><td class="c">yes</td></tr>
+    <tr><td>Tesco Mobile</td><td class="c">MVNO</td><td class="c">O2</td><td>5GB</td><td class="c">5</td><td class="r">7.50</td><td class="r">1.50</td><td class="c">12</td><td class="c">yes</td></tr>
+    <tr><td>ASDA Mobile</td><td class="c">MVNO</td><td class="c">Vodafone</td><td>3GB</td><td class="c">3</td><td class="r">5.00</td><td class="r">1.67</td><td class="c">1</td><td class="c">yes</td></tr>
+  </table>
+  <div class="lead"><b>Read:</b> the cheapest effective data on the market is an MVNO large bundle (iD Mobile 120GB ≈ £0.10/GB); network-owned own-brand plans carry a 3–15× per-GB premium for brand, support and roaming certainty.</div>
+  <div class="foot">AI2ORBIT PROJECT — UK Mobile Data Market Report — page 1</div>
+</div>
+
+<!-- ===== PAGE 2 ===== -->
+<div class="page">
+  <h2>UK SIM-Only Pricing — Charts</h2>
+  <div class="lead">Left: price per GB across finite-allowance plans. Right: monthly price of the unlimited tariffs. Colour = network-owned (MNO) vs reseller (MVNO).</div>
+  <img class="chart" src="chart_pricing.png">
+
+  <h2>Networks &amp; the MVNOs on Them</h2>
+  <div class="lead">Four physical networks carry every UK SIM; most value brands ride on them.</div>
+  <table>
+    <tr><th class="l">Host network</th><th>Own unlimited<br>(£/mo)</th><th class="l">Value brands hosted</th><th>Cheapest £/GB<br>on this network</th></tr>
+    <tr><td>Three</td><td class="r">22.00</td><td>Smarty, iD Mobile</td><td class="r">0.10</td></tr>
+    <tr><td>EE</td><td class="r">40.00</td><td>(EE own-brand only shown)</td><td class="r">—</td></tr>
+    <tr><td>Vodafone</td><td class="r">26.00</td><td>Voxi, Lebara, ASDA Mobile</td><td class="r">1.00</td></tr>
+    <tr><td>O2 (VMO2)</td><td class="r">—</td><td>Giffgaff, Tesco Mobile, Sky Mobile</td><td class="r">1.50</td></tr>
+  </table>
+  <div class="lead">Sky Mobile + Tesco Mobile alone hold &gt;15% of the consumer segment; VMO2 closed 2024 with 45.7M total connections.</div>
+  <div class="foot">AI2ORBIT PROJECT — UK Mobile Data Market Report — page 2</div>
+</div>
+
+<!-- ===== PAGE 3 ===== -->
+<div class="page">
+  <h2>Handset Ex-Factory Margins</h2>
+  <div class="slabel">Cost → ex-factory → RRP waterfall</div>
+  <div class="lead">BOM (bill-of-materials) measured from teardown estimates; ex-factory <span class="m">modelled</span> at BOM × 1.30 (assembly, test, maker's margin); RRP shown ex-VAT as the trade value. FX £0.79/USD, VAT 20%.</div>
+  <table>
+    <tr><th class="l">Model</th><th>BOM<br>(£)</th><th>Ex-factory*<br>(£)</th><th>RRP ex-VAT<br>(£)</th><th>Gross<br>margin</th><th>Markup<br>×BOM</th><th>Basis</th></tr>
+    <tr><td>iPhone 15 Pro Max</td><td class="r">440.82</td><td class="r">573.07</td><td class="r">999.17</td><td class="r">55.9%</td><td class="r">2.27×</td><td class="c">measured</td></tr>
+    <tr><td>Galaxy S23 Ultra</td><td class="r">370.51</td><td class="r">481.66</td><td class="r">1040.83</td><td class="r">64.4%</td><td class="r">2.81×</td><td class="c">measured</td></tr>
+    <tr><td class="m">Flagship (generic)</td><td class="r">410.80</td><td class="r">534.04</td><td class="r">958.33</td><td class="r">57.1%</td><td class="r">2.33×</td><td class="c m">modelled</td></tr>
+    <tr><td class="m">Mid-range (generic)</td><td class="r">181.70</td><td class="r">236.21</td><td class="r">332.50</td><td class="r">45.4%</td><td class="r">1.83×</td><td class="c m">modelled</td></tr>
+    <tr><td class="m">Budget (generic)</td><td class="r">82.95</td><td class="r">107.84</td><td class="r">132.50</td><td class="r">37.4%</td><td class="r">1.60×</td><td class="c m">modelled</td></tr>
+  </table>
+  <div class="note"><b>*Ex-factory is modelled, not a quoted number.</b> Real ex-factory prices are confidential. BOM excludes assembly, software, IP/royalties, logistics, warranty and marketing — so the gross margin above is the pool those are paid from, not net profit. One constant (EXFACTORY_MULT) re-prices the whole column.</div>
+  <div class="kpirow">
+    <div class="kpi"><b>2.3–2.8×</b><span>flagship RRP (ex-VAT) over BOM</span></div>
+    <div class="kpi"><b>56–64%</b><span>flagship gross margin of trade value</span></div>
+    <div class="kpi"><b>1.6×</b><span>budget-tier markup — margin thins downmarket</span></div>
+  </div>
+  <div class="foot">AI2ORBIT PROJECT — UK Mobile Data Market Report — page 3</div>
+</div>
+
+<!-- ===== PAGE 4 ===== -->
+<div class="page">
+  <h2>Handset Margins — Charts</h2>
+  <div class="lead">Left: how many times RRP (ex-VAT) sits above bill-of-materials. Right: gross margin of the ex-VAT trade value. Colour = measured vs modelled tier.</div>
+  <img class="chart" src="chart_handsets.png">
+  <ul class="chk">
+    <li>Flagships mark up roughly 2.3–2.8× their raw component cost.</li>
+    <li>The multiple compresses toward the budget tiers (~1.6×).</li>
+    <li>Measured rows are teardown-based; the three generic tiers are modelled and flagged.</li>
+    <li>BOM is the measured anchor — everything downstream is a stated model you can retune.</li>
+  </ul>
+  <div class="foot">AI2ORBIT PROJECT — UK Mobile Data Market Report — page 4</div>
+</div>
+
+<!-- ===== PAGE 5 ===== -->
+<div class="page">
+  <h2>Market &amp; Marketing Context</h2>
+  <div class="lead">Where the money and growth sit. The two marketing rows are modelled placeholders — replace with your own figures and they flow through unchanged.</div>
+  <table>
+    <tr><th class="l">Metric</th><th>Value</th><th class="l">Unit</th><th>Period</th><th class="l">Segment</th><th>Basis</th><th class="l">Source</th></tr>
+    <tr><td>Postpaid ARPU</td><td class="r">15.73</td><td>GBP/month</td><td class="c">2023</td><td>postpaid</td><td class="c">measured</td><td>Ofcom/Statista</td></tr>
+    <tr><td>Prepaid ARPU</td><td class="r">5.18</td><td>GBP/month</td><td class="c">2023</td><td>prepaid</td><td class="c">measured</td><td>Ofcom/Statista</td></tr>
+    <tr><td>VMO2 total connections</td><td class="r">45.7</td><td>million</td><td class="c">2024</td><td>all</td><td class="c">measured</td><td>Virgin Media O2</td></tr>
+    <tr><td>5G SA population coverage</td><td class="r">83</td><td>%</td><td class="c">2025</td><td>all</td><td class="c">measured</td><td>Ofcom CN 2025</td></tr>
+    <tr><td>Mobile data usage growth</td><td class="r">18</td><td>% YoY</td><td class="c">2025</td><td>all</td><td class="c">measured</td><td>Ofcom</td></tr>
+    <tr><td>MVNO consumer share (Sky+Tesco)</td><td class="r">&gt;15</td><td>%</td><td class="c">2025</td><td>MVNO</td><td class="c">measured</td><td>market reports</td></tr>
+    <tr><td class="m">Marketing spend of revenue</td><td class="r m">12</td><td>% (est)</td><td class="c">2026</td><td>all</td><td class="c m">modelled</td><td>placeholder</td></tr>
+    <tr><td class="m">Cost per acquisition (SIM)</td><td class="r m">18</td><td>GBP (est)</td><td class="c">2026</td><td>all</td><td class="c m">modelled</td><td>placeholder</td></tr>
+  </table>
+  <img class="chart" src="chart_market.png">
+  <div class="foot">AI2ORBIT PROJECT — UK Mobile Data Market Report — page 5</div>
+</div>
+
+<!-- ===== PAGE 6 ===== -->
+<div class="page">
+  <h2>The Report-Engine Sample Feed</h2>
+  <div class="lead">Everything in this report is driven by one deterministic generator so the numbers are reproducible and easy to widen (JSON checksum a792719cdd4e03a6).</div>
+  <table>
+    <tr><th class="l">File</th><th class="l">What it is</th></tr>
+    <tr><td>plans.csv</td><td>14 SIM-only tariffs with price-per-GB</td></tr>
+    <tr><td>handsets.csv</td><td>5 handset cost→ex-factory→RRP waterfalls</td></tr>
+    <tr><td>market.csv</td><td>8 market / marketing metrics</td></tr>
+    <tr><td>uk_data_market_sample.json</td><td>all three tables + meta &amp; assumptions</td></tr>
+    <tr><td>gen_sample.py</td><td>regenerates the CSVs + JSON; <code>--check</code> verifies invariants</td></tr>
+    <tr><td>gen_charts.py</td><td>builds the three charts in this report</td></tr>
+    <tr><td>data_dictionary.md</td><td>column-by-column schema + modelling assumptions</td></tr>
+  </table>
+  <h2 style="font-size:14px;">Honesty labels</h2>
+  <ul class="chk">
+    <li><b>measured</b> — a public / reported figure (see the source column).</li>
+    <li><b>modelled</b> — computed here from a stated assumption; not a quoted number. The ex-factory column and the two marketing rows are modelled and flagged.</li>
+  </ul>
+  <h2 style="font-size:14px;">To make v2 exact</h2>
+  <ul class="chk">
+    <li>Your report engine's expected schema / column names — I'll match it precisely.</li>
+    <li>Your own marketing figures (spend %, CPA, ROI) — they drop straight in.</li>
+  </ul>
+  <div class="foot">AI2ORBIT PROJECT — UK Mobile Data Market Report — page 6</div>
+</div>
+
+<!-- ===== PAGE 7 ===== -->
+<div class="page">
+  <h2>Sources &amp; Method</h2>
+  <div class="lead">Measured = reported figure. Modelled = computed from a stated assumption, clearly flagged.</div>
+  <ul class="chk">
+    <li>SIM-only pricing — UK operator price lists &amp; comparison sites, mid-2026 (measured).</li>
+    <li>Handset BOM — TechInsights / IHS-style teardown estimates (measured); ex-factory modelled at BOM × 1.30.</li>
+    <li>ARPU — Ofcom / Statista, 2023 (measured).</li>
+    <li>5G coverage &amp; data growth — Ofcom Connected Nations 2025 (measured).</li>
+    <li>MVNO share &amp; VMO2 connections — market reports / Virgin Media O2, 2024–25 (measured).</li>
+    <li>Marketing spend &amp; CPA — modelled placeholders, awaiting client figures.</li>
+  </ul>
+  <div class="note"><b>Modelling constants (all editable in gen_sample.py):</b> FX £0.79 / USD · ex-factory ×1.30 · VAT 20%. Change one and the whole dataset re-prices. This is a sample report — say the word and I'll widen the plan set, add handsets, or swap in your own marketing numbers, at whatever page length you want.</div>
+  <div class="foot">AI2ORBIT PROJECT — UK Mobile Data Market Report — page 7</div>
+</div>
