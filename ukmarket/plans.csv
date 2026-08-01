@@ -1,15 +1,19 @@
-operator,type,host_network,plan_name,data_gb,price_gbp_month,contract_months,price_per_gb_gbp,roaming_eu,basis,source
-Three,MNO,Three,Unlimited SIM,unlimited,22.0,24,,yes,measured,"operator price lists / UK comparison sites, mid-2026"
-Three,MNO,Three,10GB SIM,10,6.0,1,0.6,yes,measured,"operator price lists / UK comparison sites, mid-2026"
-EE,MNO,EE,Unlimited SIM,unlimited,40.0,24,,yes,measured,"operator price lists / UK comparison sites, mid-2026"
-O2,MNO,O2,Entry SIM,3,5.8,1,1.93,yes,measured,"operator price lists / UK comparison sites, mid-2026"
-Vodafone,MNO,Vodafone,Unlimited SIM,unlimited,26.0,24,,yes,measured,"operator price lists / UK comparison sites, mid-2026"
-Smarty,MVNO,Three,3GB rolling,3,3.9,1,1.3,yes,measured,"operator price lists / UK comparison sites, mid-2026"
-Smarty,MVNO,Three,~30GB rolling,30,8.0,1,0.27,yes,measured,"operator price lists / UK comparison sites, mid-2026"
-Smarty,MVNO,Three,Unlimited,unlimited,12.0,12,,yes,measured,"operator price lists / UK comparison sites, mid-2026"
-iD Mobile,MVNO,Three,120GB,120,12.0,1,0.1,yes,measured,"operator price lists / UK comparison sites, mid-2026"
-iD Mobile,MVNO,Three,Unlimited,unlimited,16.0,1,,yes,measured,"operator price lists / UK comparison sites, mid-2026"
-Lebara,MVNO,Vodafone,5GB,5,5.0,1,1.0,yes,measured,"operator price lists / UK comparison sites, mid-2026"
-Voxi,MVNO,Vodafone,Unlimited,unlimited,15.0,1,,yes,measured,"operator price lists / UK comparison sites, mid-2026"
-Tesco Mobile,MVNO,O2,5GB,5,7.5,12,1.5,yes,measured,"operator price lists / UK comparison sites, mid-2026"
-ASDA Mobile,MVNO,Vodafone,3GB,3,5.0,1,1.67,yes,measured,"operator price lists / UK comparison sites, mid-2026"
+operator,type,host_network,plan_name,data_gb,price_gbp_month,price_per_gb_gbp,contract_months,basis
+Three,MNO,Three,Unlimited SIM,unlimited,22.0,,24,measured
+Three,MNO,Three,10GB SIM,10,6.0,0.6,1,measured
+EE,MNO,EE,Unlimited SIM,unlimited,40.0,,24,measured
+EE,MNO,EE,25GB SIM,25,20.0,0.8,24,modelled
+O2,MNO,O2,Entry SIM,3,5.8,1.93,1,measured
+O2,MNO,O2,Unlimited SIM,unlimited,29.0,,24,modelled
+Vodafone,MNO,Vodafone,Unlimited SIM,unlimited,26.0,,24,measured
+Smarty,MVNO,Three,3GB rolling,3,3.9,1.3,1,measured
+Smarty,MVNO,Three,~30GB rolling,30,8.0,0.27,1,measured
+Smarty,MVNO,Three,Unlimited,unlimited,12.0,,12,measured
+iD Mobile,MVNO,Three,120GB,120,12.0,0.1,1,measured
+iD Mobile,MVNO,Three,Unlimited,unlimited,16.0,,1,measured
+Giffgaff,MVNO,O2,20GB,20,10.0,0.5,1,measured
+Giffgaff,MVNO,O2,Unlimited (18m),unlimited,14.0,,18,measured
+Lebara,MVNO,Vodafone,5GB,5,5.0,1.0,1,measured
+Voxi,MVNO,Vodafone,Unlimited,unlimited,15.0,,1,measured
+Tesco Mobile,MVNO,O2,5GB,5,7.5,1.5,12,measured
+ASDA Mobile,MVNO,Vodafone,3GB,3,5.0,1.67,1,measured

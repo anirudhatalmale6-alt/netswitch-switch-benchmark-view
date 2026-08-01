@@ -1,6 +1,12 @@
-model,brand,launch_year,bom_usd,bom_gbp,est_exfactory_usd,est_exfactory_gbp,uk_rrp_gbp_incvat,rrp_ex_vat_gbp,gross_margin_pct,markup_x_over_bom,basis,source
-iPhone 15 Pro Max,Apple,2023,558.0,440.82,725.4,573.07,1199.0,999.17,55.9,2.27,measured,TechInsights/IHS-style teardown est. 2025
-Galaxy S23 Ultra,Samsung,2023,469.0,370.51,609.7,481.66,1249.0,1040.83,64.4,2.81,measured,teardown est.; 'sells ~154% over mfg cost'
-Flagship (generic),-,2026,520.0,410.8,676.0,534.04,1150.0,958.33,57.1,2.33,modelled,modelled tier midpoint
-Mid-range (generic),-,2026,230.0,181.7,299.0,236.21,399.0,332.5,45.4,1.83,modelled,modelled tier midpoint
-Budget (generic),-,2026,105.0,82.95,136.5,107.84,159.0,132.5,37.4,1.6,modelled,modelled tier midpoint
+model,brand,year,bom_usd,bom_gbp,est_exfactory_gbp,rrp_incvat_gbp,rrp_exvat_gbp,gross_margin_pct,markup_x,basis
+iPhone 15 Pro Max,Apple,2023,558.0,440.82,573.07,1199.0,999.17,55.9,2.27,measured
+iPhone 16 Pro Max,Apple,2024,485.0,383.15,498.1,1199.0,999.17,61.7,2.61,measured
+Pixel 9 Pro,Google,2024,406.0,320.74,416.96,999.0,832.5,61.5,2.6,measured
+Galaxy S23 Ultra,Samsung,2023,469.0,370.51,481.66,1249.0,1040.83,64.4,2.81,measured
+Galaxy S24 Ultra,Samsung,2024,512.0,404.48,525.82,1249.0,1040.83,61.1,2.57,measured
+Galaxy S25 Ultra,Samsung,2025,549.0,433.71,563.82,1249.0,1040.83,58.3,2.4,measured
+Flagship (generic),-,2026,520.0,410.8,534.04,1150.0,958.33,57.1,2.33,modelled
+Upper-mid (generic),-,2026,300.0,237.0,308.1,599.0,499.17,52.5,2.11,modelled
+Mid-range (generic),-,2026,230.0,181.7,236.21,399.0,332.5,45.4,1.83,modelled
+Budget (generic),-,2026,105.0,82.95,107.84,159.0,132.5,37.4,1.6,modelled
+Entry (generic),-,2026,70.0,55.3,71.89,109.0,90.83,39.1,1.64,modelled
