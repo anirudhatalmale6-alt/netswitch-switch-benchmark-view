@@ -1,0 +1,8 @@
+cabin_class,operator,occupancy,from_usd,mult_over_inside,basis,note
+Standard inside,Tallink Silja / Viking,4,46,1.0,measured,"cheapest berth, no window"
+Standard sea-view,Tallink Silja / Viking,4,90,1.96,modelled,outside cabin midpoint
+Commodore,Tallink Silja,2,303,6.59,measured,"double bed, breakfast, aqua zone"
+Deluxe,Tallink Silja,3,409,8.89,measured,"upper-deck, breakfast, aqua zone"
+Suite / Executive Suite,Tallink Silja,2,700,15.22,modelled,premium suite midpoint
+Top suite (peak),Tallink Silja,2,2338,50.83,measured,observed high-end cabin price
+Cabin average (all classes),route mean,0,194,4.22,measured,reported route average

@@ -1,0 +1,8 @@
+route,carriers,econ_return_usd,biz_published_usd,biz_consolidator_usd,mult_published,mult_consolidator,basis
+New York — London,BA / Virgin / AA,700,3500,1900,5.0,2.71,measured
+New York — Dubai,Emirates / Qatar,950,4500,2485,4.74,2.62,measured
+New York — Singapore,Singapore Airlines,1150,4650,2565,4.04,2.23,measured
+London — New York,BA / Virgin,620,4000,2100,6.45,3.39,modelled
+London — Singapore,SIA / BA,900,4200,2400,4.67,2.67,modelled
+London — Dubai,Emirates,520,2600,1500,5.0,2.88,modelled
+US long-haul (average),all carriers,1000,5300,3000,5.3,3.0,measured
