@@ -1,0 +1,328 @@
+<meta charset="utf-8">
+<style>
+  @page { size: 960px 540px; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html,body { font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color:#2a2f36; }
+  .slide { position: relative; width: 960px; height: 540px; overflow: hidden;
+           background:#ececee; page-break-after: always; }
+  .slide:last-child { page-break-after: auto; }
+
+  /* header band */
+  .hd { height: 74px; background: linear-gradient(90deg,#0c6b6b 0%,#14a293 100%);
+        display:flex; align-items:center; justify-content:center; }
+  .hd h1 { color:#fff; font-size:30px; font-weight:800; letter-spacing:.3px; }
+  .body { padding: 22px 34px 0; height: calc(540px - 74px - 30px); }
+  .foot { position:absolute; bottom:0; left:0; right:0; height:30px; background:#f1f1f3;
+          border-top:1px solid #dcdce0; display:flex; align-items:center; padding:0 34px;
+          font-size:10px; letter-spacing:1px; color:#9096a0; text-transform:uppercase; }
+
+  .sub { text-align:center; font-size:15px; color:#4a5058; margin-bottom:8px; }
+  .rule { height:4px; width:62%; margin:0 0 18px; border-radius:3px;
+          background: linear-gradient(90deg,#ec8a3c 0%,#0e8f88 100%); }
+
+  /* section head with icon */
+  .sec { display:flex; align-items:center; gap:12px; margin: 4px 0 12px; }
+  .ic { width:40px; height:40px; border-radius:50%; flex:none; display:flex;
+        align-items:center; justify-content:center; }
+  .ic svg { width:20px; height:20px; fill:#fff; }
+  .ic.or { background:#ec8a3c; } .ic.te { background:#12938a; }
+  .ic.bl { background:#4a90e2; } .ic.rd { background:#e05a5a; } .ic.gr { background:#3faa6a; }
+  .sh { color:#0e7c78; font-size:21px; font-weight:800; }
+  .sh small { display:block; color:#6a7078; font-size:12px; font-weight:500; margin-top:2px; }
+
+  /* cards */
+  .card { background:#fff; border-radius:8px; box-shadow:0 1px 4px rgba(20,40,60,.12);
+          padding:12px 16px; margin-bottom:10px; border-left:5px solid #12938a; }
+  .card.or{border-left-color:#ec8a3c} .card.te{border-left-color:#12938a}
+  .card.bl{border-left-color:#4a90e2} .card.rd{border-left-color:#e05a5a} .card.gr{border-left-color:#3faa6a}
+  .crow { display:flex; align-items:center; gap:14px; }
+  .cname { font-size:18px; font-weight:800; color:#0e7c78; min-width:130px; }
+  .cdesc { font-size:13px; color:#454b53; }
+
+  /* two-col content table */
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px 44px; margin-top:6px; }
+  .tocsec .th { color:#0e7c78; font-size:18px; font-weight:800; }
+  .tocsec ul { margin:6px 0 0 6px; list-style:none; }
+  .tocsec li { font-size:12.5px; color:#3f4650; padding:2px 0 2px 14px; position:relative; }
+  .tocsec li:before { content:"•"; color:#ec8a3c; position:absolute; left:0; font-weight:800; }
+
+  table.t { width:100%; border-collapse:collapse; font-size:11.5px; margin-top:4px; }
+  table.t th { background:#0e7c78; color:#fff; text-align:left; padding:5px 8px; font-weight:600; }
+  table.t td { padding:4px 8px; border-bottom:1px solid #e2e5ea; }
+  table.t tr:nth-child(even) td { background:#f5f7f9; }
+  .r{ text-align:right; } .m{ color:#b57e12; font-weight:700; }
+
+  /* stat callout */
+  .stat { background:#fff; border-radius:8px; box-shadow:0 1px 4px rgba(20,40,60,.12);
+          padding:16px 20px; margin-bottom:12px; }
+  .stat .lbl { color:#0e7c78; font-size:15px; font-weight:800; display:flex; align-items:center; gap:8px; }
+  .stat .big { color:#ec7f2c; font-size:40px; font-weight:800; line-height:1.05; }
+  .stat .u { color:#5a6068; font-size:13px; }
+  .chk li{ list-style:none; font-size:13px; color:#3f4650; padding:3px 0 3px 22px; position:relative; }
+  .chk li:before{ content:"✓"; position:absolute; left:0; color:#12938a; font-weight:800; }
+
+  .note { font-size:11px; color:#6a5a20; background:#fbf7e6; border-left:4px solid #e2c65a;
+          padding:8px 12px; border-radius:4px; margin-top:6px; }
+  .cols { display:grid; grid-template-columns:1.15fr .85fr; gap:20px; }
+
+  /* cover */
+  .cover { background:#101f33; }
+  .cover .dots { position:absolute; inset:0;
+     background-image:radial-gradient(#33506e 1px, transparent 1px);
+     background-size:22px 22px; opacity:.35; }
+  .cv-in { position:absolute; inset:0; display:flex; flex-direction:column;
+           align-items:center; justify-content:center; }
+  .wordmark { font-size:44px; font-weight:800; letter-spacing:3px;
+     background:linear-gradient(90deg,#d98b3a 0%,#9aa35a 45%,#3bb0a0 100%);
+     -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .cv-title { color:#fff; font-size:30px; font-weight:800; letter-spacing:1px; margin-top:8px; }
+  .cv-uline { width:120px; height:3px; background:#ec8a3c; margin:10px 0 16px; }
+  .cv-tag { color:#c4cdd8; font-size:15px; }
+  .cv-icons { display:flex; gap:22px; margin-bottom:14px; }
+  .cv-icons svg{ width:36px; height:36px; fill:#2bb6a6; }
+  .cv-date { position:absolute; right:34px; bottom:22px; color:#8493a6;
+             font-size:12px; font-style:italic; }
+  .frame { position:absolute; border-color:#e0863a; }
+  .fr1{ left:150px; top:78px; width:60px; height:170px; border-left:3px solid #cf7f38; border-top:3px solid #cf7f38;}
+  .fr2{ right:150px; bottom:70px; width:60px; height:170px; border-right:3px solid #17968c; border-bottom:3px solid #17968c;}
+  .topline{ position:absolute; left:34px; right:34px; top:60px; height:2px;
+            background:linear-gradient(90deg,transparent,#cf7f38,transparent); }
+  .botline{ position:absolute; left:34px; right:34px; bottom:52px; height:2px;
+            background:linear-gradient(90deg,transparent,#17968c,transparent); }
+</style>
+
+<!-- ========== 1 · COVER ========== -->
+<div class="slide cover">
+  <div class="dots"></div>
+  <div class="topline"></div><div class="botline"></div>
+  <div class="frame fr1"></div><div class="frame fr2"></div>
+  <div class="cv-in">
+    <div class="cv-icons">
+      <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0-9 9h2a7 7 0 0 1 14 0h2a9 9 0 0 0-9-9zm0 4a5 5 0 0 0-5 5h2a3 3 0 0 1 6 0h2a5 5 0 0 0-5-5zm0 4a1.5 1.5 0 0 0-1.5 1.5V21h3v-8.5A1.5 1.5 0 0 0 12 11z"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm0 3v12h10V5H7zm5 13.2a.9.9 0 1 0 0 1.8.9.9 0 0 0 0-1.8z"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M10 3h4v4h3v3h3v4h-4v-2h-2v2h-4v-2H8v2H4v-4h3V7h3V3zm1 1v6h2V4h-2z"/></svg>
+    </div>
+    <div class="wordmark">AI2ORBIT PROJECT</div>
+    <div class="cv-title">UK MOBILE DATA MARKET</div>
+    <div class="cv-uline"></div>
+    <div class="cv-tag">Pricing · Handset Ex-Factory Margins · Marketing &amp; Market Context</div>
+  </div>
+  <div class="cv-date">Report Generated: 2026-08-01</div>
+</div>
+
+<!-- ========== 2 · CONTENT TABLE ========== -->
+<div class="slide">
+  <div class="hd"><h1>Content Table</h1></div>
+  <div class="body">
+    <div style="font-size:16px;color:#2a2f36;font-weight:700;margin-bottom:2px;">AI2ORBIT PROJECT — UK MOBILE DATA MARKET</div>
+    <div style="font-size:12.5px;color:#5a6068;margin-bottom:8px;">A market analysis of UK mobile data pricing, handset margins and marketing — with a machine-readable sample feed</div>
+    <div class="rule" style="margin-bottom:14px;"></div>
+    <div class="grid2">
+      <div class="tocsec"><div style="display:flex;align-items:center;gap:10px;"><span class="ic or"><svg viewBox="0 0 24 24"><path d="M4 20h3v-7H4v7zm6 0h3V4h-3v16zm6 0h3v-11h-3v11z"/></svg></span><span class="th">SIM-Only Pricing Landscape</span></div>
+        <ul><li>Four physical networks + MVNOs</li><li>Headline £/month by tariff</li><li>Price-per-GB spread</li><li>Where the cheap data really is</li></ul></div>
+      <div class="tocsec"><div style="display:flex;align-items:center;gap:10px;"><span class="ic te"><svg viewBox="0 0 24 24"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm0 3v12h10V5H7z"/></svg></span><span class="th">Handset Ex-Factory Margins</span></div>
+        <ul><li>Bill-of-materials → ex-factory → RRP</li><li>Gross margin &amp; markup ×BOM</li><li>iPhone / Galaxy worked examples</li><li>Modelled vs measured, flagged</li></ul></div>
+      <div class="tocsec"><div style="display:flex;align-items:center;gap:10px;"><span class="ic bl"><svg viewBox="0 0 24 24"><path d="M3 13h4v8H3v-8zm7-9h4v17h-4V4zm7 5h4v12h-4V9z"/></svg></span><span class="th">Market &amp; Marketing Context</span></div>
+        <ul><li>ARPU postpaid / prepaid</li><li>5G coverage &amp; data growth</li><li>MVNO consumer share</li><li>Marketing spend &amp; CPA (your inputs)</li></ul></div>
+      <div class="tocsec"><div style="display:flex;align-items:center;gap:10px;"><span class="ic gr"><svg viewBox="0 0 24 24"><path d="M4 4h16v4H4V4zm0 6h16v4H4v-4zm0 6h16v4H4v-4zM7 5.5A.9.9 0 1 0 7 7a.9.9 0 0 0 0-1.5z"/></svg></span><span class="th">Report-Engine Sample Feed</span></div>
+        <ul><li>Three tidy CSV tables + JSON</li><li>One deterministic generator</li><li>Data dictionary &amp; assumptions</li><li>How to widen it for v2</li></ul></div>
+    </div>
+  </div>
+  <div class="foot">AI2ORBIT PROJECT — UK MOBILE DATA MARKET</div>
+</div>
+
+<!-- ========== 3 · PRICING LANDSCAPE (chart) ========== -->
+<div class="slide">
+  <div class="hd"><h1>SIM-Only Pricing Landscape</h1></div>
+  <div class="body">
+    <div class="sec"><span class="ic or"><svg viewBox="0 0 24 24"><path d="M4 20h3v-7H4v7zm6 0h3V4h-3v16zm6 0h3v-11h-3v11z"/></svg></span>
+      <div class="sh">Price per GB — the real spread<small>Cheapest effective data is an MVNO large bundle; own-brand MNO plans carry a big per-GB premium</small></div></div>
+    <div class="cols">
+      <div>
+        <svg viewBox="0 0 470 250" style="width:100%;">
+          <defs><linearGradient id="bar" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0" stop-color="#12938a"/><stop offset="1" stop-color="#ec8a3c"/></linearGradient></defs>
+          <line x1="60" y1="10" x2="60" y2="210" stroke="#b8bcc4"/><line x1="60" y1="210" x2="460" y2="210" stroke="#b8bcc4"/>
+          <text x="14" y="120" transform="rotate(-90 14,120)" font-size="10" fill="#6a7078">£ per GB</text>
+          <!-- 7 bars, scale: £2.0 => 200px. h = val/2.0*200 -->
+          <!-- iD 0.10 -->
+          <rect x="72"  y="200" width="42" height="10"  fill="url(#bar)"/><text x="93"  y="196" font-size="10" fill="#3a3f47" text-anchor="middle">0.10</text><text x="93"  y="224" font-size="9" fill="#5a6068" text-anchor="middle">iD 120GB</text>
+          <rect x="128" y="183" width="42" height="27"  fill="url(#bar)"/><text x="149" y="179" font-size="10" fill="#3a3f47" text-anchor="middle">0.27</text><text x="149" y="224" font-size="9" fill="#5a6068" text-anchor="middle">Smarty 30GB</text>
+          <rect x="184" y="150" width="42" height="60"  fill="url(#bar)"/><text x="205" y="146" font-size="10" fill="#3a3f47" text-anchor="middle">0.60</text><text x="205" y="224" font-size="9" fill="#5a6068" text-anchor="middle">Three 10GB</text>
+          <rect x="240" y="110" width="42" height="100" fill="url(#bar)"/><text x="261" y="106" font-size="10" fill="#3a3f47" text-anchor="middle">1.00</text><text x="261" y="224" font-size="9" fill="#5a6068" text-anchor="middle">Lebara 5GB</text>
+          <rect x="296" y="60"  width="42" height="150" fill="url(#bar)"/><text x="317" y="56"  font-size="10" fill="#3a3f47" text-anchor="middle">1.50</text><text x="317" y="224" font-size="9" fill="#5a6068" text-anchor="middle">Tesco 5GB</text>
+          <rect x="352" y="43"  width="42" height="167" fill="url(#bar)"/><text x="373" y="39"  font-size="10" fill="#3a3f47" text-anchor="middle">1.67</text><text x="373" y="224" font-size="9" fill="#5a6068" text-anchor="middle">ASDA 3GB</text>
+          <rect x="408" y="17"  width="42" height="193" fill="url(#bar)"/><text x="429" y="13"  font-size="10" fill="#3a3f47" text-anchor="middle">1.93</text><text x="429" y="224" font-size="9" fill="#5a6068" text-anchor="middle">O2 3GB</text>
+        </svg>
+      </div>
+      <div>
+        <div class="stat" style="padding:14px 18px;">
+          <div class="lbl">Widest per-GB gap</div>
+          <div class="big">19×</div>
+          <div class="u">O2 3GB (£1.93/GB) vs iD Mobile 120GB (£0.10/GB)</div>
+        </div>
+        <ul class="chk">
+          <li>Networks: EE, O2, Vodafone, Three</li>
+          <li>MVNOs resell the same masts far cheaper</li>
+          <li>Big bundles crush the per-GB rate</li>
+          <li>All figures measured, mid-2026 list prices</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="foot">AI2ORBIT PROJECT — UK MOBILE DATA MARKET</div>
+</div>
+
+<!-- ========== 4 · OPERATORS & MVNOs ========== -->
+<div class="slide">
+  <div class="hd"><h1>Networks &amp; the MVNOs on Them</h1></div>
+  <div class="body">
+    <div class="sub">Four physical networks carry every SIM in the UK — most value brands ride on them</div>
+    <div class="rule"></div>
+    <div class="card or"><div class="crow"><div class="cname">EE / Three</div><div class="cdesc">The two premium-coverage MNOs. Three is the price leader (unlimited £22); EE the priciest (unlimited £40). Smarty &amp; iD Mobile resell Three from £3.90.</div></div></div>
+    <div class="card te"><div class="crow"><div class="cname">Vodafone</div><div class="cdesc">Unlimited £26. Hosts Voxi (unlimited £15), Lebara (5GB £5) and ASDA Mobile — value brands on Vodafone masts.</div></div></div>
+    <div class="card bl"><div class="crow"><div class="cname">O2 (VMO2)</div><div class="cdesc">Entry SIM from £5.80, EU roaming across the range. Hosts Giffgaff and Tesco Mobile; VMO2 closed 2024 with 45.7M connections.</div></div></div>
+    <div class="card gr"><div class="crow"><div class="cname">MVNO layer</div><div class="cdesc">Sky Mobile + Tesco Mobile alone hold &gt;15% of the consumer segment — the cheapest per-GB data in the market lives here.</div></div></div>
+  </div>
+  <div class="foot">AI2ORBIT PROJECT — UK MOBILE DATA MARKET</div>
+</div>
+
+<!-- ========== 5 · PRICING TABLE ========== -->
+<div class="slide">
+  <div class="hd"><h1>SIM-Only Tariffs (Measured)</h1></div>
+  <div class="body">
+    <div class="sub">Headline list prices, mid-2026 · ∞ = unlimited · £/GB blank where unlimited</div>
+    <div class="rule"></div>
+    <table class="t">
+      <tr><th>Operator</th><th>Type</th><th>Runs on</th><th>Plan</th><th class="r">Data</th><th class="r">£/mo</th><th class="r">£/GB</th><th>Roam EU</th></tr>
+      <tr><td>Three</td><td>MNO</td><td>Three</td><td>Unlimited SIM</td><td class="r">∞</td><td class="r">22.00</td><td class="r">—</td><td>yes</td></tr>
+      <tr><td>EE</td><td>MNO</td><td>EE</td><td>Unlimited SIM</td><td class="r">∞</td><td class="r">40.00</td><td class="r">—</td><td>yes</td></tr>
+      <tr><td>O2</td><td>MNO</td><td>O2</td><td>Entry SIM</td><td class="r">3</td><td class="r">5.80</td><td class="r">1.93</td><td>yes</td></tr>
+      <tr><td>Vodafone</td><td>MNO</td><td>Vodafone</td><td>Unlimited SIM</td><td class="r">∞</td><td class="r">26.00</td><td class="r">—</td><td>yes</td></tr>
+      <tr><td>Smarty</td><td>MVNO</td><td>Three</td><td>~30GB rolling</td><td class="r">30</td><td class="r">8.00</td><td class="r">0.27</td><td>yes</td></tr>
+      <tr><td>iD Mobile</td><td>MVNO</td><td>Three</td><td>120GB</td><td class="r">120</td><td class="r">12.00</td><td class="r">0.10</td><td>yes</td></tr>
+      <tr><td>iD Mobile</td><td>MVNO</td><td>Three</td><td>Unlimited</td><td class="r">∞</td><td class="r">16.00</td><td class="r">—</td><td>yes</td></tr>
+      <tr><td>Lebara</td><td>MVNO</td><td>Vodafone</td><td>5GB</td><td class="r">5</td><td class="r">5.00</td><td class="r">1.00</td><td>yes</td></tr>
+      <tr><td>Voxi</td><td>MVNO</td><td>Vodafone</td><td>Unlimited</td><td class="r">∞</td><td class="r">15.00</td><td class="r">—</td><td>yes</td></tr>
+      <tr><td>Tesco Mobile</td><td>MVNO</td><td>O2</td><td>5GB</td><td class="r">5</td><td class="r">7.50</td><td class="r">1.50</td><td>yes</td></tr>
+      <tr><td>ASDA Mobile</td><td>MVNO</td><td>Vodafone</td><td>3GB</td><td class="r">3</td><td class="r">5.00</td><td class="r">1.67</td><td>yes</td></tr>
+    </table>
+  </div>
+  <div class="foot">AI2ORBIT PROJECT — UK MOBILE DATA MARKET</div>
+</div>
+
+<!-- ========== 6 · HANDSET MARGINS ========== -->
+<div class="slide">
+  <div class="hd"><h1>Handset Ex-Factory Margins</h1></div>
+  <div class="body">
+    <div class="sec"><span class="ic te"><svg viewBox="0 0 24 24"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm0 3v12h10V5H7z"/></svg></span>
+      <div class="sh">Cost → ex-factory → RRP waterfall<small>BOM measured; ex-factory modelled at BOM × 1.30; RRP shown ex-VAT · FX £0.79/USD</small></div></div>
+    <table class="t">
+      <tr><th>Model</th><th class="r">BOM £</th><th class="r">Ex-factory £*</th><th class="r">RRP ex-VAT £</th><th class="r">Gross margin</th><th class="r">Markup ×BOM</th><th>Basis</th></tr>
+      <tr><td>iPhone 15 Pro Max</td><td class="r">440.82</td><td class="r">573.07</td><td class="r">999.17</td><td class="r">55.9%</td><td class="r">2.27×</td><td>measured</td></tr>
+      <tr><td>Galaxy S23 Ultra</td><td class="r">370.51</td><td class="r">481.66</td><td class="r">1040.83</td><td class="r">64.4%</td><td class="r">2.81×</td><td>measured</td></tr>
+      <tr><td class="m">Flagship (generic)</td><td class="r">410.80</td><td class="r">534.04</td><td class="r">958.33</td><td class="r">57.1%</td><td class="r">2.33×</td><td class="m">modelled</td></tr>
+      <tr><td class="m">Mid-range (generic)</td><td class="r">181.70</td><td class="r">236.21</td><td class="r">332.50</td><td class="r">45.4%</td><td class="r">1.83×</td><td class="m">modelled</td></tr>
+      <tr><td class="m">Budget (generic)</td><td class="r">82.95</td><td class="r">107.84</td><td class="r">132.50</td><td class="r">37.4%</td><td class="r">1.60×</td><td class="m">modelled</td></tr>
+    </table>
+    <div class="note"><b>*Ex-factory is modelled, not a quoted number.</b> Real ex-factory prices are confidential. BOM excludes assembly, software, IP/royalties, logistics, warranty and marketing — the gross margin is the pool those are paid from, not net profit.</div>
+  </div>
+  <div class="foot">AI2ORBIT PROJECT — UK MOBILE DATA MARKET</div>
+</div>
+
+<!-- ========== 7 · MARGIN CHART ========== -->
+<div class="slide">
+  <div class="hd"><h1>How Much Above Cost Phones Sell</h1></div>
+  <div class="body">
+    <div class="cols">
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#2a2f36;margin:6px 0 4px;">RRP (ex-VAT) as a multiple of bill-of-materials</div>
+        <svg viewBox="0 0 470 250" style="width:100%;">
+          <defs><linearGradient id="bar2" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0" stop-color="#12938a"/><stop offset="1" stop-color="#ec8a3c"/></linearGradient></defs>
+          <line x1="60" y1="10" x2="60" y2="210" stroke="#b8bcc4"/><line x1="60" y1="210" x2="460" y2="210" stroke="#b8bcc4"/>
+          <text x="14" y="130" transform="rotate(-90 14,130)" font-size="10" fill="#6a7078">× over BOM</text>
+          <!-- scale 3.0 => 200px : h = v/3*200 -->
+          <rect x="80"  y="59"  width="48" height="151" fill="url(#bar2)"/><text x="104" y="55"  font-size="10" fill="#3a3f47" text-anchor="middle">2.27×</text><text x="104" y="224" font-size="8.5" fill="#5a6068" text-anchor="middle">iPhone15PM</text>
+          <rect x="150" y="23"  width="48" height="187" fill="url(#bar2)"/><text x="174" y="19"  font-size="10" fill="#3a3f47" text-anchor="middle">2.81×</text><text x="174" y="224" font-size="8.5" fill="#5a6068" text-anchor="middle">S23 Ultra</text>
+          <rect x="220" y="55"  width="48" height="155" fill="url(#bar2)"/><text x="244" y="51"  font-size="10" fill="#3a3f47" text-anchor="middle">2.33×</text><text x="244" y="224" font-size="8.5" fill="#5a6068" text-anchor="middle">Flagship*</text>
+          <rect x="290" y="88"  width="48" height="122" fill="url(#bar2)"/><text x="314" y="84"  font-size="10" fill="#3a3f47" text-anchor="middle">1.83×</text><text x="314" y="224" font-size="8.5" fill="#5a6068" text-anchor="middle">Mid*</text>
+          <rect x="360" y="103" width="48" height="107" fill="url(#bar2)"/><text x="384" y="99"  font-size="10" fill="#3a3f47" text-anchor="middle">1.60×</text><text x="384" y="224" font-size="8.5" fill="#5a6068" text-anchor="middle">Budget*</text>
+        </svg>
+      </div>
+      <div>
+        <div class="stat"><div class="lbl">Flagship gross margin</div><div class="big">56–64%</div><div class="u">of ex-VAT trade value, over raw BOM</div></div>
+        <ul class="chk">
+          <li>Flagships mark up ~2.3–2.8× BOM</li>
+          <li>Margin thins toward budget tiers</li>
+          <li>* modelled tiers, clearly flagged</li>
+          <li>Change one constant to re-price all</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="foot">AI2ORBIT PROJECT — UK MOBILE DATA MARKET</div>
+</div>
+
+<!-- ========== 8 · MARKET & MARKETING ========== -->
+<div class="slide">
+  <div class="hd"><h1>Market &amp; Marketing Context</h1></div>
+  <div class="body">
+    <div class="sub">Where the money and the growth sit — with two slots reserved for your marketing figures</div>
+    <div class="rule"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+      <div class="stat"><div class="lbl">Postpaid ARPU</div><div class="big">£15.73</div><div class="u">per month · 2023 · prepaid £5.18</div></div>
+      <div class="stat"><div class="lbl">5G SA coverage</div><div class="big">83%</div><div class="u">of UK population · 2025</div></div>
+      <div class="stat"><div class="lbl">Data usage</div><div class="big">+18%</div><div class="u">year-on-year · 2025</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:2px;">
+      <div class="card te" style="border-left-color:#12938a;"><div class="cdesc"><b style="color:#0e7c78;">MVNO consumer share &gt; 15%</b> — Sky Mobile + Tesco Mobile alone, on wholesale deals with the physical networks.</div></div>
+      <div class="card or"><div class="cdesc"><b style="color:#b57e12;">Marketing (modelled placeholders):</b> spend ≈ 12% of revenue · CPA ≈ £18 per SIM. Send your real numbers and they flow straight through.</div></div>
+    </div>
+  </div>
+  <div class="foot">AI2ORBIT PROJECT — UK MOBILE DATA MARKET</div>
+</div>
+
+<!-- ========== 9 · SAMPLE FEED ========== -->
+<div class="slide">
+  <div class="hd"><h1>The Report-Engine Sample Feed</h1></div>
+  <div class="body">
+    <div class="sec"><span class="ic gr"><svg viewBox="0 0 24 24"><path d="M4 4h16v4H4V4zm0 6h16v4H4v-4zm0 6h16v4H4v-4z"/></svg></span>
+      <div class="sh">One generator, three tidy tables, fully reproducible<small>Everything below is driven by gen_sample.py — deterministic JSON checksum a792719cdd4e03a6</small></div></div>
+    <div class="cols">
+      <table class="t">
+        <tr><th>File</th><th>What it is</th></tr>
+        <tr><td>plans.csv</td><td>14 SIM-only tariffs + £/GB</td></tr>
+        <tr><td>handsets.csv</td><td>5 handset margin waterfalls</td></tr>
+        <tr><td>market.csv</td><td>8 context / marketing metrics</td></tr>
+        <tr><td>uk_data_market_sample.json</td><td>all three + meta/assumptions</td></tr>
+        <tr><td>gen_sample.py</td><td>regenerates; --check verifies</td></tr>
+        <tr><td>data_dictionary.md</td><td>column schema + assumptions</td></tr>
+      </table>
+      <div>
+        <div class="card te" style="padding:10px 14px;"><div class="cdesc"><b style="color:#0e7c78;">Honesty labels</b><br>Every row is <b>measured</b> (reported, see source) or <b>modelled</b> (from a stated assumption — not a quote).</div></div>
+        <div class="card or" style="padding:10px 14px;"><div class="cdesc"><b style="color:#b57e12;">To make v2 exact</b><br>1 · your report-engine's column names/format<br>2 · your real marketing figures</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="foot">AI2ORBIT PROJECT — UK MOBILE DATA MARKET</div>
+</div>
+
+<!-- ========== 10 · SOURCES ========== -->
+<div class="slide">
+  <div class="hd"><h1>Sources &amp; Method</h1></div>
+  <div class="body">
+    <div class="sub">Measured = reported figure · Modelled = computed from a stated assumption, clearly flagged</div>
+    <div class="rule"></div>
+    <ul class="chk" style="columns:1;">
+      <li>SIM-only pricing — UK operator price lists &amp; comparison sites, mid-2026 (measured)</li>
+      <li>Handset BOM — TechInsights / IHS-style teardown estimates (measured); ex-factory modelled at BOM × 1.30</li>
+      <li>ARPU — Ofcom / Statista, 2023 (measured)</li>
+      <li>5G coverage &amp; data growth — Ofcom Connected Nations 2025 (measured)</li>
+      <li>MVNO share — market reports, 2025 (measured)</li>
+      <li>Marketing spend &amp; CPA — modelled placeholders, awaiting client figures</li>
+    </ul>
+    <div class="note" style="margin-top:14px;"><b>Modelling constants:</b> FX £0.79 / USD · ex-factory ×1.30 · VAT 20% — all editable in gen_sample.py; change one and the whole dataset re-prices. This is a sample deck — say the word and I'll widen the plan set, add handsets, or swap in your own numbers.</div>
+  </div>
+  <div class="foot">AI2ORBIT PROJECT — UK MOBILE DATA MARKET</div>
+</div>
