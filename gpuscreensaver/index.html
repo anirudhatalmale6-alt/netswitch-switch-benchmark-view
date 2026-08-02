@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>6GGW / NetSwitch — GPU Screensaver (three lines)</title>
+<style>
+  :root { --bg:#05070d; --grid:#0e1524; --gpu:#3d88c4; --cpu:#37c98a; --coop:#e2b23c; --ink:#cfe0f5; --dim:#6f83a3; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif; overflow:hidden; }
+  #wrap { position:fixed; inset:0; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  .hud { position:absolute; left:0; right:0; bottom:0; padding:14px 18px 18px;
+    background:linear-gradient(to top, rgba(5,7,13,.92), rgba(5,7,13,0)); font-size:13px; }
+  .row { display:flex; align-items:center; gap:10px; margin:3px 0; }
+  .sw { width:26px; height:4px; border-radius:2px; flex:0 0 auto; }
+  .lab { width:190px; flex:0 0 auto; }
+  .val { font-variant-numeric:tabular-nums; color:#fff; }
+  .note { color:var(--dim); font-size:11px; margin-top:8px; line-height:1.45; max-width:760px; }
+  .title { position:absolute; top:12px; left:18px; font-size:13px; color:var(--dim); letter-spacing:.3px; }
+  .title b { color:var(--ink); }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div class="title"><b>6GGW / NetSwitch</b> &nbsp; GPU screensaver &mdash; three lines</div>
+  <div class="hud">
+    <div class="row"><span class="sw" style="background:var(--gpu)"></span>
+      <span class="lab">GPU functionality speed</span><span class="val" id="vg">measuring…</span></div>
+    <div class="row"><span class="sw" style="background:var(--cpu)"></span>
+      <span class="lab">CPU lineage</span><span class="val" id="vc">measuring…</span></div>
+    <div class="row"><span class="sw" style="background:var(--coop)"></span>
+      <span class="lab">Cooperative (both running)</span><span class="val" id="vk">measuring…</span></div>
+    <div class="note" id="note">
+      Each line length tracks a <b>real, measured</b> throughput. CPU = timed FP work loop.
+      GPU = timed WebGL fragment work (the <b>real GPU</b> on a phone/desktop; a headless build
+      box falls back to software GL, which is labelled). Cooperative = both driven in the same
+      window to show them sharing the device. GPU C-code hook lands → the GPU line reads the
+      device counters directly.
+    </div>
+  </div>
+</div>
+<script>
+const cvs = document.getElementById('c'), ctx = cvs.getContext('2d');
+let W=0,H=0,DPR=Math.min(window.devicePixelRatio||1,2);
+function resize(){ W=cvs.clientWidth; H=cvs.clientHeight; cvs.width=W*DPR; cvs.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+window.addEventListener('resize',resize); resize();
+
+// ---- real CPU benchmark: FP ops completed inside a fixed time budget ----
+function benchCPU(ms){
+  const end = performance.now()+ms; let x=0.0, n=0;
+  while(performance.now()<end){
+    for(let i=0;i<20000;i++){ x = Math.sqrt(x*1.0000001+1.234567) + Math.sin(x); }
+    n += 20000;
+  }
+  const secs = ms/1000;
+  return n/secs;            // FP-iterations per second
+}
+
+// ---- real GPU benchmark: heavy fragment shader, N passes, sync via readPixels ----
+let gl, prog, glSoftware=false, glOK=false;
+function initGL(){
+  const g = document.createElement('canvas'); g.width=256; g.height=256;
+  gl = g.getContext('webgl') || g.getContext('experimental-webgl');
+  if(!gl){ glOK=false; return; }
+  const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+  const rend = dbg ? (gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)||'') : '';
+  glSoftware = /swiftshader|software|llvmpipe|angle \(google/i.test(rend);
+  const vs=`attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}`;
+  const fs=`precision highp float;uniform float t;void main(){
+    vec2 uv=gl_FragCoord.xy/256.0; float a=0.0;
+    for(int i=0;i<200;i++){ a+=sin(uv.x*40.0+t+float(i))*cos(uv.y*40.0-t); }
+    gl_FragColor=vec4(fract(a),uv,1.0);}`;
+  function sh(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);return s;}
+  prog=gl.createProgram(); gl.attachShader(prog,sh(gl.VERTEX_SHADER,vs));
+  gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,fs)); gl.linkProgram(prog); gl.useProgram(prog);
+  const buf=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+  const loc=gl.getAttribLocation(prog,'p'); gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+  glOK=true;
+}
+function benchGPU(ms){
+  if(!glOK) return 0;
+  const tloc=gl.getUniformLocation(prog,'t'); const px=new Uint8Array(4);
+  const end=performance.now()+ms; let passes=0;
+  while(performance.now()<end){
+    gl.uniform1f(tloc,passes*0.01); gl.drawArrays(gl.TRIANGLES,0,3);
+    gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);  // forces GPU sync
+    passes++;
+  }
+  const secs=ms/1000;
+  return passes*256*256/secs;   // fragment-shader invocations per second (approx)
+}
+
+// ---- state: three live speeds, smoothed for the animation ----
+let sGPU=0, sCPU=0, sCOOP=0;        // measured
+let lGPU=0, lCPU=0, lCOOP=0;        // smoothed line lengths (0..1)
+const fmt = v => v>=1e9 ? (v/1e9).toFixed(2)+' G/s' : v>=1e6 ? (v/1e6).toFixed(1)+' M/s' : Math.round(v)+' /s';
+
+function measure(){
+  sCPU = benchCPU(120);
+  sGPU = benchGPU(120);
+  // cooperative: interleave a CPU chunk and GPU passes in the same window
+  const end=performance.now()+120; let cn=0, gp=0; const px=new Uint8Array(4);
+  const tloc = glOK ? gl.getUniformLocation(prog,'t') : null; let x=0;
+  while(performance.now()<end){
+    for(let i=0;i<8000;i++){ x=Math.sqrt(x*1.0000001+1.23)+Math.sin(x); } cn+=8000;
+    if(glOK){ gl.uniform1f(tloc,gp*0.01); gl.drawArrays(gl.TRIANGLES,0,3);
+      gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,px); gp++; }
+  }
+  sCOOP = (cn + gp*256*256)/0.120;   // combined work/sec while sharing the device
+  document.getElementById('vg').textContent = fmt(sGPU) + (glSoftware?'  (software GL)':(glOK?'  (real GPU)':'  (no WebGL)'));
+  document.getElementById('vc').textContent = fmt(sCPU);
+  document.getElementById('vk').textContent = fmt(sCOOP);
+}
+
+// draw three lines; length ∝ its own measured speed (truthful), GPU on top.
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  // faint grid
+  ctx.strokeStyle=getComputedStyle(document.body).getPropertyValue('--grid'); ctx.lineWidth=1;
+  for(let x=0;x<W;x+=40){ ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke(); }
+  const norm = Math.max(sGPU,sCPU,sCOOP,1);
+  const tgt = { g:sGPU/norm, c:sCPU/norm, k:sCOOP/norm };
+  lGPU += (tgt.g-lGPU)*0.08; lCPU += (tgt.c-lCPU)*0.08; lCOOP += (tgt.k-lCOOP)*0.08;
+  const x0=60, maxw=W-120, rows=[[0.34,lGPU,'--gpu'],[0.50,lCPU,'--cpu'],[0.66,lCOOP,'--coop']];
+  const t=performance.now()/1000;
+  for(const [yf,len,col] of rows){
+    const y=H*yf, w=maxw*len, c=getComputedStyle(document.body).getPropertyValue(col).trim();
+    ctx.strokeStyle=c; ctx.lineWidth=6; ctx.lineCap='round'; ctx.shadowColor=c; ctx.shadowBlur=18;
+    ctx.beginPath(); ctx.moveTo(x0,y);
+    // gentle wave along the line so it reads as a live "speed" line
+    const seg=Math.max(2,Math.floor(w/8));
+    for(let i=0;i<=seg;i++){ const px=x0+w*i/seg; const py=y+Math.sin(t*3+i*0.5)*3*len; ctx.lineTo(px,py); }
+    ctx.stroke();
+    // moving head dot
+    ctx.shadowBlur=24; ctx.fillStyle=c; ctx.beginPath(); ctx.arc(x0+w,y,5,0,7); ctx.fill(); ctx.shadowBlur=0;
+  }
+  requestAnimationFrame(draw);
+}
+
+initGL();
+measure(); setInterval(measure, 600);
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>
