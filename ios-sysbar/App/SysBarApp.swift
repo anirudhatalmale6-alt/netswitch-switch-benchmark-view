@@ -55,7 +55,13 @@ final class StatsModel: ObservableObject {
     func stopBar() {
         #if canImport(ActivityKit)
         if #available(iOS 16.1, *), let a = activity as? Activity<SysBarAttributes> {
-            Task { await a.end(nil, dismissalPolicy: .immediate) }
+            Task {
+                if #available(iOS 16.2, *) {
+                    await a.end(nil, dismissalPolicy: .immediate)
+                } else {
+                    await a.end(dismissalPolicy: .immediate)
+                }
+            }
             activity = nil
         }
         #endif
