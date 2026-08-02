@@ -34,6 +34,13 @@ and runs its self-test.
 | `diskbench/` | ggw_diskbench | fsync-honest disk IOPS / MB-s / latency percentiles. |
 | `thermal/` | ggw_thermal | Per-part thermal headroom / throttle-margin monitor. |
 | `sysmon/` | ggw_sysmon | Live host telemetry (cores, mem, load) — no personal data. |
+| `intbench/` | ggw_intbench | INT2/4/8/16 loopset timer (GOPS), three bars GPU/CPU/HPU. GPU/HPU = honest hook until backend linked. |
+| `drammtune/` | ggw_drammtune | DRAMM combination-search tuner (threads×duty) with a battery-energy model. GPU = hook. |
+| `benchrun/` | ggw_benchrun | One-pass CPU+RAM+thermal runner; names the bottleneck via roofline crossover. GPU = hook. |
+| `dramtest/` | ggw_dramtest | DRAM cell tester (write ×N → zero-overwrite → verify → warming rule → per-cell radian log). Detects stuck cells. |
+| `thermocalc/` | ggw_thermocalc | Thermodynamics (Cp/entropy/enthalpy/ideal/van-der-Waals/Stirling), each closed form self-checked vs numeric integration. |
+| `siso/` | ggw_siso | SISO transfer-function analyser (poles/zeros via Durand-Kerner) — the Nokia-2022 plant: UNSTABLE + non-minimum-phase. |
+| `gpuscreensaver/` | index.html | Three-line GPU/CPU/cooperative screensaver, driven by real WebGL + CPU measurements. GPU line → device counters when the GPU hook lands. |
 
 ## Numeric / signal functions
 

@@ -31,6 +31,13 @@ build_std diskbench  diskbench/ggw_diskbench.cpp
 build_std cputimer   cputimer/ggw_cputimer.cpp
 build_std radiosig   cputimer/ggw_radiosig.cpp
 build_std loopbench  loopbench/ggw_loopbench.cpp  -pthread
+# measurement suite (newer) — the CPU/RAM/thermal + math tools; each has a `selftest`.
+build_std intbench    intbench/ggw_intbench.cpp
+build_std drammtune   drammtune/ggw_drammtune.cpp  -pthread
+build_std benchrun    benchrun/ggw_benchrun.cpp
+build_std dramtest    dramtest/ggw_dramtest.cpp
+build_std thermocalc  thermocalc/ggw_thermocalc.cpp
+build_std siso        siso/ggw_siso.cpp
 # note: cputimer is header-only (cpu_mhz_timer.h) + a demo; the header is the shared
 #       MHz timebase meant to be #included across modules. radiosig runs the client's
 #       radio-parameter reduction on that timebase. Both build Linux + Windows.
@@ -99,5 +106,26 @@ if [ -f netswitch-sql/netswitch_sql.cpp ]; then
 fi
 
 echo
+echo "== selftests (tools that ship one) =="
+stpass=0; stfail=0
+run_selftest() {
+  bin="$1"
+  if [ -x "$bin" ]; then
+    if "$bin" selftest >/tmp/ggw_selftest_$(basename "$bin").log 2>&1; then
+      echo "SELFTEST PASS  $bin"; stpass=$((stpass+1))
+    else
+      echo "SELFTEST FAIL  $bin  (see /tmp/ggw_selftest_$(basename "$bin").log)"; stfail=$((stfail+1))
+    fi
+  fi
+}
+run_selftest intbench/ggw_intbench
+run_selftest drammtune/ggw_drammtune
+run_selftest benchrun/ggw_benchrun
+run_selftest dramtest/ggw_dramtest
+run_selftest thermocalc/ggw_thermocalc
+run_selftest siso/ggw_siso
+echo "selftests: $stpass passed, $stfail failed"
+
+echo
 echo "built $ok, skipped $skip, failed $fail"
-[ "$fail" -eq 0 ]
+[ "$fail" -eq 0 ] && [ "$stfail" -eq 0 ]
