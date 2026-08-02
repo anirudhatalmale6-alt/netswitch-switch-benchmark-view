@@ -1,0 +1,299 @@
+<!doctype html><meta charset='utf-8'><title>6GGW / NetSwitch — Technical Specification</title>
+<style>
+  @page { size: A4; margin: 15mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+         color:#1f2733; line-height:1.5; font-size:12.5px; margin:0; }
+  h1 { color:#2f6ea5; font-size:22px; border-bottom:3px solid #3d88c4; padding-bottom:6px; margin:0 0 14px; }
+  h2 { color:#2f6ea5; font-size:16px; margin:22px 0 8px; border-left:4px solid #3d88c4; padding-left:8px; }
+  h3 { color:#3d5063; font-size:13.5px; margin:16px 0 6px; }
+  p, li { font-size:12.5px; }
+  code { background:#eef3f8; color:#20456b; padding:1px 5px; border-radius:4px;
+         font-family: SFMono-Regular, Consolas, monospace; font-size:11.5px; }
+  pre { background:#f4f8fb; border:1px solid #d7e3ef; border-radius:6px; padding:10px 12px;
+        overflow-x:auto; font-size:11px; line-height:1.45; }
+  pre code { background:none; padding:0; color:#20456b; }
+  table { border-collapse:collapse; width:100%; margin:10px 0 16px; font-size:11px; }
+  th { background:#3d88c4; color:#fff; text-align:left; padding:7px 9px; font-weight:600; vertical-align:top; }
+  td { padding:6px 9px; border-bottom:1px solid #e3ecf4; vertical-align:top; }
+  tr:nth-child(even) td { background:#f4f8fb; }
+  strong { color:#20456b; }
+  hr { border:none; border-top:1px solid #dbe5ef; margin:20px 0; }
+  a { color:#3d88c4; text-decoration:none; }
+  .footer { margin-top:24px; padding-top:10px; border-top:1px solid #dbe5ef;
+            color:#7a8aa0; font-size:10px; }
+</style>
+<body><h1 id="6ggw-netswitch-technical-specification">6GGW / NetSwitch — Technical Specification</h1>
+<p>One-page-per-subsystem spec for NetSwitch and every tool in this repo. For the authoritative
+math numbering see <code>MATH-INDEX.md</code> (M1–M40); for the module tree see <code>SOURCE-MANIFEST.md</code>; for
+the AI + maths inventory see <code>AI-AND-MATHS.md</code>. Every module is single-file C++17 (T-SQL for the
+data plane), builds on Linux (<code>g++</code>) and Windows (MinGW <code>-static</code>), and ships its own <code>selftest</code>.</p>
+<p>Status legend: <strong>RUN</strong> = measured/working now · <strong>BACKEND</strong> = engine done, needs real
+device/credentials · <strong>STUB</strong> = honest hook awaiting your code.</p>
+<hr />
+<h2 id="1-netswitch-switch-core">1. NetSwitch switch core</h2>
+<p>The product is a phone-to-phone / thin-client <strong>switch</strong>: it registers devices, replicates media
+streams between them, meters call quality, and reroutes over the least-cost path with region
+failover. Asymmetric envelope by design — <strong>1300 kbps down / 250 kbps up / 32 kbps audio floor</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Program</th>
+<th>Interface</th>
+<th>I/O</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>server-cpp/</code></td>
+<td>ggw_server</td>
+<td>HTTP + socket control surface</td>
+<td>session registry; least-cost reroute <code>cost=RTT·(1+load/100)</code> (M35); geodistance <code>d=0.0001607·RTT</code> (M36); region failover</td>
+<td>RUN</td>
+</tr>
+<tr>
+<td><code>replicate/</code></td>
+<td>ggw_replicate</td>
+<td>phone↔phone transport</td>
+<td>STATE (reliable delta), FILE (SHA-256 verified, M37), AUDIO/VIDEO (real-time)</td>
+<td>RUN</td>
+</tr>
+<tr>
+<td><code>stream-ctl/</code></td>
+<td>ggw_streamctl</td>
+<td>routing/rerouting</td>
+<td>least-cost path, POP select, RKF45 battery ODE (M24/M25), pipe capacity (M26), split at 1/2/7/15/40/59/80% (M27)</td>
+<td>RUN</td>
+</tr>
+<tr>
+<td><code>stream-qc/</code></td>
+<td>ggw_streamqc</td>
+<td>quality metering</td>
+<td>PSNR (M22), blockiness (M23) → Black/Grey/White class → Low/Med/High reroute trigger</td>
+<td>RUN</td>
+</tr>
+<tr>
+<td><code>voice-edge/</code></td>
+<td>ggw_voice_edge</td>
+<td>walkie-talkie relay</td>
+<td>G.711 µ-law (M20), RTP/RFC-3550 pack (M21)</td>
+<td>RUN</td>
+</tr>
+<tr>
+<td><code>optimize/</code></td>
+<td>ggw_optimize</td>
+<td>bitrate allocator</td>
+<td>AUTO fills the down/up envelope, priority floor first, 2:1 split; MANUAL clamps + reroute verdict</td>
+<td>RUN</td>
+</tr>
+<tr>
+<td><code>registrar/</code></td>
+<td>ggw_registrar</td>
+<td>device/session registration</td>
+<td>CIDR prefix→mask (M39), one-time code issue</td>
+<td>RUN</td>
+</tr>
+<tr>
+<td><code>secure/</code></td>
+<td>ggw_secure</td>
+<td>transport security</td>
+<td>TLS 1.3 tunnel + cert gen (M40, OpenSSL)</td>
+<td>BACKEND (certs/keys)</td>
+</tr>
+<tr>
+<td><code>backup-codes/</code></td>
+<td>ggw_backupcodes</td>
+<td>recovery codes</td>
+<td>Crockford base32 CSPRNG, 50-bit (M38)</td>
+<td>RUN</td>
+</tr>
+<tr>
+<td><code>client-cli/</code></td>
+<td>ggw_cli</td>
+<td>thin-client CLI</td>
+<td>switch client commands</td>
+<td>RUN</td>
+</tr>
+<tr>
+<td><code>client-qt/</code></td>
+<td>Qt app</td>
+<td>desktop GUI</td>
+<td>claim/dashboard/distance/rerouting panels</td>
+<td>BACKEND (Qt build)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2-benchmark-measurement-suite">2. Benchmark / measurement suite</h2>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Program</th>
+<th>Measures</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>report-engine/</code></td>
+<td>ggw_report</td>
+<td>MFLOPS (matmul+FMA), CPU/RAM/disk inventory, OS-compat verdict → phone HTML</td>
+<td>RUN</td>
+</tr>
+<tr>
+<td><code>dramm/</code></td>
+<td>ggw_dramm</td>
+<td>DRAMM tight kernel (M1) vs naive kernel — honest same-machine speedup; CUDA twin <code>.cu</code></td>
+<td>RUN (+CUDA STUB)</td>
+</tr>
+<tr>
+<td><code>loopbench/</code></td>
+<td>ggw_loopbench</td>
+<td>sustained ops/s, FPS, MFLOPS, closed-form <code>C=11.267648…</code> (M2) with checksums</td>
+<td>RUN</td>
+</tr>
+<tr>
+<td><code>cputimer/</code></td>
+<td>ggw_cputimer, ggw_radiosig</td>
+<td>RDTSC-calibrated MHz (M31), radio-signal reduce (M32)</td>
+<td>RUN</td>
+</tr>
+<tr>
+<td><code>diskbench/</code></td>
+<td>ggw_diskbench</td>
+<td>fsync-honest IOPS / MB-s / latency percentiles (M33)</td>
+<td>RUN</td>
+</tr>
+<tr>
+<td><code>thermal/</code></td>
+<td>ggw_thermal</td>
+<td>per-part temp vs trip, throttle-swing learn (M34)</td>
+<td>RUN (real sensors = BACKEND)</td>
+</tr>
+<tr>
+<td><code>sysmon/</code></td>
+<td>ggw_sysmon</td>
+<td>live cores/mem/load, per-core Gops (M29), FPS (M30) — no personal data</td>
+<td>RUN</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-hw-test-tools-the-testing-tools-from-the-ai2orbit-primer">3. HW-test tools (the "testing tools" from the AI2Orbit primer)</h2>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Program</th>
+<th>What it times / tests</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>intbench/</code></td>
+<td>ggw_intbench</td>
+<td>INT2/4/8/16 quantized MAC loopset, three bars GPU/CPU/HPU</td>
+<td>RUN (CPU) · GPU/HPU STUB</td>
+</tr>
+<tr>
+<td><code>drammtune/</code></td>
+<td>ggw_drammtune</td>
+<td><strong>NEW</strong> — CPU/GPU combination search (threads × duty) to run DRAMM fastest + battery savings</td>
+<td>RUN (CPU) · GPU/energy STUB→BACKEND</td>
+</tr>
+<tr>
+<td><code>hwtools/</code></td>
+<td>ggw_memtimer</td>
+<td>reserve-memory-per-calc timer + CLI log-list + dX (today/tomorrow) compare</td>
+<td>RUN</td>
+</tr>
+<tr>
+<td><code>hwtools/</code></td>
+<td>ggw_nettrace</td>
+<td>40 pings + 15 traceroutes + 11 pingroutes concurrently, per-type timing</td>
+<td>RUN</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="4-numeric-signal-functions">4. Numeric / signal functions</h2>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Program</th>
+<th>Computes</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ddtm/</code></td>
+<td>ggw_ddtm</td>
+<td>8×8 DCT-II/IDCT (M6/M7), powered/unpowered split (M8), entropy (M9), PSNR + best scaler (M10/M11), MHz banding (M12)</td>
+<td>RUN</td>
+</tr>
+<tr>
+<td><code>ipr/</code></td>
+<td>ggw_ipr</td>
+<td>DCT image-block transform, depth ratioing (M28)</td>
+<td>RUN</td>
+</tr>
+<tr>
+<td><code>approve/</code></td>
+<td>ggw_approve</td>
+<td>deterministic "server AI == thin-client AI": workload (M3), result hash (M4), approval ratio (M5)</td>
+<td>RUN</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="5-data-plane-ms-sql">5. Data plane (MS SQL)</h2>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>File</th>
+<th>What it is</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>netswitch-sql/</code></td>
+<td>netswitch_sql.cpp</td>
+<td>ODBC connector: device_session, sccm_block, scaler_result</td>
+<td>BACKEND (target instance)</td>
+</tr>
+<tr>
+<td><code>netswitch-sql/scaling/</code></td>
+<td>ggw_scaling.sql</td>
+<td>T-SQL scaling math (M13–M19), DDTM constant −0.090908889 (M13), Python cross-check</td>
+<td>RUN (SQL) · locks with T1/T2/LogLogRad</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-build-verify-conventions">6. Build &amp; verify conventions</h2>
+<pre><code class="language-bash">./build-all.sh                       # Linux: build + selftest every module
+g++ -std=c++17 -O2 &lt;mod&gt;.cpp -o &lt;mod&gt;
+x86_64-w64-mingw32-g++ -std=c++17 -O2 &lt;mod&gt;.cpp -o &lt;mod&gt;.exe -static
+</code></pre>
+<p>Every tool: single-file, zero hidden deps, deterministic where a checksum is claimed, a <code>selftest</code>
+sub-command, and cross-platform checksum identity where the maths is deterministic. Measured vs.
+modelled vs. stub is labelled in-tool and in each README — nothing invented.</p>
+<hr />
+<h2 id="7-pending-awaiting-your-input-kept-explicit-nothing-dropped">7. Pending / awaiting your input (kept explicit, nothing dropped)</h2>
+<ul>
+<li><strong>GPU code</strong> → wires <code>gpu_loopset()</code> (intbench) and <code>gpu_throughput()</code> (drammtune) live.</li>
+<li><strong>Real energy sensor</strong> (RAPL/battery API) → replaces the drammtune battery model with a watt reading.</li>
+<li><strong>Thermal engine</strong> — the two thermals (Justacon/Entropia, van der Waals) need one worked example
+  each (inputs → the number you already get) before I lock the formulas; not guessed.</li>
+<li><strong>DDTM constant</strong> locks once T1/T2/LogLogRad values are given.</li>
+<li><strong>MS SQL target instance</strong> (2025/2026) for the data-plane connector.</li>
+<li><strong>Phone model + Android/iOS version</strong> for the NDK/Capacitor build.</li>
+</ul><div class='footer'>6GGW / NetSwitch — 6GGW / NetSwitch — Technical Specification. Anirudha Talmale.</div></body>

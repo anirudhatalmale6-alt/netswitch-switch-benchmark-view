@@ -1,0 +1,154 @@
+<!doctype html><meta charset='utf-8'><title>6GGW / NetSwitch — AI & Implemented Maths</title>
+<style>
+  @page { size: A4; margin: 15mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+         color:#1f2733; line-height:1.5; font-size:12.5px; margin:0; }
+  h1 { color:#2f6ea5; font-size:22px; border-bottom:3px solid #3d88c4; padding-bottom:6px; margin:0 0 14px; }
+  h2 { color:#2f6ea5; font-size:16px; margin:22px 0 8px; border-left:4px solid #3d88c4; padding-left:8px; }
+  h3 { color:#3d5063; font-size:13.5px; margin:16px 0 6px; }
+  p, li { font-size:12.5px; }
+  code { background:#eef3f8; color:#20456b; padding:1px 5px; border-radius:4px;
+         font-family: SFMono-Regular, Consolas, monospace; font-size:11.5px; }
+  pre { background:#f4f8fb; border:1px solid #d7e3ef; border-radius:6px; padding:10px 12px;
+        overflow-x:auto; font-size:11px; line-height:1.45; }
+  pre code { background:none; padding:0; color:#20456b; }
+  table { border-collapse:collapse; width:100%; margin:10px 0 16px; font-size:11px; }
+  th { background:#3d88c4; color:#fff; text-align:left; padding:7px 9px; font-weight:600; vertical-align:top; }
+  td { padding:6px 9px; border-bottom:1px solid #e3ecf4; vertical-align:top; }
+  tr:nth-child(even) td { background:#f4f8fb; }
+  strong { color:#20456b; }
+  hr { border:none; border-top:1px solid #dbe5ef; margin:20px 0; }
+  a { color:#3d88c4; text-decoration:none; }
+  .footer { margin-top:24px; padding-top:10px; border-top:1px solid #dbe5ef;
+            color:#7a8aa0; font-size:10px; }
+</style>
+<body><h1 id="6ggw-netswitch-ai-implemented-maths">6GGW / NetSwitch — AI &amp; Implemented Maths</h1>
+<p>The list you asked for: every piece of decision-logic ("AI") in the product, and every maths
+function actually implemented, with an honest status. Authoritative math numbering is in
+<code>MATH-INDEX.md</code> (M1–M40); this file groups it by purpose and adds the AI layer on top.</p>
+<p>Status: <strong>RUN</strong> measured/working · <strong>BACKEND</strong> engine done, needs device/creds · <strong>STUB</strong> honest
+hook awaiting your code · <strong>MODEL</strong> a stated assumption, labelled, replaced by a real sensor later.</p>
+<hr />
+<h2 id="a-ai-decision-logic-the-algorithmic-ai-in-the-product">A. AI / decision logic (the algorithmic "AI" in the product)</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Where</th>
+<th>What it decides</th>
+<th>How</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AI-1</td>
+<td><code>drammtune/</code></td>
+<td>best CPU/GPU combination to run DRAMM fastest <strong>and</strong> save battery</td>
+<td>search over threads × duty; picks FASTEST, BEST-BATTERY, MEET-TARGET</td>
+<td>RUN (CPU); GPU/energy STUB→BACKEND</td>
+</tr>
+<tr>
+<td>AI-2</td>
+<td><code>optimize/</code></td>
+<td>codec bitrate per active call inside the 1300/250 kbps envelope</td>
+<td>AUTO envelope-fill, priority 32 kbps floor first, 2:1 split; MANUAL clamp + reroute verdict</td>
+<td>RUN</td>
+</tr>
+<tr>
+<td>AI-3</td>
+<td><code>server-cpp/</code></td>
+<td>which POP to route/failover to</td>
+<td>least-cost <code>cost=RTT·(1+load/100)</code> (M35), reachability, region failover</td>
+<td>RUN</td>
+</tr>
+<tr>
+<td>AI-4</td>
+<td><code>stream-qc/</code></td>
+<td>when to reroute a call</td>
+<td>Black/Grey/White quality class from PSNR (M22)/blockiness (M23) → Low/Med/High trigger</td>
+<td>RUN</td>
+</tr>
+<tr>
+<td>AI-5</td>
+<td><code>thermal/</code></td>
+<td>throttle margin / headroom per part</td>
+<td>trip-headroom + throttle-swing learn (M34)</td>
+<td>RUN (real sensors BACKEND)</td>
+</tr>
+<tr>
+<td>AI-6</td>
+<td><code>approve/</code></td>
+<td>"is the thin-client AI identical to the server AI?"</td>
+<td>deterministic workload (M3) + result hash (M4) + approval ratio (M5) — same binary ⇒ same answer</td>
+<td>RUN</td>
+</tr>
+<tr>
+<td>AI-7</td>
+<td><code>ddtm/</code></td>
+<td>best spectral scaler per block</td>
+<td>argmax <code>PSNR/(bits/64)</code> above a 30 dB floor (M11)</td>
+<td>RUN</td>
+</tr>
+<tr>
+<td>AI-8</td>
+<td><code>intbench/</code></td>
+<td>throughput per integer precision, GPU vs CPU vs HPU</td>
+<td>timed INT2/4/8/16 loopset, three bars</td>
+<td>RUN (CPU); GPU/HPU STUB</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="b-implemented-maths-grouped-m-numbers-math-index">B. Implemented maths (grouped; M-numbers = MATH-INDEX)</h2>
+<ul>
+<li><strong>Compute kernel</strong> — DRAMM step (M1), closed-form loop constant <code>C=11.267648…</code> (M2), approve
+  workload/hash/ratio (M3–M5). Canonical DRAMM constant <code>x=0.120493199688742</code>, reproduced by both
+  <code>dramm/</code> and <code>drammtune/</code>. <strong>RUN</strong></li>
+<li><strong>Transform / scaling</strong> — 8×8 DCT-II/IDCT (M6/M7), powered split (M8), Shannon entropy bits+nats
+  (M9), requant+PSNR (M10), best scaler (M11), MHz banding (M12). T-SQL twins: DDTM constant
+  −0.090908889 (M13), constant calc (M14), hyper-downscale (M15), thrice-sinwave (M16), lnlog (M17),
+  binary-lnlog (M18), DB best scaler (M19). <strong>RUN</strong> (M14/M13 lock fully once T1/T2/LogLogRad given)</li>
+<li><strong>Media</strong> — µ-law (M20), RTP pack (M21), PSNR (M22), blockiness (M23), battery ODE RKF45 +
+  Laplace check (M24/M25), pipe capacity (M26), byte-exact split (M27), depth ratioing (M28). <strong>RUN</strong></li>
+<li><strong>Measure</strong> — per-core Gops (M29), FPS (M30), RDTSC MHz (M31), radio-signal reduce (M32), disk
+  IOPS/latency (M33), thermal headroom (M34). <strong>RUN</strong></li>
+<li><strong>Control</strong> — reroute cost (M35), geodistance (M36), SHA-256 (M37), backup-code gen (M38),
+  CIDR mask (M39), TLS handshake (M40). <strong>RUN</strong> (M40 BACKEND: certs/keys)</li>
+<li><strong>New HW-test maths (this week)</strong> — INT2/4/8/16 quantized MAC GOPS (intbench); reserve-memory
+  timing + dX day-over-day derivative (memtimer); concurrent probe timing + concurrency factor
+  (nettrace); DRAMM throughput × duty delivered + energy model <code>T·D+0.15·T·(1−D)</code> + efficiency
+  (drammtune). <strong>RUN</strong> (energy = MODEL until RAPL wired)</li>
+</ul>
+<p><strong>Total: 40 numbered math functions (M1–M40) + the new HW-test maths above.</strong></p>
+<hr />
+<h2 id="c-not-yet-implemented-held-honestly-no-guessing">C. Not yet implemented — held honestly (no guessing)</h2>
+<ul>
+<li><strong>Thermal engine — two thermals</strong>: <em>Justacon/Entropia</em> and <em>van der Waals</em>. You've sent the value
+  lists but not the input→output formula. I need one worked example each (the inputs and the number
+  you already get) and I'll reproduce them exactly. Van der Waals ((P+a·n²/V²)(V−nb)=nRT) I can code
+  now given a/b and which of P/V/T/n you feed.</li>
+<li><strong>Newton / inductive-power / Richter-log / logT1–T4</strong> screen — same: awaiting the complete set.</li>
+</ul>
+<hr />
+<h2 id="d-product-implementation-todo-from-your-message-captured-so-nothing-is-lost">D. Product-implementation TODO (from your message — captured so nothing is lost)</h2>
+<p>You said: <em>"four to-dos here; 6 codes for GPU and CPU and DRAMM v.2 on the todo list for product
+implementation."</em> Here is that list, mapped to what exists and what's next:</p>
+<p><strong>Four to-dos</strong>
+1. <strong>Docs + tech spec</strong> — <code>TECH-SPEC.md</code> (this repo). <strong>DONE today.</strong>
+2. <strong>AI + implemented-maths list</strong> — this file. <strong>DONE today.</strong>
+3. <strong>DRAMM run-fast-with-battery AI</strong> — <code>drammtune/</code> working version. <strong>DONE today</strong> (fixes tomorrow,
+   impl-ready Tuesday per your cadence).
+4. <strong>More networking tests</strong> — scheduled Tue–Wed on top of <code>nettrace</code>; RC Thu–Fri. <strong>PLANNED.</strong></p>
+<p><strong>Six codes for GPU / CPU / DRAMM v.2</strong> (the compute-implementation set)
+| # | Code | Status |
+|---|---|---|
+| 1 | CPU DRAMM kernel (M1) + tight-vs-naive speedup | RUN (<code>dramm/</code>) |
+| 2 | CPU INT2/4/8/16 loopset (intbench, CPU bar) | RUN |
+| 3 | CPU/GPU combination tuner (drammtune) | RUN (CPU) — GPU pending your code |
+| 4 | GPU DRAMM kernel (<code>ggw_dramm.cu</code>) | STUB — goes live on an NVIDIA box / your GPU code |
+| 5 | GPU INT loopset (<code>gpu_loopset()</code> hook) | STUB — one function, wires from your GPU code |
+| 6 | DRAMM v.2 (real energy sensor + emitted apply-config) | Tomorrow→Tuesday |</p>
+<p>The three STUB/next items all converge on the same input: <strong>your GPU code</strong>. The moment it lands,
+codes 3/4/5 become live in one pass, and DRAMM v.2 (code 6) follows with the energy sensor.</p><div class='footer'>6GGW / NetSwitch — 6GGW / NetSwitch — AI & Implemented Maths. Anirudha Talmale.</div></body>
