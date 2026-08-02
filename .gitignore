@@ -20,3 +20,4 @@ loopbench/ggw_loopbench
 loopbench/ggw_loopbench.exe
 
 benchrun/ggw_benchrun
+dramtest/ggw_dramtest
