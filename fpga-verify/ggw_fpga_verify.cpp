@@ -115,11 +115,31 @@ int main(int argc,char** argv){
         printf("P = V*I = %g * %g = %g W\n", V,I,V*I);
         return 0;
     }
+    if(argc>=2 && !strcmp(argv[1],"capacity")){
+        // Per-generation capacity helper. From your notes: base constant ~232.66 (your calculator),
+        // channels per gen 2G=2 / 4G=8 / 5G=4 (piping tests), LN divisor 1.4 (city) .. 1.8 (rural).
+        // The EXACT combine rule isn't locked yet, so this prints the candidate combinations for a
+        // given (base, channels, ln) — tell me which one matches your 2/23/300/700 ladder and I bake it.
+        double base=232.66, ch=0, ln=1.7;
+        for(int i=2;i<argc;i++){
+            if(!strcmp(argv[i],"--base")&&i+1<argc)base=atof(argv[++i]);
+            else if(!strcmp(argv[i],"--channels")&&i+1<argc)ch=atof(argv[++i]);
+            else if(!strcmp(argv[i],"--ln")&&i+1<argc)ln=atof(argv[++i]);
+        }
+        printf("capacity helper — base=%g  channels=%g  ln=%g\n", base, ch, ln);
+        printf("  base * channels / ln = %g\n", ch? base*ch/ln : 0);
+        printf("  base * channels      = %g\n", base*ch);
+        printf("  base / ln            = %g\n", base/ln);
+        printf("channel map (your note): 2G=2  4G=8  5G=4 ; LN 1.4 city .. 1.8 rural (~1.7)\n");
+        printf("(combine rule not locked — confirm which line matches your ladder and I fix it.)\n");
+        return 0;
+    }
     printf("GGW FPGA-Engine verification calculator\n");
     printf("usage:\n");
     printf("  ggw_fpga_verify selftest\n");
     printf("  ggw_fpga_verify area  Ax Ay Az  Bx By Bz  Cx Cy Cz\n");
     printf("  ggw_fpga_verify cross ax ay az  bx by bz\n");
     printf("  ggw_fpga_verify power --volts 230 --amps 4\n");
+    printf("  ggw_fpga_verify capacity --base 232.66 --channels 8 --ln 1.7\n");
     return 0;
 }
