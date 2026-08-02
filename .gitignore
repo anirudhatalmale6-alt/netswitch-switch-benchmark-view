@@ -18,3 +18,5 @@ cputimer/ggw_radiosig
 cputimer/ggw_radiosig.exe
 loopbench/ggw_loopbench
 loopbench/ggw_loopbench.exe
+
+benchrun/ggw_benchrun
