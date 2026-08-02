@@ -75,7 +75,9 @@ enum SysStats {
         var total: Double = 0
         for i in 0..<Int(count) {
             var ti = thread_basic_info()
-            var tc = mach_msg_type_number_t(THREAD_BASIC_INFO_COUNT)
+            // THREAD_BASIC_INFO_COUNT is a C macro Swift doesn't import; derive it.
+            var tc = mach_msg_type_number_t(MemoryLayout<thread_basic_info>.size /
+                                            MemoryLayout<integer_t>.size)
             let kr = withUnsafeMutablePointer(to: &ti) {
                 $0.withMemoryRebound(to: integer_t.self, capacity: Int(tc)) {
                     thread_info(threads[i], thread_flavor_t(THREAD_BASIC_INFO), $0, &tc)
