@@ -1,0 +1,34 @@
+name: Build SysBar iOS
+
+on:
+  push:
+    paths:
+      - 'ios-sysbar/**'
+      - '.github/workflows/ios.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: ios-sysbar
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Compile (simulator SDK, no signing)
+        run: |
+          xcodebuild \
+            -project GGWSysBar.xcodeproj \
+            -scheme GGWSysBar \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            build

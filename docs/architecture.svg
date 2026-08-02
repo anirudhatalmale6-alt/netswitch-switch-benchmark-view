@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="1020" viewBox="0 0 1480 1020" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <style>
+      .title{font-size:30px;font-weight:700;fill:#1f2733}
+      .sub{font-size:15px;fill:#5b6b80}
+      .band{font-size:13px;font-weight:700;fill:#fff;letter-spacing:.6px}
+      .box{font-size:14px;font-weight:600;fill:#20456b}
+      .lbl{font-size:11.5px;fill:#3d5063}
+      .tag{font-size:10px;font-weight:700}
+      .flow{font-size:11px;fill:#6b7b90}
+      .run{fill:#2e7d4f}.backend{fill:#b06a00}.stub{fill:#a03030}.held{fill:#7a4fb0}
+    </style>
+    <marker id="arw" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#8aa0b8"/></marker>
+  </defs>
+
+  <rect width="1480" height="1020" fill="#f6f9fc"/>
+  <text x="40" y="52" class="title">6GGW / NetSwitch — System Architecture</text>
+  <text x="40" y="78" class="sub">One serverless app + native C++ modules + MS SQL data plane. Tags: RUN built &amp; verified · BACKEND model, swaps to sensor · STUB awaits your code · HELD awaits your worked example.</text>
+
+  <!-- CLIENT FACES -->
+  <rect x="40" y="100" width="1400" height="72" rx="10" fill="#2f6ea5"/>
+  <text x="60" y="127" class="band">CLIENT FACES  (interchangeable, one wire)</text>
+  <g class="box" fill="#eaf2fb">
+    <rect x="60" y="134" width="300" height="30" rx="6" fill="#3d88c4"/><text x="72" y="154" fill="#fff" font-size="13">PWA — index.html / sw.js / manifest</text>
+    <rect x="376" y="134" width="240" height="30" rx="6" fill="#3d88c4"/><text x="388" y="154" fill="#fff" font-size="13">Qt client — 4 tabs</text>
+    <rect x="632" y="134" width="200" height="30" rx="6" fill="#3d88c4"/><text x="644" y="154" fill="#fff" font-size="13">CLI client</text>
+    <rect x="848" y="134" width="270" height="30" rx="6" fill="#3d88c4"/><text x="860" y="154" fill="#fff" font-size="13">thin-client = approve binary</text>
+    <rect x="1134" y="134" width="286" height="30" rx="6" fill="#1f5c88"/><text x="1146" y="154" fill="#fff" font-size="13">Phone: SysBar Android RUN · iOS HELD</text>
+  </g>
+
+  <line x1="740" y1="172" x2="740" y2="200" stroke="#8aa0b8" stroke-width="2" marker-end="url(#arw)"/>
+  <text x="750" y="190" class="flow">HTTP / SIP·RTP / approve</text>
+
+  <!-- CONTROL PLANE -->
+  <rect x="40" y="200" width="1400" height="120" rx="10" fill="#e7f0f8" stroke="#c7dcee"/>
+  <text x="60" y="226" class="band" fill="#2f6ea5">CONTROL PLANE</text>
+  <g>
+    <rect x="60" y="238" width="250" height="66" rx="7" fill="#fff" stroke="#c7dcee"/><text x="72" y="262" class="box">server-cpp / server</text><text x="72" y="281" class="lbl">the one API: health·ping·distance·device</text><text x="72" y="297" class="tag run">RUN</text>
+    <rect x="326" y="238" width="230" height="66" rx="7" fill="#fff" stroke="#c7dcee"/><text x="338" y="262" class="box">registrar</text><text x="338" y="281" class="lbl">enrol; logs IP/GW/MASK/DNS/DHCP</text><text x="338" y="297" class="tag run">RUN</text>
+    <rect x="572" y="238" width="230" height="66" rx="7" fill="#fff" stroke="#c7dcee"/><text x="584" y="262" class="box">backup-codes</text><text x="584" y="281" class="lbl">500 one-time, salted SHA-256</text><text x="584" y="297" class="tag run">RUN</text>
+    <rect x="818" y="238" width="270" height="66" rx="7" fill="#fff" stroke="#c7dcee"/><text x="830" y="262" class="box">approve</text><text x="830" y="281" class="lbl">one binary both ends; timing ratio ~1 = OK</text><text x="830" y="297" class="tag run">RUN</text>
+    <rect x="1104" y="238" width="316" height="66" rx="7" fill="#fff" stroke="#c7dcee"/><text x="1116" y="262" class="box">secure</text><text x="1116" y="281" class="lbl">TLS 1.3 (EC-256/RSA), SSH tunnel, short certs</text><text x="1116" y="297" class="tag run">RUN</text>
+  </g>
+
+  <line x1="740" y1="320" x2="740" y2="348" stroke="#8aa0b8" stroke-width="2" marker-end="url(#arw)"/>
+
+  <!-- FOUR PLANES -->
+  <g>
+    <!-- ROUTING -->
+    <rect x="40" y="348" width="330" height="196" rx="10" fill="#fff" stroke="#c7dcee"/>
+    <rect x="40" y="348" width="330" height="30" rx="10" fill="#3d88c4"/><text x="54" y="369" class="band">ROUTING</text>
+    <text x="54" y="400" class="lbl">least-cost POP by measured RTT</text>
+    <text x="54" y="420" class="lbl">cost = RTT · (1 + load/100)</text>
+    <text x="54" y="446" class="box">nettrace</text><text x="120" y="446" class="lbl">40 ping / 15 tracert / 11 pingroute</text><text x="54" y="463" class="tag run">RUN</text>
+    <text x="54" y="490" class="box">optimize · reroute</text><text x="54" y="507" class="tag run">RUN</text>
+  </g>
+  <g>
+    <!-- MEDIA -->
+    <rect x="384" y="348" width="330" height="196" rx="10" fill="#fff" stroke="#c7dcee"/>
+    <rect x="384" y="348" width="330" height="30" rx="10" fill="#3d88c4"/><text x="398" y="369" class="band">MEDIA PLANE</text>
+    <text x="398" y="400" class="box">voice-edge</text><text x="480" y="400" class="lbl">SIP + RTP (G.711) edge</text><text x="398" y="417" class="tag run">RUN</text>
+    <text x="398" y="444" class="box">stream-ctl</text><text x="480" y="444" class="lbl">bitrate tiers, pipe floor</text><text x="398" y="461" class="tag run">RUN</text>
+    <text x="398" y="488" class="box">stream-qc · ipr</text><text x="540" y="488" class="lbl">dB gate, in-picture</text><text x="398" y="505" class="tag run">RUN</text>
+  </g>
+  <g>
+    <!-- DATA PLANE -->
+    <rect x="728" y="348" width="330" height="196" rx="10" fill="#fff" stroke="#c7dcee"/>
+    <rect x="728" y="348" width="330" height="30" rx="10" fill="#2f6ea5"/><text x="742" y="369" class="band">DATA PLANE — MS SQL</text>
+    <text x="742" y="400" class="box">netswitch-sql</text><text x="850" y="400" class="lbl">ODBC bridge</text><text x="742" y="417" class="tag backend">BACKEND · instance TBD (9.1)</text>
+    <text x="742" y="446" class="lbl">.sql: constant · hyper-downscale</text>
+    <text x="742" y="464" class="lbl">thrice-sin · lnlog · best-scaler</text>
+    <text x="742" y="490" class="box">device_session store</text><text x="742" y="507" class="tag run">RUN</text>
+  </g>
+  <g>
+    <!-- MEASURE -->
+    <rect x="1072" y="348" width="368" height="196" rx="10" fill="#fff" stroke="#c7dcee"/>
+    <rect x="1072" y="348" width="368" height="30" rx="10" fill="#3d88c4"/><text x="1086" y="369" class="band">MEASURE / COMPUTE  (HW Test Kit)</text>
+    <text x="1086" y="398" class="box">dramm</text><text x="1150" y="398" class="lbl">hot kernel → 0.120493199688742</text><text x="1086" y="414" class="tag run">RUN</text>
+    <text x="1086" y="438" class="box">drammtune</text><text x="1180" y="438" class="lbl">CPU/GPU tuner: fastest + battery</text><text x="1086" y="454" class="tag backend">CPU RUN · GPU STUB</text>
+    <text x="1086" y="478" class="box">intbench · memtimer · thermal</text><text x="1086" y="494" class="tag run">RUN</text>
+    <text x="1086" y="516" class="box">sysmon · diskbench · fpga-verify</text><text x="1086" y="532" class="tag run">RUN</text>
+  </g>
+
+  <line x1="740" y1="544" x2="740" y2="572" stroke="#8aa0b8" stroke-width="2" marker-end="url(#arw)"/>
+  <text x="750" y="562" class="flow">measures + tuning targets ↓ down to the metal</text>
+
+  <!-- HARDWARE / PHONE LAYER -->
+  <rect x="40" y="572" width="1400" height="180" rx="10" fill="#eef3f9" stroke="#c7dcee"/>
+  <text x="60" y="598" class="band" fill="#2f6ea5">HARDWARE ABSTRACTION  (phone + board) — your C-code drops in here</text>
+  <g>
+    <rect x="60" y="612" width="205" height="120" rx="8" fill="#fff" stroke="#c7dcee"/><text x="72" y="636" class="box">CPU</text><text x="72" y="656" class="lbl">MHz/RDTSC, turns &amp;</text><text x="72" y="672" class="lbl">rotation stops (drammtune)</text><text x="72" y="712" class="tag run">RUN (measured)</text>
+    <rect x="277" y="612" width="205" height="120" rx="8" fill="#fff" stroke="#c7dcee"/><text x="289" y="636" class="box">GPU</text><text x="289" y="656" class="lbl">loopset + throughput</text><text x="289" y="672" class="lbl">hooks: gpu_throughput()</text><text x="289" y="712" class="tag stub">STUB → your GPU C-code</text>
+    <rect x="494" y="612" width="205" height="120" rx="8" fill="#fff" stroke="#c7dcee"/><text x="506" y="636" class="box">RF Unit</text><text x="506" y="656" class="lbl">2G/4G/5G capacity model</text><text x="506" y="672" class="lbl">base·bands·LN (fpga-verify)</text><text x="506" y="712" class="tag backend">BACKEND · combine-rule TBD</text>
+    <rect x="711" y="612" width="205" height="120" rx="8" fill="#fff" stroke="#c7dcee"/><text x="723" y="636" class="box">Battery</text><text x="723" y="656" class="lbl">energy_model(T,D)</text><text x="723" y="672" class="lbl">swap → RAPL / batt C-code</text><text x="723" y="712" class="tag backend">BACKEND (model)</text>
+    <rect x="928" y="612" width="205" height="120" rx="8" fill="#fff" stroke="#c7dcee"/><text x="940" y="636" class="box">Motherboard BUS</text><text x="940" y="656" class="lbl">transfer/latency across bus</text><text x="940" y="672" class="lbl">memtimer reserve-per-calc</text><text x="940" y="712" class="tag run">RUN (host) · phone TBD</text>
+    <rect x="1145" y="612" width="275" height="120" rx="8" fill="#fff" stroke="#c7dcee"/><text x="1157" y="636" class="box">Thermal / STAC</text><text x="1157" y="656" class="lbl">van der Waals · Justacon</text><text x="1157" y="672" class="lbl">Newton-Loco-Richter @677</text><text x="1157" y="712" class="tag held">HELD → your worked example</text>
+  </g>
+
+  <line x1="740" y1="752" x2="740" y2="778" stroke="#8aa0b8" stroke-width="2" marker-end="url(#arw)"/>
+
+  <!-- HYPERVISOR / VM LAYER -->
+  <rect x="40" y="778" width="1400" height="150" rx="10" fill="#e7f0f8" stroke="#c7dcee"/>
+  <text x="60" y="804" class="band" fill="#2f6ea5">SCHI / SCCM / HYPERVISOR — NetSwitch SCHI-SCCM VM  (txt spec incoming from you)</text>
+  <g>
+    <rect x="60" y="818" width="330" height="92" rx="8" fill="#fff" stroke="#c7dcee"/><text x="72" y="842" class="box">SCCM block pipeline</text><text x="72" y="862" class="lbl">ddtm 8×8 DCT + requant →</text><text x="72" y="878" class="lbl">MS SQL picks best scaler</text><text x="72" y="900" class="tag run">RUN</text>
+    <rect x="402" y="818" width="330" height="92" rx="8" fill="#fff" stroke="#c7dcee"/><text x="414" y="842" class="box">Hypervisor-removed RAM VM</text><text x="414" y="862" class="lbl">down-up, more FPS target</text><text x="414" y="878" class="lbl">Android / iOS</text><text x="414" y="900" class="tag held">DESIGN · your txt spec</text>
+    <rect x="744" y="818" width="330" height="92" rx="8" fill="#fff" stroke="#c7dcee"/><text x="756" y="842" class="box">SCHI schematic</text><text x="756" y="862" class="lbl">system schi-sccm map</text><text x="756" y="900" class="tag held">HELD · your txt files</text>
+    <rect x="1086" y="818" width="334" height="92" rx="8" fill="#fff" stroke="#c7dcee"/><text x="1098" y="842" class="box">switch-config</text><text x="1098" y="862" class="lbl">one XML the switch reads at boot;</text><text x="1098" y="878" class="lbl">every plane above = a stanza</text><text x="1098" y="900" class="tag run">RUN</text>
+  </g>
+
+  <text x="40" y="960" class="lbl">Flow: client REGISTER (one-time code) → registrar logs to SQL → approve (ratio~1) → routing picks edge by RTT → voice-edge relays RTP → SCCM block scaled (ddtm+SQL) → stream-ctl/qc tiers.</text>
+  <text x="40" y="982" class="lbl">Blocked on you: GPU C-code (GPU column) · capacity combine-rule (RF) · thermal worked examples (STAC) · SCHI-SCCM txt spec (VM) · MS SQL instance (data plane).</text>
+  <text x="40" y="1008" class="sub" fill="#7a8aa0">6GGW / NetSwitch architecture — first-cut, matches repo today. Anirudha Talmale.</text>
+</svg>

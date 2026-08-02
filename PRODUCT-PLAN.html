@@ -1,0 +1,176 @@
+<!doctype html><meta charset='utf-8'><title>6GGW / NetSwitch — Product Set & Aug-Sep-Oct Plan</title>
+<style>
+  @page { size: A4; margin: 15mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+         color:#1f2733; line-height:1.5; font-size:12.5px; margin:0; }
+  h1 { color:#2f6ea5; font-size:22px; border-bottom:3px solid #3d88c4; padding-bottom:6px; margin:0 0 14px; }
+  h2 { color:#2f6ea5; font-size:16px; margin:22px 0 8px; border-left:4px solid #3d88c4; padding-left:8px; }
+  h3 { color:#3d5063; font-size:13.5px; margin:16px 0 6px; }
+  p, li { font-size:12.5px; }
+  code { background:#eef3f8; color:#20456b; padding:1px 5px; border-radius:4px;
+         font-family: SFMono-Regular, Consolas, monospace; font-size:11.5px; }
+  table { border-collapse:collapse; width:100%; margin:10px 0 16px; font-size:11px; }
+  th { background:#3d88c4; color:#fff; text-align:left; padding:7px 9px; font-weight:600; vertical-align:top; }
+  td { padding:6px 9px; border-bottom:1px solid #e3ecf4; vertical-align:top; }
+  tr:nth-child(even) td { background:#f4f8fb; }
+  strong { color:#20456b; }
+  hr { border:none; border-top:1px solid #dbe5ef; margin:20px 0; }
+  .footer { margin-top:24px; padding-top:10px; border-top:1px solid #dbe5ef; color:#7a8aa0; font-size:10px; }
+</style>
+<body><h1 id="6ggw-netswitch-product-set-order-augsepoct-plan">6GGW / NetSwitch — Product Set, Order &amp; Aug–Sep–Oct Plan</h1>
+<p>This is the 6-product order you asked for: what each product is, what parts are
+already built and running, what parts are still missing, how I propose to solve
+each missing part, and what we develop in which month (Aug → Sep → Oct). It is
+built from what is actually in the repo today, with honest status tags:</p>
+<ul>
+<li><strong>RUN</strong> — built, self-tests pass, verified on Linux + Windows (wine).</li>
+<li><strong>BACKEND</strong> — implemented but wired to a model/assumption, swaps to real sensor/hardware when your code lands.</li>
+<li><strong>STUB</strong> — honest hook, returns "no device" until your GPU / RF / battery C-code is in.</li>
+</ul>
+<p>Nothing below is marketing. Where a number depends on your hardware or a formula
+you still owe me, it says so.</p>
+<hr />
+<h2 id="the-6-products-delivery-order">The 6 products (delivery order)</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Product</th>
+<th>One line</th>
+<th>Depends on</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>NetSwitch Core</strong></td>
+<td>the serverless switch: register, approve, reroute, media edge, SQL data plane</td>
+<td>— (built)</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>HW Test Kit</strong></td>
+<td>intbench + drammtune + memtimer + nettrace + thermal + sysmon + fpga-verify</td>
+<td>your GPU C-code for full GPU numbers</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Phone SysBar (Android)</strong></td>
+<td>always-on RAM/ROM/CPU top bar</td>
+<td>shipped; iOS variant is product 6</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>Capacity / RF Model</strong></td>
+<td>2G/4G/5G capacity from base + bands + LN</td>
+<td>your combine-rule + a/b constants</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>Thermal + STAC Engine</strong></td>
+<td>van der Waals / Justacon / Newton-Loco-Richter running-hot model</td>
+<td>your worked input→output examples</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>Phone App (iOS) + CPU/GPU Adaptivity</strong></td>
+<td>iOS stats surface + on-device CPU/GPU tuner ("both running")</td>
+<td>Apple signing + your GPU C-code</td>
+</tr>
+</tbody>
+</table>
+<p>The order is deliberate: 1 is the spine everything speaks to, 2 measures the box,
+3 is already in your hands, 4–5 are the physics that need your worked numbers, 6
+is the second phone platform plus the on-device adaptivity that needs the GPU code.</p>
+<hr />
+<h2 id="product-1-netswitch-core-status-run-with-2-backend-edges">Product 1 — NetSwitch Core   (status: RUN, with 2 BACKEND edges)</h2>
+<p><strong>What it is.</strong> One serverless app + native C++ control plane. A device registers
+with a one-time backup code, <code>approve</code> (same binary both ends) gates it by a timing
+ratio, the routing engine picks the least-cost edge by measured RTT, <code>voice-edge</code>
+relays the RTP media, and the MS SQL data plane stores sessions and picks the best
+scaler. Four interchangeable client faces (PWA, Qt, CLI, thin-client).</p>
+<p><strong>Built &amp; running:</strong> register/approve/reroute/media path, backup-codes (500 salted
+one-time), TLS 1.3 + SSH tunnel, <code>switch-config</code> XML boot config, the SQL data plane.</p>
+<p><strong>Missing parts → how to solve:</strong>
+- <em>MS SQL target instance not fixed.</em> You mentioned 9.1 / MS SQL 2025–2026 — <strong>solve:</strong> you name the instance + version, I lock the ODBC DSN and run the <code>.sql</code> set against it.
+- <em>Real marketing/traffic numbers.</em> Reports currently run on a synthetic dataset — <strong>solve:</strong> you hand me one real dataset (1:1 columns), I bind the report engine to it and set the page count.</p>
+<h2 id="product-2-hw-test-kit-status-run-on-cpu-gpu-parts-stub">Product 2 — HW Test Kit   (status: RUN on CPU, GPU parts STUB)</h2>
+<p><strong>What it is.</strong> The full measure suite, each a single-file C++17 tool with a <code>selftest</code>:
+<code>intbench</code> (INT2/4/8/16 loopset timer), <code>drammtune</code> (CPU/GPU combination-search AI, fastest + battery), <code>memtimer</code> (reserve-mem-per-calc + today/tomorrow dX compare), <code>nettrace</code> (40 pings / 15 traceroutes / 11 pingroutes concurrently), <code>thermal</code>, <code>sysmon</code>, <code>diskbench</code>, <code>fpga-verify</code>.</p>
+<p><strong>Built &amp; running:</strong> every CPU path, all self-tests 5/5, cross-checksum identical
+Linux↔Windows. drammtune reproduces the DRAMM constant 0.120493199688742.</p>
+<p><strong>Missing parts → how to solve:</strong>
+- <em>GPU throughput / loopset return −1 ("no device").</em> Honest stubs — <strong>solve:</strong> your GPU C-code drops into <code>gpu_throughput()</code> (drammtune) and <code>gpu_loopset()</code> (intbench); I wire and verify same-day.
+- <em>Energy is a model, not a sensor.</em> <code>energy_model(T,D)</code> is labelled MODEL — <strong>solve:</strong> swap in RAPL (Intel) / your battery C-code and it reads real joules.
+- <em>No single tester-runner yet.</em> <strong>solve:</strong> one <code>tester-runner</code> that runs intbench+drammtune+nettrace+thermal+fpga-verify in one pass and prints the phone bottleneck (CPU / GPU / RAM / thermal / network limiter). Built once the GPU code lands so the GPU column isn't blank.</p>
+<h2 id="product-3-phone-sysbar-android-status-run-shipped">Product 3 — Phone SysBar, Android   (status: RUN, shipped)</h2>
+<p><strong>What it is.</strong> The always-on top bar (RAM/ROM/CPU%, small font, over every app),
+foreground-service overlay, install-time RAM estimate. APK already delivered.</p>
+<p><strong>Missing parts → how to solve:</strong>
+- <em>Device-wide CPU% is (app) not (sys) on locked-down phones.</em> <strong>solve:</strong> optional root/privileged reader for a true system CPU%.
+- <em>Optional fields.</em> battery %, temperature, network kb/s — <strong>solve:</strong> say the word, each is a small add + fresh APK.</p>
+<h2 id="product-4-capacity-rf-model-status-backend-formula-open">Product 4 — Capacity / RF Model   (status: BACKEND, formula open)</h2>
+<p><strong>What it is.</strong> The 2G/4G/5G capacity model from your base constant (~232.66),
+bands (2 / 8 / 4), and LN divisor (1.4 city … 1.8 rural). <code>fpga-verify capacity</code>
+already computes the candidate combinations.</p>
+<p><strong>Missing parts → how to solve:</strong>
+- <em>The combine rule.</em> Your ladder (6 / 23 / 300 / 700) is not base×bands÷LN — <strong>solve:</strong> you tell me what 2+4 / 23 / 100+200 / 230+230+240 represent (or the exact formula), I lock the per-generation number and add a <code>selftest</code> that reproduces 6/23/300/700 exactly.
+- <em>"split capacity reCh 5 from 2" + the <code>2G / LOG1.1 ^277</code> line.</em> Undefined tokens — <strong>solve:</strong> one worked input→output example each.</p>
+<h2 id="product-5-thermal-stac-engine-status-held-needs-your-numbers">Product 5 — Thermal + STAC Engine   (status: HELD, needs your numbers)</h2>
+<p><strong>What it is.</strong> The running-hot physics: van der Waals + Justacon/Entropia thermals,
+Newton/Loco/Richter of StaceyReynolds at moment 677, feeding the data-rate model
+("running hot" derate).</p>
+<p><strong>Missing parts → how to solve:</strong> I have all your input lines logged, but no
+input→output example to fit against. <strong>solve:</strong> for each thermal, one line of
+"these inputs → this result" and I turn it into a verified function with a
+<code>selftest</code> that reproduces your result to the digit. I will not invent the formula.</p>
+<h2 id="product-6-phone-app-ios-cpugpu-adaptivity-status-source-this-week-honest-caveats">Product 6 — Phone App iOS + CPU/GPU Adaptivity   (status: source this week, honest caveats)</h2>
+<p><strong>What it is.</strong> The iOS counterpart to SysBar, plus the on-device CPU/GPU adaptivity
+("both running") — drammtune's fastest-vs-battery search adapted to the phone.</p>
+<p><strong>Two honest platform facts up front (so we plan around them, not into them):</strong>
+1. <strong>iOS has no Android-style floating bar over other apps.</strong> Apple's sandbox has
+   no equivalent to <code>SYSTEM_ALERT_WINDOW</code>. The legitimate always-visible surfaces
+   are <strong>Live Activity</strong> (Dynamic Island + Lock Screen) and <strong>Widgets</strong>. So the iOS
+   "always visible" bar = a Live Activity, not a free-floating overlay. I build it
+   that way; it is App-Store-legal.
+2. <strong>Shipping to your iPhone needs signing.</strong> I can write and cloud-compile the Swift
+   source, but installing on your device needs an Apple ID / developer cert — <strong>solve:</strong>
+   you supply the signing identity (or I give you the project to open in Xcode and run
+   on your own phone in 2 taps).
+3. <strong>iOS restricts system-wide CPU% and other-process memory</strong> the same way Android 8+
+   does. App reads its own task CPU + device RAM/ROM honestly; a true device-wide CPU%
+   needs entitlements — same <code>(sys)</code>/<code>(app)</code> honesty tag as Android.</p>
+<p><strong>On-device CPU/GPU adaptivity</strong> reuses drammtune's engine; the GPU half is STUB
+until your GPU C-code lands, then "both running" is real on the phone.</p>
+<hr />
+<h2 id="month-plan">Month plan</h2>
+<h3 id="august-measure-spine">August — measure &amp; spine</h3>
+<ul>
+<li><strong>P1:</strong> lock MS SQL instance (your 9.1 target), bind report engine to one real dataset.</li>
+<li><strong>P2:</strong> land your GPU C-code into intbench + drammtune; build the <strong>tester-runner</strong> + phone bottleneck check (CPU/GPU/RAM/thermal/network limiter).</li>
+<li><strong>P3:</strong> SysBar optional fields (battery/temp/net) on request.</li>
+<li><strong>P6:</strong> iOS source + Live-Activity bar + macOS cloud-compile CI (this week).</li>
+</ul>
+<h3 id="september-physics-adaptivity">September — physics &amp; adaptivity</h3>
+<ul>
+<li><strong>P4:</strong> lock the capacity combine-rule → per-generation 2G/4G/5G numbers with a reproducing selftest.</li>
+<li><strong>P5:</strong> thermal/STAC engine — fit each of your thermals to its worked example, verified to the digit.</li>
+<li><strong>P6:</strong> on-device CPU/GPU adaptivity live ("both running") once GPU code is in.</li>
+</ul>
+<h3 id="october-release-candidates">October — release candidates</h3>
+<ul>
+<li><strong>P1–P2:</strong> RC of core + HW kit, cross-platform checksums, install-compatibility matrix refreshed.</li>
+<li><strong>P4–P5:</strong> capacity + thermal folded into the switch's "running-hot" data-rate derate, end-to-end verified.</li>
+<li><strong>P3 + P6:</strong> SysBar Android RC + iOS signed build (with your signing identity) as a matched pair.</li>
+</ul>
+<hr />
+<h2 id="what-i-need-from-you-to-keep-all-six-moving">What I need from you to keep all six moving</h2>
+<ol>
+<li><strong>GPU C-code</strong> — unblocks P2 GPU numbers, tester-runner, and P6 adaptivity.</li>
+<li><strong>Capacity combine-rule</strong> — unblocks P4 (I already have base/bands/LN).</li>
+<li><strong>One worked input→output per thermal</strong> — unblocks P5.</li>
+<li><strong>MS SQL instance + one real dataset</strong> — unblocks P1 reports.</li>
+<li><strong>iOS signing identity</strong> (or you run the Xcode project yourself) — unblocks P6 install.</li>
+</ol>
+<p>Everything else I can push on without you. That's the plan for Aug–Sep–Oct.</p><div class='footer'>6GGW / NetSwitch — Product Set & Aug-Sep-Oct Plan. Anirudha Talmale.</div></body>
