@@ -6,7 +6,7 @@ cascade, transmission lines, microstrip synthesis/analysis, matching networks.
 
 ```
 g++ -std=c++17 -O2 ggw_rfsim.cpp -o ggw_rfsim
-./ggw_rfsim selftest      # 38 checks, PASS/FAIL each
+./ggw_rfsim selftest      # 46 checks, PASS/FAIL each
 ./ggw_rfsim report        # showcase
 ```
 
@@ -27,6 +27,8 @@ field-solver roadmap (FEM / 3D FDTD, still TODO) is in `ROADMAP.md`.
 | `bpf <butter\|cheby> <n> <f0_MHz> <BW_MHz> <Z0> [ripple_dB]` | bandpass LC synthesis (lowpass prototype → bandpass transform) | gives real pF/nH per element |
 | `s2p <file.s2p>` | read Touchstone data (RI/MA/dB, any freq unit): per-freq VSWR/RL/insertion-loss + Rollett stability K, |Δ| | 3dB attenuator → IL 3.0dB, VSWR 1, K>1 stable |
 | `fft` | Fourier: FFT / inverse FFT (radix-2). Demo resolves a 2-tone signal | tone→single bin, delta→flat, Parseval, round-trip |
+| `dft` | DFT chapter walk-through: naive O(N²) DFT vs radix-2 FFT (they agree), real amplitude A_m=2\|F_m\|/N, conjugate symmetry F_{N−k}=conj(F_k), iDFT via conjugate trick, Nyquist/Shannon | naive DFT == FFT to 1e-14; amps recovered exactly; symmetry holds; Ex7.1 sin@2× → all zeros |
+| `signal <fs> <N> <fHz:amp>...` | **simulate a discrete signal** (sum of tones sampled at fs over N points) and analyse its spectrum — Hz axis, Δf=fs/N, Nyquist=fs/2, aliasing warning + fold-back | 30 kHz tone at fs=40 kHz → warned, folds back to 10 kHz bin |
 | `settings [file.conf]` | show capability On/Off + implemented/planned (FEM, FDTD, Fourier…) | file toggles; planned-but-enabled flagged |
 
 `filter`/`bpf` cover the AWR/ADS "filter synthesis" workflow; `s2p` reads the universal RF
@@ -58,6 +60,13 @@ drop straight in. LC element values are exact closed forms; g-values match publi
 - FDTD: 1D Yee update, eps∝1/Z, mu∝Z so wave impedance = Z and speed is constant; 1st-order
   Mur ABC on both ends; incident peak from a homogeneous run, reflected peak from the
   stepped run, ratio = |Γ|.
+- DFT / discrete-signal analysis (the DFT chapter): unit root w = e^(−i2π/N),
+  F_m = Σ f_n w^(mn). The naive O(N²) DFT is the direct book for-loop and works for **any** N;
+  the radix-2 FFT needs N=2^k and is cross-checked against it (they agree to ~1e-14). Real
+  amplitude A_m = 2·√(Re²+Im²)/N (DC and the Nyquist bin are not doubled). The iDFT reuses
+  the DFT: f = conj(DFT(conj(F)))/N. Frequency axis f_m = m·fs/N, spacing Δf = fs/N, highest
+  recognizable frequency fs/2 (Nyquist/Shannon — `signal` warns and shows the fold-back when a
+  tone exceeds it).
 
 Everything measured/derived is a closed form or a simulated field — nothing is stubbed here.
 No GPU hook in this tool; it is CPU-exact by design.

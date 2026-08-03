@@ -238,6 +238,46 @@ static void fft(std::vector<cd>& a, bool inverse){
 }
 static bool is_pow2(size_t n){ return n && !(n&(n-1)); }
 
+// ---- Discrete Fourier Transform, in the conventions of the DFT chapter ----
+// Book: unit root w = e^{-i 2pi/N};  DFT  F_m = sum_{n=0}^{N-1} f_n w^{mn}  (no 1/N forward).
+// Naive O(N^2) DFT — the direct form of the book's for-loop. Works for ANY N (the radix-2
+// fft() above needs N=2^k); we keep it to cross-check the FFT, exactly the chapter's point.
+static void dft_naive(const std::vector<cd>& f, std::vector<cd>& F){
+  size_t N=f.size(); F.assign(N,cd(0,0));
+  for(size_t m=0;m<N;m++){
+    cd acc(0,0);
+    for(size_t n=0;n<N;n++){
+      double ang=-2*PI*(double)m*(double)n/(double)N;
+      acc += f[n]*cd(std::cos(ang),std::sin(ang));
+    }
+    F[m]=acc;
+  }
+}
+// Inverse DFT via the book's "Important" identity (sec 7.3): f = conj( DFT( conj(F) ) ) / N,
+// i.e. the iDFT reuses the very same DFT routine.
+static void idft_conj(const std::vector<cd>& F, std::vector<cd>& f){
+  size_t N=F.size(); std::vector<cd> t(N);
+  for(size_t k=0;k<N;k++) t[k]=std::conj(F[k]);
+  std::vector<cd> T; dft_naive(t,T);
+  f.assign(N,cd(0,0));
+  for(size_t n=0;n<N;n++) f[n]=std::conj(T[n])/(double)N;
+}
+// Real amplitude spectrum A_m for a real signal (physical amplitudes), m=0..N/2:
+//   0<m<N/2  -> A_m = 2|F_m|/N   (factor 2 = the book's real amplitude, folding +/- freq)
+//   m=0 (DC) and, for even N, m=N/2 (Nyquist) -> A_m = |F_m|/N   (not doubled)
+static std::vector<double> amp_spectrum(const std::vector<cd>& F){
+  size_t N=F.size(); std::vector<double> A(N/2+1,0.0);
+  for(size_t m=0;m<=N/2;m++){
+    double a=std::abs(F[m])/(double)N;
+    if(m!=0 && !(N%2==0 && m==N/2)) a*=2.0;
+    A[m]=a;
+  }
+  return A;
+}
+// Frequency axis (Hz) for bin m at sample rate fs: f_m = m*fs/N.  Spacing df = fs/N;
+// the highest recognizable frequency is fs/2 at m=N/2 (the Nyquist / Shannon limit).
+static double bin_freq_Hz(size_t m,double fs,size_t N){ return (double)m*fs/(double)N; }
+
 // ---------------- capability settings (On/Off, implemented/planned) ----------------
 struct Cap { const char* key; const char* desc; bool on; bool implemented; };
 static std::vector<Cap> default_caps(){
@@ -245,7 +285,7 @@ static std::vector<Cap> default_caps(){
     {"circuit",    "S-params, microstrip, match, qwt, line, sweep", true,  true },
     {"filter",     "Butterworth/Chebyshev lowpass + bandpass LC",   true,  true },
     {"touchstone", ".s2p import + Rollett stability K",             true,  true },
-    {"fourier",    "FFT / inverse FFT spectrum",                    true,  true },
+    {"fourier",    "DFT/FFT/iDFT, amplitude spectrum, Nyquist",      true,  true },
     {"fdtd1d",     "1D FDTD field solver (verified vs closed form)",true,  true },
     {"fem",        "3D finite-element field solver",                false, false},
     {"fdtd3d",     "3D FDTD field solver",                          false, false},
@@ -451,6 +491,31 @@ static int cmd_selftest(){
     ck("is_pow2 detects 64 yes / 48 no", is_pow2(64) && !is_pow2(48));
   }
 
+  // 19b DFT chapter (discrete-signal analysis): naive O(N^2) DFT vs FFT, amplitude
+  //     recovery, conjugate symmetry, spectral repetition, iDFT trick, Nyquist/Shannon.
+  {
+    int N=16; std::vector<cd> x(N);
+    for(int n=0;n<N;n++) x[n]=cd(std::cos(2*PI*2*n/N)+0.5*std::cos(2*PI*5*n/N),0);
+    std::vector<cd> Xd; dft_naive(x,Xd);
+    std::vector<cd> Xf=x; fft(Xf,false);
+    double d=0; for(int k=0;k<N;k++) d=std::max(d,std::abs(Xd[k]-Xf[k]));
+    ck("DFT: naive O(N^2) DFT == radix-2 FFT", d<1e-9);
+    auto A=amp_spectrum(Xd);
+    ck("DFT: real amplitude recovered (bin2=1.0, bin5=0.5)", approx(A[2],1.0,1e-9)&&approx(A[5],0.5,1e-9));
+    double cs=0; for(int k=1;k<N;k++) cs=std::max(cs,std::abs(Xd[N-k]-std::conj(Xd[k])));
+    ck("DFT: conjugate symmetry F_{N-k}=conj(F_k) (real signal)", cs<1e-9);
+    { int m=N+3; cd acc(0,0); for(int n=0;n<N;n++){ double a=-2*PI*(double)m*n/N; acc+=x[n]*cd(std::cos(a),std::sin(a)); }
+      ck("DFT: spectra repeat F_{m+N}=F_m", std::abs(acc-Xd[3])<1e-9); }
+    std::vector<cd> back; idft_conj(Xd,back);
+    double ir=0; for(int n=0;n<N;n++) ir=std::max(ir,std::abs(back[n]-x[n]));
+    ck("DFT: inverse via conjugate trick round-trips", ir<1e-9);
+    { std::vector<cd> cst(8,cd(3.0,0)); std::vector<cd> C; dft_naive(cst,C); auto Ac=amp_spectrum(C);
+      ck("DFT: DC amplitude not doubled (const 3 -> A_0=3)", approx(Ac[0],3.0,1e-9)&&Ac[1]<1e-9); }
+    double mx=0; for(int n=0;n<8;n++) mx=std::max(mx,std::fabs(std::sin(2*PI*0.5*n)));
+    ck("DFT: Shannon Ex7.1 sin sampled at 2x fmax -> ~0 (signal lost)", mx<1e-9);
+    ck("DFT: FFT cost 0.5*N*log2(N) (N=1024 -> 5120)", approx(0.5*1024*std::log2(1024.0),5120.0,1e-6));
+  }
+
   // 20 settings: defaults have implemented caps ON and FEM/FDTD-3D as planned/off
   {
     auto caps=default_caps(); bool fourierOn=false, femPlanned=false;
@@ -475,6 +540,8 @@ static int usage(){
    "  bpf <butter|cheby> <n> <f0_MHz> <BW_MHz> <Z0> [ripple_dB]   bandpass LC synthesis\n"
    "  s2p <file.s2p>                 read Touchstone data: VSWR/RL/IL + stability K per freq\n"
    "  fft                            Fourier (FFT) demo: 2-tone spectrum\n"
+   "  dft                            DFT chapter walk-through (naive DFT vs FFT, amps, symmetry, Nyquist)\n"
+   "  signal <fs_Hz> <N> <fHz:amp>...   simulate a discrete signal, analyse its spectrum (FFT or DFT)\n"
    "  settings [file.conf]           show capability On/Off + implemented/planned (FEM/FDTD/Fourier...)\n"
    "  sweep <ZLre> <ZLim> <Zsys> <Zline> <er> <len_m> <f0_MHz> <f1_MHz> <npts>   VSWR/RL vs freq\n"
    "  fdtd <Z1> <Z2>                 1D FDTD reflection off an impedance step\n"
@@ -531,6 +598,54 @@ int main(int argc,char**argv){
       double m=std::abs(X[k])/N*2.0;
       printf("%4d  %6.3f %s\n", k, m, (m>0.2)?"<== tone":"");
     }
+    return 0; }
+  if(c=="dft"){
+    // Walk through the DFT chapter on a known real signal, N=16.
+    int N=16; std::vector<cd> x(N);
+    for(int n=0;n<N;n++) x[n]=cd(std::cos(2*PI*2*n/N)+0.5*std::cos(2*PI*5*n/N),0);
+    std::vector<cd> Xd; dft_naive(x,Xd);
+    std::vector<cd> Xf=x; fft(Xf,false);
+    double d=0; for(int k=0;k<N;k++) d=std::max(d,std::abs(Xd[k]-Xf[k]));
+    printf("DFT chapter demo, N=%d  (real signal: amp 1.0 @ bin2  +  amp 0.5 @ bin5)\n",N);
+    printf("naive O(N^2) DFT vs radix-2 FFT: max diff %.2e  -> %s\n", d, d<1e-9?"AGREE":"MISMATCH");
+    auto A=amp_spectrum(Xd);
+    printf("amplitude spectrum  A_m = 2|F_m|/N  (DC and Nyquist not doubled):\n");
+    printf("   m    A_m     note\n");
+    for(int m=0;m<=N/2;m++) printf("  %2d  %7.4f   %s\n", m, A[m], A[m]>0.05?"<== tone":"");
+    double cs=0; for(int k=1;k<N;k++) cs=std::max(cs,std::abs(Xd[N-k]-std::conj(Xd[k])));
+    printf("conjugate symmetry F_{N-k}=conj(F_k): max err %.2e (%s)\n", cs, cs<1e-9?"holds":"fails");
+    std::vector<cd> back; idft_conj(Xd,back);
+    double ir=0; for(int n=0;n<N;n++) ir=std::max(ir,std::abs(back[n]-x[n]));
+    printf("inverse DFT (conjugate trick f=conj(DFT(conj(F)))/N): round-trip err %.2e\n", ir);
+    double mx=0; for(int n=0;n<8;n++) mx=std::max(mx,std::fabs(std::sin(2*PI*0.5*n)));
+    printf("Nyquist/Shannon Ex7.1: sin(2*pi*t) sampled at exactly 2x fmax -> peak |sample| %.2e (all ~0)\n",mx);
+    printf("FFT cost for N=%d: 0.5*N*log2(N) = %.0f complex mults\n", N, 0.5*N*std::log2((double)N));
+    return 0; }
+  if(c=="signal" && argc>=4){
+    // Simulate a discrete signal and analyse it by FFT/DFT.
+    //   signal <fs_Hz> <N> <fHz:amp> [<fHz:amp> ...]
+    double fs=atof(argv[2]); int N=atoi(argv[3]);
+    if(fs<=0 || N<2){ printf("need fs>0 and N>=2\n"); return 1; }
+    std::vector<std::pair<double,double>> comp;
+    for(int i=4;i<argc;i++){ std::string s=argv[i]; auto col=s.find(':');
+      if(col==std::string::npos) continue;
+      comp.push_back({atof(s.substr(0,col).c_str()), atof(s.substr(col+1).c_str())}); }
+    std::vector<cd> x(N);
+    for(int n=0;n<N;n++){ double v=0; for(auto&p:comp) v+=p.second*std::cos(2*PI*p.first*n/fs); x[n]=cd(v,0); }
+    double T=N/fs, df=fs/(double)N, fnyq=fs/2.0;
+    printf("simulated discrete signal: N=%d samples, fs=%.6g Hz, window T=%.6g s\n",N,fs,T);
+    printf("frequency spacing df=fs/N=%.6g Hz, Nyquist (max recognizable)=fs/2=%.6g Hz\n",df,fnyq);
+    for(auto&p:comp) if(p.first>=fnyq)
+      printf("  ! %.6g Hz >= Nyquist %.6g Hz -> ALIASES (Shannon needs fs > 2*fmax)\n",p.first,fnyq);
+    std::vector<cd> X;
+    bool usefft=is_pow2((size_t)N);
+    if(usefft){ X=x; fft(X,false); } else dft_naive(x,X);
+    auto A=amp_spectrum(X);
+    printf("spectrum (bins with amplitude > 1e-6):\n");
+    printf("   bin   freq[Hz]      amplitude\n");
+    for(size_t m=0;m<A.size();m++)
+      if(A[m]>1e-6) printf("  %4zu   %-11.6g   %.5f\n", m, bin_freq_Hz(m,fs,N), A[m]);
+    printf("(engine: %s)\n", usefft?"radix-2 FFT (N=2^k)":"naive O(N^2) DFT (N not a power of 2)");
     return 0; }
   if(c=="filter" && argc>=6){
     std::string ty=argv[2]; int n=atoi(argv[3]); double fc=atof(argv[4])*1e6, Z0=atof(argv[5]);
