@@ -26,6 +26,7 @@ dev can trust a tool before touching it:
 ```
 benchrun/ggw_benchrun   selftest      # 12 checks
 dramtest/ggw_dramtest   selftest      # 10 checks (incl. injected stuck-cell)
+productmeasure/ggw_productmeasure selftest  # 15 checks (mem verify + GEMM determinism + verdict)
 intbench/ggw_intbench   selftest
 drammtune/ggw_drammtune selftest
 thermocalc/ggw_thermocalc selftest
@@ -38,7 +39,7 @@ Full tree + one-line descriptions: `SOURCE-MANIFEST.md`.
 
 Every benchmark tool measures CPU/RAM for real and leaves the GPU as a single
 honest function that currently returns "no device" (`-1`). This is deliberate —
-nothing is faked. Fill in these four spots with real GPU code (CUDA / OpenCL /
+nothing is faked. Fill in these five spots with real GPU code (CUDA / OpenCL /
 Vulkan / Metal — whatever the target uses) and the GPU axis goes live everywhere:
 
 | File | Function | Contract |
@@ -47,6 +48,7 @@ Vulkan / Metal — whatever the target uses) and the GPU axis goes live everywhe
 | `intbench/ggw_intbench.cpp` | GPU path (search `gpu`) | return GOPS per INT2/4/8/16 precision → third bar goes live |
 | `drammtune/ggw_drammtune.cpp` | `gpu_throughput()` | return GPU steps/s → GPU becomes a candidate in the tuner search |
 | `gpuscreensaver/index.html` | GPU line | swap the WebGL probe for device counters (currently real WebGL, labelled) |
+| `productmeasure/ggw_productmeasure.cpp` | `gpu_ai()` | return measured GPU GEMM flop/s (>0) → AI measure + infer floor go device-live |
 
 Each returns a single number given a size/iters input. Even ~20 lines of real,
 compiling GPU code per target is enough — wire it in, re-run `selftest`, done.

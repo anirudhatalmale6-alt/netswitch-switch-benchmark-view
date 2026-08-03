@@ -38,6 +38,7 @@ build_std benchrun    benchrun/ggw_benchrun.cpp
 build_std dramtest    dramtest/ggw_dramtest.cpp
 build_std thermocalc  thermocalc/ggw_thermocalc.cpp
 build_std siso        siso/ggw_siso.cpp
+build_std productmeasure productmeasure/ggw_productmeasure.cpp
 # note: cputimer is header-only (cpu_mhz_timer.h) + a demo; the header is the shared
 #       MHz timebase meant to be #included across modules. radiosig runs the client's
 #       radio-parameter reduction on that timebase. Both build Linux + Windows.
@@ -124,6 +125,7 @@ run_selftest benchrun/ggw_benchrun
 run_selftest dramtest/ggw_dramtest
 run_selftest thermocalc/ggw_thermocalc
 run_selftest siso/ggw_siso
+run_selftest productmeasure/ggw_productmeasure
 echo "selftests: $stpass passed, $stfail failed"
 
 echo

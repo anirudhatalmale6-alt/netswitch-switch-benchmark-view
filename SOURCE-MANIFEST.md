@@ -38,6 +38,7 @@ and runs its self-test.
 | `drammtune/` | ggw_drammtune | DRAMM combination-search tuner (threads×duty) with a battery-energy model. GPU = hook. |
 | `benchrun/` | ggw_benchrun | One-pass CPU+RAM+thermal runner; names the bottleneck via roofline crossover. GPU = hook. |
 | `dramtest/` | ggw_dramtest | DRAM cell tester (write ×N → zero-overwrite → verify → warming rule → per-cell radian log). Detects stuck cells. |
+| `productmeasure/` | ggw_productmeasure | Device MEM + AI measure for product management (bandwidth + cell integrity + dense-GEMM inference floor → one readiness verdict; `json` mode for CI). GPU = hook. |
 | `thermocalc/` | ggw_thermocalc | Thermodynamics (Cp/entropy/enthalpy/ideal/van-der-Waals/Stirling), each closed form self-checked vs numeric integration. |
 | `siso/` | ggw_siso | SISO transfer-function analyser (poles/zeros via Durand-Kerner) — the Nokia-2022 plant: UNSTABLE + non-minimum-phase. |
 | `gpuscreensaver/` | index.html | Three-line GPU/CPU/cooperative screensaver, driven by real WebGL + CPU measurements. GPU line → device counters when the GPU hook lands. |
