@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NetSwitch — placing IP/POP nodes onto a real map (geo projection)</title>
+<style>
+  :root{ --bg:#070b12; --ink:#e8eef7; --dim:#7f93b0; --grid:#16233a; --netA:#39a0ff; --good:#39d98a; --mid:#ffb020; --bad:#ff5a5a; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif; }
+  .wrap{ max-width:900px; margin:0 auto; padding:18px; }
+  h1{ font-size:18px; margin:0 0 4px; }
+  p.sub{ color:var(--dim); margin:0 0 14px; }
+  canvas{ width:100%; display:block; border-radius:10px; background:#050810; border:1px solid #12203a; }
+  .note{ color:var(--dim); font-size:12px; margin-top:12px; }
+  .note b{ color:var(--ink); }
+  .legend{ display:flex; gap:16px; flex-wrap:wrap; margin:10px 0 0; font-size:12px; color:var(--dim); }
+  .dot{ display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; vertical-align:middle; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Placing the IP / POP map onto a real map</h1>
+  <p class="sub">Each node is positioned by its true latitude / longitude through an equirectangular map projection — no Google Maps, no HSL, no tiles. Fully self-contained and original.</p>
+  <canvas id="map" width="864" height="470"></canvas>
+  <div class="legend">
+    <span><span class="dot" style="background:var(--netA)"></span>on active route</span>
+    <span><span class="dot" style="background:#3a4d72"></span>other POP</span>
+    <span>grid = latitude / longitude graticule</span>
+  </div>
+  <p class="note">
+    <b>How an IP lands on a map:</b> IP address → geolocation gives a <b>(latitude, longitude)</b> →
+    a <b>projection</b> converts lat/long to an (x, y) pixel. Here the projection is equirectangular:
+    x scales with longitude, y with latitude. Swap in a real coastline base underneath (OpenStreetMap
+    data we render ourselves — open license, we own the styling) and these exact same node positions sit
+    on top of real geography. The math that places the dot does not change; only the backdrop does.
+  </p>
+</div>
+<script>
+// ---- POPs with REAL coordinates (lat, lon in degrees) ----
+const POPs = [
+  {id:'HEL', name:'Helsinki',  lat:60.17, lon:24.94},
+  {id:'FRA', name:'Frankfurt', lat:50.11, lon: 8.68},
+  {id:'LON', name:'London',    lat:51.51, lon:-0.13},
+  {id:'WAW', name:'Warsaw',    lat:52.23, lon:21.01},
+  {id:'NYC', name:'New York',  lat:40.71, lon:-74.01},
+  {id:'SIN', name:'Singapore', lat: 1.35, lon:103.82},
+];
+const ROUTE = ['HEL','FRA','NYC','SIN']; // one example call path caller->callee
+
+const cv = document.getElementById('map'), g = cv.getContext('2d');
+const W = cv.width, H = cv.height;
+const M = {l:46, r:20, t:22, b:26};      // inset for degree labels
+
+// ---- fit the projection to the data bounds (+ padding) ----
+const lons = POPs.map(p=>p.lon), lats = POPs.map(p=>p.lat);
+let lonMin=Math.min(...lons), lonMax=Math.max(...lons);
+let latMin=Math.min(...lats), latMax=Math.max(...lats);
+const padLon=(lonMax-lonMin)*0.10, padLat=(latMax-latMin)*0.12;
+lonMin-=padLon; lonMax+=padLon; latMin-=padLat; latMax+=padLat;
+
+// equirectangular projection: (lat,lon) -> (x,y) pixel
+function sx(lon){ return M.l + (lon-lonMin)/(lonMax-lonMin) * (W-M.l-M.r); }
+function sy(lat){ return M.t + (latMax-lat)/(latMax-latMin) * (H-M.t-M.b); }
+function P(id){ return POPs.find(p=>p.id===id); }
+
+function css(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+// ---- graticule (the "map" grid): meridians + parallels with degree labels ----
+function niceStep(span){ const s=[5,10,15,20,30,45,60]; const target=span/6; for(const v of s) if(v>=target) return v; return 60; }
+function drawGraticule(){
+  g.strokeStyle=css('--grid'); g.fillStyle=css('--dim'); g.lineWidth=1; g.font='10px system-ui';
+  const lonStep=niceStep(lonMax-lonMin), latStep=niceStep(latMax-latMin);
+  g.textAlign='center'; g.textBaseline='top';
+  for(let lon=Math.ceil(lonMin/lonStep)*lonStep; lon<=lonMax; lon+=lonStep){
+    const x=sx(lon); g.beginPath(); g.moveTo(x,M.t); g.lineTo(x,H-M.b); g.stroke();
+    const lab = lon===0?'0°': (lon>0? lon+'°E' : (-lon)+'°W');
+    g.fillText(lab, x, H-M.b+4);
+  }
+  g.textAlign='right'; g.textBaseline='middle';
+  for(let lat=Math.ceil(latMin/latStep)*latStep; lat<=latMax; lat+=latStep){
+    const y=sy(lat); g.beginPath(); g.moveTo(M.l,y); g.lineTo(W-M.r,y); g.stroke();
+    const lab = lat===0?'0°': (lat>0? lat+'°N' : (-lat)+'°S');
+    g.fillText(lab, M.l-6, y);
+  }
+}
+
+function draw(){
+  g.clearRect(0,0,W,H);
+  drawGraticule();
+  // active route line, drawn through true positions
+  g.strokeStyle=css('--netA'); g.lineWidth=3; g.shadowColor=css('--netA'); g.shadowBlur=10;
+  g.beginPath();
+  ROUTE.forEach((id,i)=>{ const p=P(id); const x=sx(p.lon),y=sy(p.lat); i?g.lineTo(x,y):g.moveTo(x,y); });
+  g.stroke(); g.shadowBlur=0;
+  // nodes at their real coordinates
+  for(const p of POPs){
+    const x=sx(p.lon), y=sy(p.lat), on=ROUTE.includes(p.id);
+    g.fillStyle= on?css('--netA'):'#3a4d72'; g.strokeStyle='#0a1120'; g.lineWidth=2;
+    g.beginPath(); g.arc(x,y,on?7:5,0,7); g.fill(); g.stroke();
+    g.fillStyle=css('--ink'); g.font='11px system-ui'; g.textAlign='center'; g.textBaseline='bottom';
+    g.fillText(p.name, x, y-9);
+    g.fillStyle=css('--dim'); g.font='9px system-ui'; g.textBaseline='top';
+    g.fillText(p.lat.toFixed(1)+', '+p.lon.toFixed(1), x, y+8);
+  }
+  // caller/callee tags
+  g.fillStyle=css('--dim'); g.font='10px system-ui'; g.textBaseline='middle';
+  const h=P('HEL'), s=P('SIN');
+  g.textAlign='left';  g.fillText('▶ caller', sx(h.lon)+10, sy(h.lat));
+  g.textAlign='right'; g.fillText('callee ◀', sx(s.lon)-10, sy(s.lat));
+}
+draw();
+</script>
+</body>
+</html>
