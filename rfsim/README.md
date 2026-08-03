@@ -6,7 +6,7 @@ cascade, transmission lines, microstrip synthesis/analysis, matching networks.
 
 ```
 g++ -std=c++17 -O2 ggw_rfsim.cpp -o ggw_rfsim
-./ggw_rfsim selftest      # 19 checks, PASS/FAIL each
+./ggw_rfsim selftest      # 32 checks, PASS/FAIL each
 ./ggw_rfsim report        # showcase
 ```
 
@@ -20,6 +20,13 @@ g++ -std=c++17 -O2 ggw_rfsim.cpp -o ggw_rfsim
 | `match <RS> <RL>` | L-network (real→real): Q, series/shunt reactances | Zin verified = 50+0j numerically |
 | `line <ZLre> <ZLim> <Z0> <f> <len> <er>` | Zin, |Γ|, VSWR, return-loss of a terminated line | 100Ω on 50Ω → VSWR 2.000 |
 | `sweep <ZLre> <ZLim> <Zsys> <Zline> <er> <len> <f0MHz> <f1MHz> <npts>` | VSWR/RL vs frequency (S11 sweep, the core RF deliverable) | quarter-wave 100→50 dips to VSWR 1.000 at design freq, degrades at band edges |
+| `filter <butter\|cheby> <n> <fc_MHz> <Z0> [ripple_dB]` | lowpass LC synthesis: prototype g-values → real L/C ladder | Butterworth n=3 g={1,2,1}; Cheby 0.5dB n=3 g={1.596,1.097,1.596} |
+| `bpf <butter\|cheby> <n> <f0_MHz> <BW_MHz> <Z0> [ripple_dB]` | bandpass LC synthesis (lowpass prototype → bandpass transform) | gives real pF/nH per element |
+| `s2p <file.s2p>` | read Touchstone data (RI/MA/dB, any freq unit): per-freq VSWR/RL/insertion-loss + Rollett stability K, |Δ| | 3dB attenuator → IL 3.0dB, VSWR 1, K>1 stable |
+
+`filter`/`bpf` cover the AWR/ADS "filter synthesis" workflow; `s2p` reads the universal RF
+data format so measured or simulated S-parameters (from a VNA, or exported by ADS/CST/HFSS)
+drop straight in. LC element values are exact closed forms; g-values match published tables.
 | `fdtd <Z1> <Z2>` | **1D field solver**: reflection off an impedance step | matches |(Z2−Z1)/(Z2+Z1)| to ~0.3% |
 
 ## Honest scope — what this is and is NOT

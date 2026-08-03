@@ -21,6 +21,9 @@
 #include <string>
 #include <vector>
 #include <array>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
 
 using cd = std::complex<double>;
 static const double PI = 3.14159265358979323846;
@@ -144,6 +147,74 @@ static double fdtd_reflection(double Z1, double Z2){
   return refl/inc;
 }
 
+// ---------------- filter synthesis (lowpass prototype g-values -> real LC) ----------------
+// Butterworth (maximally flat) prototype element values, g0=gN+1=1.
+static std::vector<double> butter_g(int n){
+  std::vector<double> g(n);
+  for(int k=1;k<=n;k++) g[k-1]=2.0*std::sin((2*k-1)*PI/(2.0*n));
+  return g;
+}
+// Chebyshev (equal-ripple) prototype element values for a given passband ripple in dB.
+static std::vector<double> cheby_g(int n, double ripple_dB, double& gLoad){
+  double beta=std::log(1.0/std::tanh(ripple_dB/17.37));
+  double gam =std::sinh(beta/(2.0*n));
+  std::vector<double> a(n+1), b(n+1), g(n+1);
+  for(int k=1;k<=n;k++) a[k]=std::sin((2*k-1)*PI/(2.0*n));
+  for(int k=1;k<=n;k++){ double s=std::sin(k*PI/n); b[k]=gam*gam+s*s; }
+  g[1]=2.0*a[1]/gam;
+  for(int k=2;k<=n;k++) g[k]=(4.0*a[k-1]*a[k])/(b[k-1]*g[k-1]);
+  // termination: 1 for odd order, coth^2(beta/4) for even order
+  gLoad = (n%2)? 1.0 : 1.0/(std::tanh(beta/4.0)*std::tanh(beta/4.0));
+  std::vector<double> out(n); for(int k=1;k<=n;k++) out[k-1]=g[k];
+  return out;
+}
+
+// ---------------- Touchstone .s2p reader (universal RF data format) ----------------
+struct SPoint { double f_Hz; cd s11,s21,s12,s22; };
+static bool read_s2p(const std::string& path, std::vector<SPoint>& out, double& zref){
+  std::ifstream in(path); if(!in) return false;
+  double funit=1e9; std::string fmt="MA"; zref=50.0;      // Touchstone defaults
+  std::string line;
+  auto up=[](std::string s){ for(auto&c:s)c=std::toupper((unsigned char)c); return s; };
+  while(std::getline(in,line)){
+    // strip trailing comments after '!'
+    auto bang=line.find('!'); if(bang!=std::string::npos) line=line.substr(0,bang);
+    std::string t=line; while(!t.empty()&&(t[0]==' '||t[0]=='\t')) t.erase(t.begin());
+    if(t.empty()) continue;
+    if(t[0]=='#'){
+      std::istringstream ss(t.substr(1)); std::string tok;
+      std::vector<std::string> tk; while(ss>>tok) tk.push_back(up(tok));
+      for(size_t i=0;i<tk.size();i++){
+        if(tk[i]=="HZ")funit=1; else if(tk[i]=="KHZ")funit=1e3;
+        else if(tk[i]=="MHZ")funit=1e6; else if(tk[i]=="GHZ")funit=1e9;
+        else if(tk[i]=="RI"||tk[i]=="MA"||tk[i]=="DB") fmt=tk[i];
+        else if(tk[i]=="R"&&i+1<tk.size()) zref=std::atof(tk[i+1].c_str());
+      }
+      continue;
+    }
+    std::istringstream ss(line); std::vector<double> v; double x;
+    while(ss>>x) v.push_back(x);
+    if(v.size()<9) continue;                 // freq + 4 S-params (8 numbers)
+    auto mk=[&](double a,double b)->cd{
+      if(fmt=="RI") return cd(a,b);
+      double mag = (fmt=="DB")? std::pow(10.0,a/20.0) : a;
+      double ang = b*PI/180.0;
+      return cd(mag*std::cos(ang), mag*std::sin(ang));
+    };
+    SPoint p; p.f_Hz=v[0]*funit;
+    p.s11=mk(v[1],v[2]); p.s21=mk(v[3],v[4]); p.s12=mk(v[5],v[6]); p.s22=mk(v[7],v[8]);
+    out.push_back(p);
+  }
+  return !out.empty();
+}
+// Rollett stability factor K and |Delta|; unconditionally stable iff K>1 and |Delta|<1.
+static void stability(const SPoint& p, double& K, double& magDelta){
+  cd D = p.s11*p.s22 - p.s12*p.s21;
+  magDelta = std::abs(D);
+  double num = 1.0 - std::norm(p.s11) - std::norm(p.s22) + magDelta*magDelta;
+  K = num / (2.0*std::abs(p.s12*p.s21));
+}
+
 // ---------------- frequency sweep (S-params vs frequency, the core RF deliverable) ----------------
 // A transmission-line/matching section of impedance Zline and length len_m, inserted in a
 // Zsys system and terminated in ZL, swept across a band. Reflection is measured at the SYSTEM
@@ -260,6 +331,41 @@ static int cmd_selftest(){
   ck("sweep 1200-4000: QWT matches (VSWR~1) near 2600 MHz", atCentre<1.05);
   ck("sweep: edges worse than centre (VSWR>1.4 somewhere)", sw.front().vswr>1.4 || sw.back().vswr>1.4);
 
+  // 15 Butterworth prototype g-values (textbook): n=3 -> 1,2,1 ; n=1 -> 2
+  auto gb3=butter_g(3);
+  ck("Butterworth n=3 g = {1,2,1}", approx(gb3[0],1.0,1e-6)&&approx(gb3[1],2.0,1e-6)&&approx(gb3[2],1.0,1e-6));
+  ck("Butterworth n=1 g = {2}", approx(butter_g(1)[0],2.0,1e-6));
+
+  // 16 Chebyshev 0.5 dB ripple n=3 (textbook): g = 1.5963, 1.0967, 1.5963
+  double gL; auto gc=cheby_g(3,0.5,gL);
+  ck("Chebyshev 0.5dB n=3 g1,g3 ~ 1.596", approx(gc[0],1.5963,3e-3)&&approx(gc[2],1.5963,3e-3));
+  ck("Chebyshev 0.5dB n=3 g2 ~ 1.097", approx(gc[1],1.0967,3e-3));
+  ck("Chebyshev odd order load = 1", approx(gL,1.0,1e-9));
+
+  // 17 LC denormalisation: 3rd-order Butterworth, fc=1GHz, 50 ohm -> C1=3.183pF, L2=15.915nH
+  double wc=2*PI*1e9;
+  ck("Butter LC: shunt C1 ~ 3.183 pF", approx(gb3[0]/(50.0*wc)*1e12, 3.1831, 2e-3));
+  ck("Butter LC: series L2 ~ 15.915 nH", approx(gb3[1]*50.0/wc*1e9, 15.9155, 2e-2));
+
+  // 18 Touchstone round trip: write a matched 3 dB attenuator .s2p, read it back
+  {
+    std::string tmp="/tmp/ggw_rfsim_test.s2p";
+    std::ofstream of(tmp);
+    of<<"! test 3 dB attenuator, matched\n# MHz S MA R 50\n";
+    of<<"1200 0 0 0.7079 0 0.7079 0 0 0\n";
+    of<<"4000 0 0 0.7079 0 0.7079 0 0 0\n"; of.close();
+    std::vector<SPoint> pts; double zr;
+    bool ok=read_s2p(tmp,pts,zr);
+    ck("s2p parse: 2 points, Zref 50", ok&&pts.size()==2&&approx(zr,50.0,1e-9));
+    if(ok&&pts.size()==2){
+      double il=-20*std::log10(std::abs(pts[0].s21));
+      ck("s2p: insertion loss ~ 3.0 dB", approx(il,3.0,0.02));
+      ck("s2p: |S11|=0 -> VSWR 1", approx(vswr_of(std::abs(pts[0].s11)),1.0,1e-6));
+      double K,dd; stability(pts[0],K,dd);
+      ck("s2p: attenuator unconditionally stable (K>1,|D|<1)", K>1.0 && dd<1.0);
+    }
+  }
+
   printf("\nselftest: %d passed, %d failed\n", pass, fail);
   return fail? 1:0;
 }
@@ -272,6 +378,9 @@ static int usage(){
    "  qwt <Zs> <Zl>                  quarter-wave transformer Zq\n"
    "  match <RS> <RL>                L-match (real->real): Q, series/shunt reactances\n"
    "  line <ZLre> <ZLim> <Z0> <f_Hz> <len_m> <er>   Zin, |Gamma|, VSWR, RL(dB)\n"
+   "  filter <butter|cheby> <n> <fc_MHz> <Z0> [ripple_dB]   lowpass LC synthesis (g-values + L/C)\n"
+   "  bpf <butter|cheby> <n> <f0_MHz> <BW_MHz> <Z0> [ripple_dB]   bandpass LC synthesis\n"
+   "  s2p <file.s2p>                 read Touchstone data: VSWR/RL/IL + stability K per freq\n"
    "  sweep <ZLre> <ZLim> <Zsys> <Zline> <er> <len_m> <f0_MHz> <f1_MHz> <npts>   VSWR/RL vs freq\n"
    "  fdtd <Z1> <Z2>                 1D FDTD reflection off an impedance step\n"
    "  report                         run the showcase\n"
@@ -311,6 +420,52 @@ int main(int argc,char**argv){
     cd G=gamma_of(zin,Z0); double mg=std::abs(G);
     printf("Zin=%.3f%+.3fj ohm  |Gamma|=%.4f  VSWR=%.3f  RL=%.2f dB\n",
       zin.real(),zin.imag(),mg,vswr_of(mg),retloss_dB(mg));
+    return 0; }
+  if(c=="filter" && argc>=6){
+    std::string ty=argv[2]; int n=atoi(argv[3]); double fc=atof(argv[4])*1e6, Z0=atof(argv[5]);
+    double gL=1.0; std::vector<double> g;
+    if(ty=="butter") g=butter_g(n);
+    else if(ty=="cheby"){ double rip=(argc>=7)?atof(argv[6]):0.5; g=cheby_g(n,rip,gL); }
+    else return usage();
+    double wc=2*PI*fc;
+    printf("%s lowpass, order %d, fc=%.1f MHz, Z0=%.1f ohm\n", ty.c_str(), n, fc/1e6, Z0);
+    printf("g-values:"); for(double gi:g) printf(" %.4f",gi); printf("  (load %.4f)\n",gL);
+    printf("ladder (shunt-C first):\n");
+    for(int k=1;k<=n;k++){
+      if(k%2) printf("  el%d  shunt  C = %.4f pF\n", k, g[k-1]/(Z0*wc)*1e12);
+      else    printf("  el%d  series L = %.4f nH\n", k, g[k-1]*Z0/wc*1e9);
+    }
+    return 0; }
+  if(c=="bpf" && argc>=7){
+    std::string ty=argv[2]; int n=atoi(argv[3]);
+    double f0=atof(argv[4])*1e6, BW=atof(argv[5])*1e6, Z0=atof(argv[6]);
+    double gL=1.0; std::vector<double> g;
+    if(ty=="butter") g=butter_g(n);
+    else if(ty=="cheby"){ double rip=(argc>=8)?atof(argv[7]):0.5; g=cheby_g(n,rip,gL); }
+    else return usage();
+    double w0=2*PI*f0, D=BW/f0;
+    printf("%s bandpass, order %d, f0=%.1f MHz, BW=%.1f MHz (frac %.3f), Z0=%.1f ohm\n",
+           ty.c_str(), n, f0/1e6, BW/1e6, D, Z0);
+    for(int k=1;k<=n;k++){
+      double gk=g[k-1];
+      if(k%2) printf("  el%d  shunt  Cp = %.4f pF || Lp = %.4f nH\n", k,
+                     gk/(w0*D*Z0)*1e12, D*Z0/(w0*gk)*1e9);
+      else    printf("  el%d  series Ls = %.4f nH  Cs = %.4f pF\n", k,
+                     gk*Z0/(w0*D)*1e9, D/(w0*Z0*gk)*1e12);
+    }
+    return 0; }
+  if(c=="s2p" && argc>=3){
+    std::vector<SPoint> pts; double zref;
+    if(!read_s2p(argv[2],pts,zref)){ printf("cannot read %s\n",argv[2]); return 1; }
+    printf("Touchstone %s  (Zref=%.1f ohm, %zu points)\n", argv[2], zref, pts.size());
+    printf("  f(MHz)   |S11|   VSWR    RL(dB)  IL(dB)     K    |Delta|  stable\n");
+    for(auto&p:pts){
+      double mg=std::abs(p.s11), il=(std::abs(p.s21)<=0)?300:-20*std::log10(std::abs(p.s21));
+      double K,dd; stability(p,K,dd);
+      printf("%8.1f  %6.4f  %6.3f  %7.2f  %6.2f  %6.3f  %6.3f   %s\n",
+        p.f_Hz/1e6, mg, vswr_of(mg), retloss_dB(mg), il, K, dd,
+        (K>1&&dd<1)?"yes":"no");
+    }
     return 0; }
   if(c=="sweep" && argc>=11){
     double zre=atof(argv[2]),zim=atof(argv[3]),Zsys=atof(argv[4]),Zline=atof(argv[5]);
