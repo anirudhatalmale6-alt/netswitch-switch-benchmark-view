@@ -21,3 +21,5 @@ loopbench/ggw_loopbench.exe
 
 benchrun/ggw_benchrun
 dramtest/ggw_dramtest
+routingdemo/shot.py
+routingdemo/*.png
