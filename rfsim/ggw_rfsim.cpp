@@ -144,6 +144,26 @@ static double fdtd_reflection(double Z1, double Z2){
   return refl/inc;
 }
 
+// ---------------- frequency sweep (S-params vs frequency, the core RF deliverable) ----------------
+// A transmission-line/matching section of impedance Zline and length len_m, inserted in a
+// Zsys system and terminated in ZL, swept across a band. Reflection is measured at the SYSTEM
+// impedance Zsys (which is what a VNA sees) — so a quarter-wave transformer, where Zline != Zsys,
+// correctly dips to VSWR~1 at its design frequency and degrades at the band edges.
+struct SweepPt { double f_MHz, magG, vswr, rl_dB; };
+static std::vector<SweepPt> sweep_line(cd ZL, double Zsys, double Zline, double er, double len_m,
+                                       double f0_MHz, double f1_MHz, int npts){
+  std::vector<SweepPt> out;
+  double vp = C0/std::sqrt(er);
+  for(int i=0;i<npts;i++){
+    double f = f0_MHz + (f1_MHz-f0_MHz)*(npts==1?0:double(i)/(npts-1));
+    double beta = 2*PI*(f*1e6)/vp;
+    cd zin = zin_of(tline(Zline,beta*len_m), ZL);
+    double mg = std::abs(gamma_of(zin,Zsys));     // measured at the system impedance
+    out.push_back({f, mg, vswr_of(mg), retloss_dB(mg)});
+  }
+  return out;
+}
+
 // ---------------- reporting ----------------
 static int cmd_report(){
   printf("== ggw_rfsim showcase ==\n");
@@ -229,6 +249,17 @@ static int cmd_selftest(){
   // 13 gamma at matched load is zero
   ck("Gamma(50 into 50)=0", std::abs(gamma_of(cd(50,0),50.0))<1e-12);
 
+  // 14 frequency sweep: quarter-wave transformer (100->50) dips to VSWR~1 at its design freq,
+  //     and is worse at the band edges (narrowband behaviour) — across 1200-4000 MHz on FR4
+  double erf=4.4, vp=C0/std::sqrt(erf), fc=2600e6;         // band-centre design
+  double qlen=vp/(4.0*fc);                                  // quarter-wave length at 2600 MHz
+  auto sw=sweep_line(cd(100,0), 50.0, std::sqrt(50.0*100.0), erf, qlen, 1200, 4000, 29);
+  double best=1e9; double atCentre=1e9;
+  for(auto&p:sw){ if(p.vswr<best) best=p.vswr;
+                  if(std::fabs(p.f_MHz-2600.0)<60) atCentre=std::min(atCentre,p.vswr); }
+  ck("sweep 1200-4000: QWT matches (VSWR~1) near 2600 MHz", atCentre<1.05);
+  ck("sweep: edges worse than centre (VSWR>1.4 somewhere)", sw.front().vswr>1.4 || sw.back().vswr>1.4);
+
   printf("\nselftest: %d passed, %d failed\n", pass, fail);
   return fail? 1:0;
 }
@@ -241,6 +272,7 @@ static int usage(){
    "  qwt <Zs> <Zl>                  quarter-wave transformer Zq\n"
    "  match <RS> <RL>                L-match (real->real): Q, series/shunt reactances\n"
    "  line <ZLre> <ZLim> <Z0> <f_Hz> <len_m> <er>   Zin, |Gamma|, VSWR, RL(dB)\n"
+   "  sweep <ZLre> <ZLim> <Zsys> <Zline> <er> <len_m> <f0_MHz> <f1_MHz> <npts>   VSWR/RL vs freq\n"
    "  fdtd <Z1> <Z2>                 1D FDTD reflection off an impedance step\n"
    "  report                         run the showcase\n"
    "  selftest                       run checks (PASS/FAIL)\n"
@@ -279,6 +311,17 @@ int main(int argc,char**argv){
     cd G=gamma_of(zin,Z0); double mg=std::abs(G);
     printf("Zin=%.3f%+.3fj ohm  |Gamma|=%.4f  VSWR=%.3f  RL=%.2f dB\n",
       zin.real(),zin.imag(),mg,vswr_of(mg),retloss_dB(mg));
+    return 0; }
+  if(c=="sweep" && argc>=11){
+    double zre=atof(argv[2]),zim=atof(argv[3]),Zsys=atof(argv[4]),Zline=atof(argv[5]);
+    double er=atof(argv[6]),len=atof(argv[7]),f0=atof(argv[8]),f1=atof(argv[9]); int np=atoi(argv[10]);
+    auto pts=sweep_line(cd(zre,zim),Zsys,Zline,er,len,f0,f1,np);
+    printf("  f(MHz)    |Gamma|   VSWR     RL(dB)\n");
+    SweepPt best=pts[0], worst=pts[0];
+    for(auto&p:pts){ printf("%9.1f  %7.4f  %6.3f  %8.2f\n",p.f_MHz,p.magG,p.vswr,p.rl_dB);
+      if(p.vswr<best.vswr) best=p; if(p.vswr>worst.vswr) worst=p; }
+    printf("best  match: %.1f MHz  VSWR=%.3f  RL=%.2f dB\n",best.f_MHz,best.vswr,best.rl_dB);
+    printf("worst match: %.1f MHz  VSWR=%.3f  RL=%.2f dB\n",worst.f_MHz,worst.vswr,worst.rl_dB);
     return 0; }
   if(c=="fdtd" && argc>=4){ double z1=atof(argv[2]),z2=atof(argv[3]);
     double r=fdtd_reflection(z1,z2);

@@ -19,6 +19,7 @@ g++ -std=c++17 -O2 ggw_rfsim.cpp -o ggw_rfsim
 | `qwt <Zs> <Zl>` | quarter-wave transformer impedance | √(50·100)=70.71, and it truly matches |
 | `match <RS> <RL>` | L-network (real→real): Q, series/shunt reactances | Zin verified = 50+0j numerically |
 | `line <ZLre> <ZLim> <Z0> <f> <len> <er>` | Zin, |Γ|, VSWR, return-loss of a terminated line | 100Ω on 50Ω → VSWR 2.000 |
+| `sweep <ZLre> <ZLim> <Zsys> <Zline> <er> <len> <f0MHz> <f1MHz> <npts>` | VSWR/RL vs frequency (S11 sweep, the core RF deliverable) | quarter-wave 100→50 dips to VSWR 1.000 at design freq, degrades at band edges |
 | `fdtd <Z1> <Z2>` | **1D field solver**: reflection off an impedance step | matches |(Z2−Z1)/(Z2+Z1)| to ~0.3% |
 
 ## Honest scope — what this is and is NOT
