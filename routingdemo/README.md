@@ -16,6 +16,13 @@ Cloudflare/Netlify static site) and it runs. This is the "serverless HTML" ask.
   go bad; a fixed route drops. That gap is the product's value, shown, not claimed.
 - Buttons to inject congestion / fail the active link so a customer can watch the
   reroute protect the call in real time.
+- **Routing control** — pick how the call is routed: NetSwitch adaptive, Static
+  (fixed), or Manual (choose the path yourself) — so you can feel the difference.
+- **Automated call-box voice** (Web Speech API, in-browser): a "Play test-call
+  announcement" button speaks *"This is a test call for network congestion
+  checking. Current line quality is …"*, and an opt-in auto-announce speaks a
+  congestion / rerouting alert when the live network degrades. All client-side —
+  still zero backend.
 
 ## What's real vs simulated (honest)
 

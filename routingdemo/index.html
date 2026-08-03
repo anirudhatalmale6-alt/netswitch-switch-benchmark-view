@@ -31,6 +31,13 @@
     padding:9px 12px;font-size:13px;cursor:pointer}
   button:hover{border-color:#3a4d70}
   button.warn{background:#2a1512;border-color:#5a2a22;color:#ffb4a6}
+  button:disabled{opacity:.5;cursor:default}
+  .seg{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:12px}
+  .segl{color:var(--dim);font-size:12px;margin-right:2px}
+  .seg button,.paths button{padding:7px 10px;font-size:12.5px}
+  button.on{border-color:var(--netA);color:#fff;background:#122a44}
+  .paths{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .chk{display:flex;align-items:center;gap:6px;color:var(--dim);font-size:12.5px}
   .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--dim);margin-top:8px}
   .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:middle}
   .note{color:var(--dim);font-size:11px;line-height:1.55;margin-top:12px;border-top:1px solid var(--grid);padding-top:10px}
@@ -53,10 +60,21 @@
         <span><span class="dot" style="background:var(--dim)"></span>candidate path</span>
         <span><span class="dot" style="background:var(--bad)"></span>degraded / failed link</span>
       </div>
+      <div class="seg" id="modeSeg">
+        <span class="segl">Routing control:</span>
+        <button data-mode="adaptive" class="on">NetSwitch adaptive</button>
+        <button data-mode="static">Static (fixed)</button>
+        <button data-mode="manual">Manual pick</button>
+      </div>
+      <div class="paths" id="pathPick" style="display:none"></div>
       <div class="ctrls">
         <button id="bCong">Inject congestion on active path</button>
         <button id="bFail" class="warn">Fail the active link</button>
         <button id="bCalm">Calm the network</button>
+      </div>
+      <div class="ctrls">
+        <button id="bCall">▶ Play test-call announcement</button>
+        <label class="chk"><input type="checkbox" id="autoAnn"> Auto-announce congestion &amp; reroutes</label>
       </div>
     </div>
 
@@ -153,14 +171,25 @@ function chooseBest(){ let best=null,bi=0;
   return {idx:bi, ...best};
 }
 
-let activeIdx=1, activeHold=0;
+let activeIdx=1, mode='adaptive', manualIdx=1, lastAnn=-999, lastClass='';
 function route(){
-  const best=chooseBest();
-  // hysteresis: only switch if clearly better, or if the active path collapsed
-  const cur=scorePath(PATHS[activeIdx]);
-  if(best.idx!==activeIdx && (best.R>cur.R+6 || cur.R<50)){ activeIdx=best.idx; activeHold=0; }
-  else activeHold++;
-  return scorePath(PATHS[activeIdx]);
+  const prev=activeIdx;
+  if(mode==='adaptive'){
+    // hysteresis: only switch if clearly better, or if the active path collapsed
+    const best=chooseBest(); const cur=scorePath(PATHS[activeIdx]);
+    if(best.idx!==activeIdx && (best.R>cur.R+6 || cur.R<50)){ activeIdx=best.idx; }
+  } else if(mode==='static'){ activeIdx=0; }
+  else { activeIdx=manualIdx; }               // manual: user drives the routing
+  const q=scorePath(PATHS[activeIdx]);
+  // automated call-box voice reacting to the live network (opt-in)
+  const cls=qualityClass(q.MOS).label.split(' ')[0];   // WHITE / GREY / BLACK
+  const auto=document.getElementById('autoAnn');
+  if(auto && auto.checked && tick-lastAnn>45){
+    if(mode==='adaptive' && prev!==activeIdx){ announce('reroute'); lastAnn=tick; }
+    else if(cls==='BLACK' && lastClass!=='BLACK'){ announce('congestion'); lastAnn=tick; }
+  }
+  lastClass=cls;
+  return q;
 }
 
 // static baseline: never reroutes (locked to path 0) — for the comparison chart
@@ -242,6 +271,35 @@ document.getElementById('bCong').onclick=()=>{ activeLinks().forEach(L=>{ if(!L.
 document.getElementById('bFail').onclick=()=>{ const ls=activeLinks(); // fail the middle hop of the active path
   const L=ls[Math.min(1,ls.length-1)]; L.failed=true; setTimeout(()=>{L.failed=false;},6000); };
 document.getElementById('bCalm').onclick=()=>{ for(const k in links){ links[k].cong=0; links[k].failed=false; } };
+
+// ---------- automated call-box voice (Web Speech API — client-side, serverless) ----------
+const synth = window.speechSynthesis;
+function classWords(){ const m=parseFloat(document.getElementById('mos').textContent)||0;
+  return m>=4.0 ? 'good, high definition' : m>=3.2 ? 'acceptable' : 'poor, the line is congested'; }
+function speak(text){ if(!synth) return false;
+  const u=new SpeechSynthesisUtterance(text); u.rate=0.98; u.pitch=1.0; synth.cancel(); synth.speak(u); return true; }
+function announce(kind){
+  let t;
+  if(kind==='reroute')      t='Network congestion detected. Rerouting your call to a better path now.';
+  else if(kind==='congestion') t='Warning. Network congestion. Current call quality is '+classWords()+'.';
+  else                      t='This is a test call for network congestion checking. Current line quality is '+classWords()+'.';
+  speak(t);
+}
+const bCall=document.getElementById('bCall');
+if(synth){ bCall.onclick=()=>announce('test'); }
+else { bCall.disabled=true; bCall.textContent='(voice not supported in this browser)'; }
+
+// ---------- routing control: adaptive / static / manual ----------
+document.querySelectorAll('#modeSeg button').forEach(b=>{ b.onclick=()=>{
+  mode=b.dataset.mode;
+  document.querySelectorAll('#modeSeg button').forEach(x=>x.classList.toggle('on', x===b));
+  document.getElementById('pathPick').style.display = (mode==='manual') ? 'flex' : 'none';
+}; });
+const pp=document.getElementById('pathPick');
+PATHS.forEach((p,i)=>{ const btn=document.createElement('button');
+  btn.textContent='Path '+String.fromCharCode(65+i)+': '+p.join('→');
+  btn.onclick=()=>{ manualIdx=i; document.querySelectorAll('#pathPick button').forEach(x=>x.classList.toggle('on', x===btn)); };
+  if(i===manualIdx) btn.classList.add('on'); pp.appendChild(btn); });
 
 frame();
 </script>
