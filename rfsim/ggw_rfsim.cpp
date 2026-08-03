@@ -215,6 +215,72 @@ static void stability(const SPoint& p, double& K, double& magDelta){
   K = num / (2.0*std::abs(p.s12*p.s21));
 }
 
+// ---------------- Fourier (FFT / inverse FFT) ----------------
+// iterative radix-2 Cooley-Tukey; n must be a power of two. inverse divides by n.
+static void fft(std::vector<cd>& a, bool inverse){
+  size_t n=a.size(); if(n<2) return;
+  for(size_t i=1,j=0;i<n;i++){                 // bit-reversal permutation
+    size_t bit=n>>1; for(; j&bit; bit>>=1) j^=bit; j^=bit;
+    if(i<j) std::swap(a[i],a[j]);
+  }
+  for(size_t len=2; len<=n; len<<=1){
+    double ang=2*PI/len*(inverse?1:-1);
+    cd wl(std::cos(ang),std::sin(ang));
+    for(size_t i=0;i<n;i+=len){
+      cd w(1,0);
+      for(size_t k=0;k<len/2;k++){
+        cd u=a[i+k], v=a[i+k+len/2]*w;
+        a[i+k]=u+v; a[i+k+len/2]=u-v; w*=wl;
+      }
+    }
+  }
+  if(inverse) for(auto&x:a) x/=double(n);
+}
+static bool is_pow2(size_t n){ return n && !(n&(n-1)); }
+
+// ---------------- capability settings (On/Off, implemented/planned) ----------------
+struct Cap { const char* key; const char* desc; bool on; bool implemented; };
+static std::vector<Cap> default_caps(){
+  return {
+    {"circuit",    "S-params, microstrip, match, qwt, line, sweep", true,  true },
+    {"filter",     "Butterworth/Chebyshev lowpass + bandpass LC",   true,  true },
+    {"touchstone", ".s2p import + Rollett stability K",             true,  true },
+    {"fourier",    "FFT / inverse FFT spectrum",                    true,  true },
+    {"fdtd1d",     "1D FDTD field solver (verified vs closed form)",true,  true },
+    {"fem",        "3D finite-element field solver",                false, false},
+    {"fdtd3d",     "3D FDTD field solver",                          false, false},
+    {"thermal",    "thermal automation hook (see thermal/, thermocalc/)", false, false},
+  };
+}
+// overlay on/off from a settings file: lines "key = on|off" (# comments ok)
+static void apply_settings_file(std::vector<Cap>& caps, const std::string& path){
+  std::ifstream in(path); if(!in) return;
+  std::string line;
+  while(std::getline(in,line)){
+    auto h=line.find('#'); if(h!=std::string::npos) line=line.substr(0,h);
+    auto eq=line.find('='); if(eq==std::string::npos) continue;
+    std::string k=line.substr(0,eq), v=line.substr(eq+1);
+    auto trim=[](std::string s){ size_t a=s.find_first_not_of(" \t\r\n");
+      size_t b=s.find_last_not_of(" \t\r\n");
+      return (a==std::string::npos)?std::string():s.substr(a,b-a+1); };
+    k=trim(k); v=trim(v); for(auto&c:v)c=std::tolower((unsigned char)c);
+    for(auto&cap:caps) if(k==cap.key) cap.on=(v=="on"||v=="1"||v=="true");
+  }
+}
+static int cmd_settings(const std::string& path){
+  auto caps=default_caps();
+  if(!path.empty()) apply_settings_file(caps,path);
+  printf("capability     state   status        description\n");
+  printf("----------     -----   ------        -----------\n");
+  for(auto&c:caps){
+    const char* st = c.implemented ? "implemented" : "planned/TODO";
+    const char* on = c.on ? "ON " : "off";
+    printf("%-13s  %-5s   %-12s  %s%s\n", c.key, on, st, c.desc,
+           (c.on && !c.implemented) ? "  [enabled but NOT yet built]" : "");
+  }
+  return 0;
+}
+
 // ---------------- frequency sweep (S-params vs frequency, the core RF deliverable) ----------------
 // A transmission-line/matching section of impedance Zline and length len_m, inserted in a
 // Zsys system and terminated in ZL, swept across a band. Reflection is measured at the SYSTEM
@@ -366,6 +432,33 @@ static int cmd_selftest(){
     }
   }
 
+  // 19 Fourier: FFT of a pure tone concentrates at its bin; inverse round-trips; delta is flat
+  {
+    int N=64; std::vector<cd> x(N);
+    for(int n=0;n<N;n++) x[n]=std::cos(2*PI*7*n/N);       // tone at bin 7
+    std::vector<cd> X=x; fft(X,false);
+    double e7=std::abs(X[7]), e_other=0; for(int k=0;k<N;k++) if(k!=7&&k!=N-7) e_other=std::max(e_other,std::abs(X[k]));
+    ck("FFT: tone energy at bin 7, elsewhere ~0", e7>20.0 && e_other<1e-9);
+    std::vector<cd> back=X; fft(back,true);
+    double err=0; for(int n=0;n<N;n++) err=std::max(err,std::abs(back[n]-x[n]));
+    ck("FFT: inverse round-trip recovers signal", err<1e-9);
+    std::vector<cd> d(N,cd(0,0)); d[0]=cd(1,0); fft(d,false);
+    double flat=0; for(int k=0;k<N;k++) flat=std::max(flat,std::fabs(std::abs(d[k])-1.0));
+    ck("FFT: delta -> flat spectrum (all |X|=1)", flat<1e-12);
+    // Parseval: sum|x|^2 == (1/N) sum|X|^2
+    double t=0,f=0; for(int n=0;n<N;n++){ t+=std::norm(x[n]); f+=std::norm(X[n]); }
+    ck("FFT: Parseval energy conserved", approx(t, f/N, 1e-9));
+    ck("is_pow2 detects 64 yes / 48 no", is_pow2(64) && !is_pow2(48));
+  }
+
+  // 20 settings: defaults have implemented caps ON and FEM/FDTD-3D as planned/off
+  {
+    auto caps=default_caps(); bool fourierOn=false, femPlanned=false;
+    for(auto&c:caps){ if(std::string(c.key)=="fourier") fourierOn=c.on&&c.implemented;
+                      if(std::string(c.key)=="fem")    femPlanned=(!c.on)&&(!c.implemented); }
+    ck("settings: fourier ON+implemented, fem off+planned", fourierOn && femPlanned);
+  }
+
   printf("\nselftest: %d passed, %d failed\n", pass, fail);
   return fail? 1:0;
 }
@@ -381,6 +474,8 @@ static int usage(){
    "  filter <butter|cheby> <n> <fc_MHz> <Z0> [ripple_dB]   lowpass LC synthesis (g-values + L/C)\n"
    "  bpf <butter|cheby> <n> <f0_MHz> <BW_MHz> <Z0> [ripple_dB]   bandpass LC synthesis\n"
    "  s2p <file.s2p>                 read Touchstone data: VSWR/RL/IL + stability K per freq\n"
+   "  fft                            Fourier (FFT) demo: 2-tone spectrum\n"
+   "  settings [file.conf]           show capability On/Off + implemented/planned (FEM/FDTD/Fourier...)\n"
    "  sweep <ZLre> <ZLim> <Zsys> <Zline> <er> <len_m> <f0_MHz> <f1_MHz> <npts>   VSWR/RL vs freq\n"
    "  fdtd <Z1> <Z2>                 1D FDTD reflection off an impedance step\n"
    "  report                         run the showcase\n"
@@ -420,6 +515,22 @@ int main(int argc,char**argv){
     cd G=gamma_of(zin,Z0); double mg=std::abs(G);
     printf("Zin=%.3f%+.3fj ohm  |Gamma|=%.4f  VSWR=%.3f  RL=%.2f dB\n",
       zin.real(),zin.imag(),mg,vswr_of(mg),retloss_dB(mg));
+    return 0; }
+  if(c=="settings"){
+    return cmd_settings(argc>=3? std::string(argv[2]) : std::string());
+  }
+  if(c=="fft"){
+    // fft demo: 2-tone signal, N=64, tones at bins 5 and 12 -> show magnitude spectrum
+    int N=64; std::vector<cd> x(N);
+    for(int n=0;n<N;n++)
+      x[n]= std::cos(2*PI*5*n/N) + 0.5*std::cos(2*PI*12*n/N);
+    std::vector<cd> X=x; fft(X,false);
+    printf("Fourier (FFT) demo: N=%d, tones injected at bins 5 and 12\n",N);
+    printf(" bin   |X|\n");
+    for(int k=0;k<=N/2;k++){
+      double m=std::abs(X[k])/N*2.0;
+      printf("%4d  %6.3f %s\n", k, m, (m>0.2)?"<== tone":"");
+    }
     return 0; }
   if(c=="filter" && argc>=6){
     std::string ty=argv[2]; int n=atoi(argv[3]); double fc=atof(argv[4])*1e6, Z0=atof(argv[5]);
