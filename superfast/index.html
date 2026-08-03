@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SuperFastBrowsing — iOS fast-browsing engine (honest demo)</title>
+<style>
+  :root{ --bg:#0a0e16; --card:#111826; --ink:#eaf1fb; --dim:#8195b4; --line:#1d2a40;
+         --a:#39a0ff; --good:#39d98a; --bad:#ff6a6a; --mid:#ffb020; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif; }
+  .phone{ max-width:390px; margin:16px auto; background:var(--card); border:1px solid var(--line);
+          border-radius:22px; overflow:hidden; }
+  .bar{ display:flex; align-items:center; gap:8px; padding:10px 12px; background:#0c1220; border-bottom:1px solid var(--line); }
+  .url{ flex:1; background:#0a0f1b; border:1px solid var(--line); border-radius:14px; padding:6px 12px;
+        color:var(--dim); font-size:12px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .body{ padding:14px; }
+  h1{ font-size:15px; margin:0 0 2px; }
+  .sub{ color:var(--dim); font-size:12px; margin:0 0 12px; }
+  .toggle{ display:flex; align-items:center; justify-content:space-between; background:#0c1424;
+           border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:12px; }
+  .sw{ width:46px; height:26px; border-radius:14px; background:#2a3651; position:relative; cursor:pointer; transition:.15s; }
+  .sw.on{ background:var(--good); }
+  .sw i{ position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:.15s; }
+  .sw.on i{ left:23px; }
+  .stats{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+  .stat{ background:#0c1424; border:1px solid var(--line); border-radius:12px; padding:10px; }
+  .stat .k{ color:var(--dim); font-size:11px; }
+  .stat .v{ font-size:20px; font-weight:700; margin-top:2px; }
+  .stat .v small{ font-size:12px; color:var(--dim); font-weight:400; }
+  .green{ color:var(--good); } .amber{ color:var(--mid); }
+  .speed{ display:flex; gap:6px; margin-bottom:12px; }
+  .speed button{ flex:1; background:#0c1424; color:var(--dim); border:1px solid var(--line);
+                 border-radius:10px; padding:7px 0; font-size:12px; cursor:pointer; }
+  .speed button.sel{ color:var(--ink); border-color:var(--a); background:#12233d; }
+  table{ width:100%; border-collapse:collapse; font-size:12px; }
+  td{ padding:5px 4px; border-bottom:1px solid #16223a; }
+  .tag{ font-size:10px; padding:1px 6px; border-radius:8px; }
+  .t-content{ background:#123; color:#7fd0ff; } .t-ad{ background:#311; color:#ff9a9a; }
+  .t-track{ background:#321; color:#ffcf8a; } .t-media{ background:#213; color:#c79aff; }
+  .blocked{ opacity:.4; text-decoration:line-through; }
+  canvas{ width:100%; display:block; background:#080d17; border-radius:10px; border:1px solid var(--line); margin-top:6px; }
+  .note{ color:var(--dim); font-size:11px; margin-top:12px; }
+  .note b{ color:var(--ink); }
+  .tabs{ display:flex; gap:6px; margin:14px 0 8px; }
+  .tabs button{ background:#0c1424; color:var(--dim); border:1px solid var(--line); border-radius:10px; padding:6px 12px; font-size:12px; cursor:pointer; }
+  .tabs button.sel{ color:var(--ink); border-color:var(--a); }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="bar">
+    <span style="color:var(--dim)">‹ ›</span>
+    <div class="url">https://news.example.com/article</div>
+    <span style="color:var(--good)">⟳</span>
+  </div>
+  <div class="body">
+    <h1>SuperFastBrowsing</h1>
+    <p class="sub">Fewer bytes = faster load, lighter scroll. iOS, App-Store-legal.</p>
+
+    <div class="toggle">
+      <div><b>Fast mode</b><div style="color:var(--dim);font-size:11px">block ads · trackers · heavy media</div></div>
+      <div id="sw" class="sw on"><i></i></div>
+    </div>
+
+    <div class="speed" id="speed">
+      <button data-mbps="3">3 Mbps</button>
+      <button data-mbps="10" class="sel">10 Mbps</button>
+      <button data-mbps="25">25 Mbps</button>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="k">Page weight</div><div class="v" id="wt"></div></div>
+      <div class="stat"><div class="k">Load time</div><div class="v" id="lt"></div></div>
+      <div class="stat"><div class="k">Requests</div><div class="v" id="rq"></div></div>
+      <div class="stat"><div class="k">Heavy scripts</div><div class="v" id="hs"></div></div>
+    </div>
+
+    <div class="tabs" id="tabs">
+      <button data-tab="res" class="sel">What loaded</button>
+      <button data-tab="map">Network map</button>
+    </div>
+
+    <div id="pane-res">
+      <table id="restab"></table>
+    </div>
+    <div id="pane-map" style="display:none">
+      <canvas id="map" width="348" height="180"></canvas>
+      <div style="color:var(--dim);font-size:11px;margin-top:4px">The routing/geo map renders on the app surface (WKWebView) — same HTML/canvas, no Google, no tiles.</div>
+    </div>
+
+    <p class="note">
+      <b>Honest:</b> iOS won't let any app raise your carrier's actual link speed — nothing can.
+      What this does is cut the <b>bytes</b> a page needs (block ad/tracker/heavy-media requests via
+      Apple's content-blocker), so it loads faster and scrolls on fewer scripts. Load time here is the
+      transparent model <b>bytes ÷ your connection speed</b> on a representative article page — on device
+      the same rules run against the live page. Ruleset: <b>blockerRules.json</b>.
+    </p>
+  </div>
+</div>
+<script>
+// representative resources on a typical news article (sizes in KB)
+const RES = [
+  {name:'document.html',      kb:45,  cat:'content'},
+  {name:'site.css',           kb:60,  cat:'content'},
+  {name:'app.js',             kb:180, cat:'content', script:true},
+  {name:'article-img-1.jpg',  kb:210, cat:'content'},
+  {name:'article-img-2.jpg',  kb:180, cat:'content'},
+  {name:'article-img-3.jpg',  kb:130, cat:'content'},
+  {name:'webfont.woff2',      kb:90,  cat:'content'},
+  {name:'ad-slot-top (iframe)',    kb:260, cat:'ad', script:true},
+  {name:'ad-slot-mid (iframe)',    kb:240, cat:'ad', script:true},
+  {name:'ad-slot-side (iframe)',   kb:170, cat:'ad', script:true},
+  {name:'ad-slot-inline (iframe)', kb:110, cat:'ad', script:true},
+  {name:'google-analytics.js',kb:48,  cat:'track', script:true},
+  {name:'gtag/manager.js',    kb:74,  cat:'track', script:true},
+  {name:'facebook-pixel.js',  kb:38,  cat:'track', script:true},
+  {name:'hotjar.js',          kb:52,  cat:'track', script:true},
+  {name:'taboola-feed.js',    kb:60,  cat:'track', script:true},
+  {name:'autoplay-video.mp4', kb:900, cat:'media'},
+  {name:'social-widgets.js',  kb:130, cat:'ad', script:true},
+];
+const BLOCKED = new Set(['ad','track','media']); // Fast mode blocks these categories
+let fast = true, mbps = 10, tab='res';
+
+const el = id => document.getElementById(id);
+function tagClass(c){ return c==='content'?'t-content':c==='ad'?'t-ad':c==='track'?'t-track':'t-media'; }
+function tagText(c){ return c==='content'?'content':c==='ad'?'ad':c==='track'?'tracker':'media'; }
+
+function loadedList(){ return RES.filter(r => !(fast && BLOCKED.has(r.cat))); }
+function kb(list){ return list.reduce((s,r)=>s+r.kb,0); }
+function secs(totalKB){ return (totalKB*1024*8) / (mbps*1e6); } // bytes*8 / bits-per-sec
+
+function render(){
+  const all = RES, shown = loadedList();
+  const wtFull = kb(all), wtNow = kb(shown);
+  el('wt').innerHTML = wtNow>=1024 ? (wtNow/1024).toFixed(1)+' <small>MB</small>' : wtNow+' <small>KB</small>';
+  el('lt').innerHTML = '<span class="'+(fast?'green':'amber')+'">'+secs(wtNow).toFixed(1)+'</span> <small>s</small>';
+  el('rq').innerHTML = shown.length+' <small>/ '+all.length+'</small>';
+  const heavy = all.filter(r=>r.script && BLOCKED.has(r.cat)).length;
+  el('hs').innerHTML = fast ? '<span class="green">0</span> <small>/ '+heavy+' cut</small>' : heavy+' <small>running</small>';
+
+  let rows='';
+  for(const r of all){
+    const blocked = fast && BLOCKED.has(r.cat);
+    rows += '<tr class="'+(blocked?'blocked':'')+'"><td>'+r.name+'</td>'+
+            '<td style="text-align:right;color:var(--dim)">'+r.kb+' KB</td>'+
+            '<td style="text-align:right"><span class="tag '+tagClass(r.cat)+'">'+tagText(r.cat)+'</span></td></tr>';
+  }
+  el('restab').innerHTML = rows;
+  drawMap();
+}
+
+// mini network map on the app surface (true lat/lon, equirectangular) — proof the map lives here
+const POPs=[{n:'HEL',lat:60.2,lon:24.9},{n:'FRA',lat:50.1,lon:8.7},{n:'LON',lat:51.5,lon:-0.1},
+            {n:'NYC',lat:40.7,lon:-74},{n:'SIN',lat:1.4,lon:103.8}];
+const ROUTE=['HEL','FRA','NYC','SIN'];
+function drawMap(){
+  const cv=el('map'); if(!cv) return; const g=cv.getContext('2d'), W=cv.width,H=cv.height;
+  g.clearRect(0,0,W,H);
+  const lo=POPs.map(p=>p.lon), la=POPs.map(p=>p.lat);
+  let a=Math.min(...lo)-8,b=Math.max(...lo)+8,c=Math.min(...la)-6,d=Math.max(...la)+6;
+  const sx=lon=>16+(lon-a)/(b-a)*(W-32), sy=lat=>14+(d-lat)/(d-c)*(H-28);
+  g.strokeStyle='#16233a'; g.lineWidth=1;
+  for(let x=-60;x<=120;x+=30){ const px=sx(x); if(px>10&&px<W-6){ g.beginPath(); g.moveTo(px,10); g.lineTo(px,H-10); g.stroke(); } }
+  for(let y=0;y<=60;y+=15){ const py=sy(y); if(py>8&&py<H-8){ g.beginPath(); g.moveTo(10,py); g.lineTo(W-6,py); g.stroke(); } }
+  g.strokeStyle='#39a0ff'; g.lineWidth=2; g.beginPath();
+  ROUTE.forEach((id,i)=>{ const p=POPs.find(q=>q.n===id); const x=sx(p.lon),y=sy(p.lat); i?g.lineTo(x,y):g.moveTo(x,y); });
+  g.stroke();
+  for(const p of POPs){ const x=sx(p.lon),y=sy(p.lat),on=ROUTE.includes(p.n);
+    g.fillStyle=on?'#39a0ff':'#3a4d72'; g.beginPath(); g.arc(x,y,on?5:4,0,7); g.fill();
+    g.fillStyle='#eaf1fb'; g.font='9px system-ui'; g.textAlign='center'; g.fillText(p.n,x,y-7); }
+}
+
+el('sw').onclick=()=>{ fast=!fast; el('sw').classList.toggle('on',fast); render(); };
+el('speed').querySelectorAll('button').forEach(bt=>bt.onclick=()=>{
+  el('speed').querySelectorAll('button').forEach(b=>b.classList.remove('sel'));
+  bt.classList.add('sel'); mbps=+bt.dataset.mbps; render(); });
+el('tabs').querySelectorAll('button').forEach(bt=>bt.onclick=()=>{
+  el('tabs').querySelectorAll('button').forEach(b=>b.classList.remove('sel'));
+  bt.classList.add('sel'); tab=bt.dataset.tab;
+  el('pane-res').style.display = tab==='res'?'block':'none';
+  el('pane-map').style.display = tab==='map'?'block':'none'; drawMap(); });
+
+render();
+</script>
+</body>
+</html>
