@@ -6,7 +6,7 @@ cascade, transmission lines, microstrip synthesis/analysis, matching networks.
 
 ```
 g++ -std=c++17 -O2 ggw_rfsim.cpp -o ggw_rfsim
-./ggw_rfsim selftest      # 46 checks, PASS/FAIL each
+./ggw_rfsim selftest      # 52 checks, PASS/FAIL each
 ./ggw_rfsim report        # showcase
 ```
 
@@ -28,7 +28,7 @@ field-solver roadmap (FEM / 3D FDTD, still TODO) is in `ROADMAP.md`.
 | `s2p <file.s2p>` | read Touchstone data (RI/MA/dB, any freq unit): per-freq VSWR/RL/insertion-loss + Rollett stability K, |Δ| | 3dB attenuator → IL 3.0dB, VSWR 1, K>1 stable |
 | `fft` | Fourier: FFT / inverse FFT (radix-2). Demo resolves a 2-tone signal | tone→single bin, delta→flat, Parseval, round-trip |
 | `dft` | DFT chapter walk-through: naive O(N²) DFT vs radix-2 FFT (they agree), real amplitude A_m=2\|F_m\|/N, conjugate symmetry F_{N−k}=conj(F_k), iDFT via conjugate trick, Nyquist/Shannon | naive DFT == FFT to 1e-14; amps recovered exactly; symmetry holds; Ex7.1 sin@2× → all zeros |
-| `signal <fs> <N> <fHz:amp>...` | **simulate a discrete signal** (sum of tones sampled at fs over N points) and analyse its spectrum — Hz axis, Δf=fs/N, Nyquist=fs/2, aliasing warning + fold-back | 30 kHz tone at fs=40 kHz → warned, folds back to 10 kHz bin |
+| `signal <fs> <N> <fHz:amp>... [win=hann\|hamming\|blackman]` | **simulate a discrete signal** (sum of tones sampled at fs over N points) and analyse its spectrum — Hz axis, Δf=fs/N, Nyquist=fs/2, aliasing warning + fold-back; optional **taper window** to cut spectral leakage of off-bin tones (amplitude-corrected by coherent gain) | 30 kHz tone at fs=40 kHz → warned, folds to 10 kHz bin; off-bin tone → Hann cuts far-bin leakage ~100× while peak amplitude preserved |
 | `settings [file.conf]` | show capability On/Off + implemented/planned (FEM, FDTD, Fourier…) | file toggles; planned-but-enabled flagged |
 
 `filter`/`bpf` cover the AWR/ADS "filter synthesis" workflow; `s2p` reads the universal RF

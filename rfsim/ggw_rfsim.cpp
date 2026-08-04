@@ -278,6 +278,40 @@ static std::vector<double> amp_spectrum(const std::vector<cd>& F){
 // the highest recognizable frequency is fs/2 at m=N/2 (the Nyquist / Shannon limit).
 static double bin_freq_Hz(size_t m,double fs,size_t N){ return (double)m*fs/(double)N; }
 
+// ---------------- windowing (spectral leakage control) ----------------
+// A finite record has hard edges; the DFT sees them as a step, which smears
+// (leaks) a single tone across many bins. A taper window softens the edges so
+// off-bin tones leak far less, at the cost of a slightly wider main lobe.
+// Periodic (DFT) definitions are used: coherent gain (mean coeff) is then exact
+// = the window's a0 term (Hann 0.5, Hamming 0.54, Blackman 0.42). Dividing the
+// amplitude spectrum by the coherent gain restores the true tone amplitude.
+enum WinType { W_RECT, W_HANN, W_HAMMING, W_BLACKMAN };
+static WinType win_from_name(const std::string& s){
+  if(s=="hann"||s=="hanning") return W_HANN;
+  if(s=="hamming")            return W_HAMMING;
+  if(s=="blackman")           return W_BLACKMAN;
+  return W_RECT;
+}
+static const char* win_name(WinType w){
+  switch(w){ case W_HANN:return "Hann"; case W_HAMMING:return "Hamming";
+             case W_BLACKMAN:return "Blackman"; default:return "rectangular (none)"; }
+}
+static double win_coeff(WinType w,int n,int N){
+  double t=2*PI*(double)n/(double)N;           // periodic (no duplicated endpoint)
+  switch(w){
+    case W_HANN:     return 0.5  - 0.5 *std::cos(t);
+    case W_HAMMING:  return 0.54 - 0.46*std::cos(t);
+    case W_BLACKMAN: return 0.42 - 0.5 *std::cos(t) + 0.08*std::cos(2*t);
+    default:         return 1.0;
+  }
+}
+// Apply a window in place; return coherent gain (mean of coefficients).
+static double apply_window(std::vector<cd>& x, WinType w){
+  int N=(int)x.size(); double sum=0;
+  for(int n=0;n<N;n++){ double c=win_coeff(w,n,N); x[n]*=c; sum+=c; }
+  return sum/(double)N;
+}
+
 // ---------------- capability settings (On/Off, implemented/planned) ----------------
 struct Cap { const char* key; const char* desc; bool on; bool implemented; };
 static std::vector<Cap> default_caps(){
@@ -285,7 +319,7 @@ static std::vector<Cap> default_caps(){
     {"circuit",    "S-params, microstrip, match, qwt, line, sweep", true,  true },
     {"filter",     "Butterworth/Chebyshev lowpass + bandpass LC",   true,  true },
     {"touchstone", ".s2p import + Rollett stability K",             true,  true },
-    {"fourier",    "DFT/FFT/iDFT, amplitude spectrum, Nyquist",      true,  true },
+    {"fourier",    "DFT/FFT/iDFT, amplitude spectrum, windowing, Nyquist", true,  true },
     {"fdtd1d",     "1D FDTD field solver (verified vs closed form)",true,  true },
     {"fem",        "3D finite-element field solver",                false, false},
     {"fdtd3d",     "3D FDTD field solver",                          false, false},
@@ -516,6 +550,36 @@ static int cmd_selftest(){
     ck("DFT: FFT cost 0.5*N*log2(N) (N=1024 -> 5120)", approx(0.5*1024*std::log2(1024.0),5120.0,1e-6));
   }
 
+  // 19c windowing: coherent gains exact, leakage cut, amplitude preserved
+  {
+    int Nw=64;
+    auto cgof=[&](WinType w){ std::vector<cd> t(Nw,cd(1,0)); return apply_window(t,w); };
+    ck("window: coherent gain rectangular = 1",   std::fabs(cgof(W_RECT)-1.0)<1e-9);
+    ck("window: coherent gain Hann = 0.50",       std::fabs(cgof(W_HANN)-0.50)<1e-9);
+    ck("window: coherent gain Hamming = 0.54",    std::fabs(cgof(W_HAMMING)-0.54)<1e-9);
+    ck("window: coherent gain Blackman = 0.42",   std::fabs(cgof(W_BLACKMAN)-0.42)<1e-9);
+    // spectrum of a tone sitting BETWEEN bins (worst-case leakage)
+    int N2=64; double fs=64.0;
+    auto specOf=[&](WinType w){
+      std::vector<cd> x(N2);
+      for(int n=0;n<N2;n++) x[n]=cd(std::cos(2*PI*10.5*n/fs),0);   // 10.5 Hz, between bins 10 & 11
+      double cg=1.0; if(w!=W_RECT) cg=apply_window(x,w);
+      std::vector<cd> X=x; fft(X,false); auto A=amp_spectrum(X);
+      if(w!=W_RECT){ for(auto&a:A) a/=cg; }
+      return A;
+    };
+    auto Ar=specOf(W_RECT), Ah=specOf(W_HANN);
+    ck("window: Hann cuts far-bin leakage vs rectangular", Ah[20]<Ar[20] && Ah[30]<Ar[30]);
+    // on-bin tone: Hann + coherent-gain correction recovers the true amplitude at the peak bin
+    {
+      int N3=64; double fs3=64.0; std::vector<cd> x(N3);
+      for(int n=0;n<N3;n++) x[n]=cd(2.0*std::cos(2*PI*8.0*n/fs3),0);  // amp 2.0 on bin 8
+      double cg=apply_window(x,W_HANN); std::vector<cd> X=x; fft(X,false);
+      auto A=amp_spectrum(X); for(auto&a:A) a/=cg;
+      ck("window: Hann on-bin amplitude recovery (2.0)", std::fabs(A[8]-2.0)<0.02);
+    }
+  }
+
   // 20 settings: defaults have implemented caps ON and FEM/FDTD-3D as planned/off
   {
     auto caps=default_caps(); bool fourierOn=false, femPlanned=false;
@@ -541,7 +605,7 @@ static int usage(){
    "  s2p <file.s2p>                 read Touchstone data: VSWR/RL/IL + stability K per freq\n"
    "  fft                            Fourier (FFT) demo: 2-tone spectrum\n"
    "  dft                            DFT chapter walk-through (naive DFT vs FFT, amps, symmetry, Nyquist)\n"
-   "  signal <fs_Hz> <N> <fHz:amp>...   simulate a discrete signal, analyse its spectrum (FFT or DFT)\n"
+   "  signal <fs_Hz> <N> <fHz:amp>... [win=hann|hamming|blackman]   simulate a discrete signal, analyse its spectrum (FFT/DFT), optional taper window\n"
    "  settings [file.conf]           show capability On/Off + implemented/planned (FEM/FDTD/Fourier...)\n"
    "  sweep <ZLre> <ZLim> <Zsys> <Zline> <er> <len_m> <f0_MHz> <f1_MHz> <npts>   VSWR/RL vs freq\n"
    "  fdtd <Z1> <Z2>                 1D FDTD reflection off an impedance step\n"
@@ -627,7 +691,10 @@ int main(int argc,char**argv){
     double fs=atof(argv[2]); int N=atoi(argv[3]);
     if(fs<=0 || N<2){ printf("need fs>0 and N>=2\n"); return 1; }
     std::vector<std::pair<double,double>> comp;
-    for(int i=4;i<argc;i++){ std::string s=argv[i]; auto col=s.find(':');
+    WinType wt=W_RECT;
+    for(int i=4;i<argc;i++){ std::string s=argv[i];
+      if(s.rfind("win=",0)==0){ wt=win_from_name(s.substr(4)); continue; }
+      auto col=s.find(':');
       if(col==std::string::npos) continue;
       comp.push_back({atof(s.substr(0,col).c_str()), atof(s.substr(col+1).c_str())}); }
     std::vector<cd> x(N);
@@ -637,10 +704,16 @@ int main(int argc,char**argv){
     printf("frequency spacing df=fs/N=%.6g Hz, Nyquist (max recognizable)=fs/2=%.6g Hz\n",df,fnyq);
     for(auto&p:comp) if(p.first>=fnyq)
       printf("  ! %.6g Hz >= Nyquist %.6g Hz -> ALIASES (Shannon needs fs > 2*fmax)\n",p.first,fnyq);
+    double cg=1.0;
+    if(wt!=W_RECT){ cg=apply_window(x,wt);
+      printf("window: %s (coherent gain %.4f; amplitude-corrected, cuts spectral leakage of off-bin tones)\n",
+             win_name(wt), cg);
+    } else printf("window: rectangular (none) - off-bin tones leak across bins; add win=hann for cleaner peaks\n");
     std::vector<cd> X;
     bool usefft=is_pow2((size_t)N);
     if(usefft){ X=x; fft(X,false); } else dft_naive(x,X);
     auto A=amp_spectrum(X);
+    if(wt!=W_RECT) for(auto&a:A) a/=cg;   // restore true amplitude after tapering
     printf("spectrum (bins with amplitude > 1e-6):\n");
     printf("   bin   freq[Hz]      amplitude\n");
     for(size_t m=0;m<A.size();m++)
