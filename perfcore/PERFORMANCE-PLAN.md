@@ -70,6 +70,10 @@ No overclocking, no fake "make the phone faster" — real, defensible, and it de
 
 1. **Wire `perfcore` into the two apps** — NDK for Android, Obj-C++ for iOS — so the same numbers
    show on both. This is the "run constant on iOS and Android" deliverable.  *(no new inputs needed)*
+   → **STARTED:** Android side done at the native layer — JNI bridge + CMake + Kotlin surface in
+   `perfcore/android/`, cross-compiled with NDK r27 to valid `libperfcore.so` for arm64-v8a and
+   armeabi-v7a (JNI symbols verified). Next: drop into the app module UI; iOS side adds the same
+   `.cpp` as Obj-C++ to the Xcode target.
 2. **DRAMM ×4.2 virtualization made measured** — back the tiered model with a real fast-tier vs
    slow-tier latency probe on-device.  *(no new inputs needed)*
 3. **Fold in your named constants** — e.g. the 56.3° = arctan(1.5) / −100/11 lock, once you say

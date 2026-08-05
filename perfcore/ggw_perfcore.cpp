@@ -185,6 +185,9 @@ static int usage(){
   return 1;
 }
 
+// Define PERFCORE_NO_MAIN to reuse the functions above as a library (e.g. the Android
+// JNI bridge / iOS Obj-C++ bridge #include this file). Desktop CLI keeps main().
+#ifndef PERFCORE_NO_MAIN
 int main(int argc, char** argv){
   if(argc<2) return usage();
   std::string c=argv[1];
@@ -249,3 +252,4 @@ int main(int argc, char** argv){
   }
   return usage();
 }
+#endif // PERFCORE_NO_MAIN
