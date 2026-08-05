@@ -31,6 +31,7 @@ numbers. The native core is the fix.
 |---|---|---|---|
 | DRAMM priority table (p.5): per-pin READ/WRITE/READ/WRITE/WRITE/WRITE, time each | `perfcore dramm` | **BUILT** | measured (real memory read/write + integrity check) |
 | "adding removing friction, to up and down performance" (bus friction) | `perfcore friction` / `fricsweep` | **BUILT** | measured (sequential streaming vs random pointer-chase — a real 20–30× swing) |
+| "run many instances even though it loses a lot of speed it still works" (your patent) | `perfcore instances` / `instsweep` | **BUILT** | measured (N concurrent instances; integrity holds at every N — degrades, never breaks) |
 | "math electricity and named formulas" | `perfcore power` | **BUILT** | P = V·I exact; energy/op from measured ops/s (V, I are your inputs) |
 | RAM virtualized ×4.2 (p.6) | `perfcore virt42` | **BUILT** (model) | modelled tiered capacity + hit/miss latency blend |
 | peak / "max kvint calculation" | `perfcore run` → peak ops/s | **BUILT** | measured peak throughput reached in the pass |

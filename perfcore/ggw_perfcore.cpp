@@ -27,6 +27,7 @@
 #include <vector>
 #include <string>
 #include <numeric>
+#include <thread>
 
 using clk = std::chrono::steady_clock;
 static double now_s(){ return std::chrono::duration<double>(clk::now().time_since_epoch()).count(); }
@@ -74,6 +75,42 @@ static FricResult friction_run(double f, size_t n=1u<<20){
   double mops = ops/t/1e6;
   double gbps = (double)ops*sizeof(uint64_t)/t/1e9;
   return { mops, gbps, f };
+}
+
+// ---------------- many instances (client: "run many instances, loses speed but still works") -
+// Take the same workload and run N copies at once. Past the core count each instance loses
+// a lot of per-instance speed (contention), but every instance still completes correctly and
+// data integrity holds — the point the client patented: it degrades, it does not break.
+struct InstResult { int n; double agg_mops; double per_inst_mops; double wall_s; bool all_ok; };
+static InstResult instances_run(int N){
+  if(N<1) N=1;
+  const size_t words = 1u<<18;               // 256K words per instance (own buffer, no sharing)
+  std::vector<double> mops((size_t)N,0.0);
+  std::vector<char>   ok((size_t)N,1);
+  double t0=now_s();
+  std::vector<std::thread> th;
+  th.reserve((size_t)N);
+  for(int t=0;t<N;t++){
+    th.emplace_back([&,t](){
+      std::vector<uint64_t> buf(words);
+      const uint64_t tag = (uint64_t)t*0x9e3779b97f4a7c15ull;
+      long ops=0; double d0=now_s();
+      for(size_t i=0;i<words;i++){ buf[i]=tag ^ i; }            // write
+      ops += (long)words;
+      volatile uint64_t s=0;
+      for(int p=0;p<4;p++){ for(size_t i=0;i<words;i++) s+=buf[i]; ops += (long)words; } // read x4
+      (void)s;
+      bool good=true;                                            // integrity: it still works
+      for(size_t i=0;i<words;i+=(words/32)+1) if(buf[i]!=(tag ^ i)){ good=false; break; }
+      double dt=now_s()-d0; if(dt<=0) dt=1e-9;
+      mops[(size_t)t]=ops/dt/1e6; ok[(size_t)t]=good?1:0;
+    });
+  }
+  for(auto&x:th) x.join();
+  double wall=now_s()-t0; if(wall<=0) wall=1e-9;
+  double agg=0; bool all=true;
+  for(int t=0;t<N;t++){ agg+=mops[(size_t)t]; if(!ok[(size_t)t]) all=false; }
+  return { N, agg, agg/(double)N, wall, all };
 }
 
 // ---------------- DRAMM priority table (plan p.5) ----------------
@@ -164,6 +201,11 @@ static int selftest(){
   ck("virt42: effective capacity = base x 4.2", std::fabs(v.eff_capacity_MB-420.0)<1e-9);
   ck("virt42: blended latency between fast and slow", v.blended_ns>2.0 && v.blended_ns<80.0);
   ck("virt42: 90% hit blend = 9.8 ns", std::fabs(v.blended_ns-9.8)<1e-9);
+  // many instances: integrity holds whether 1 or many (degrades speed, never breaks)
+  InstResult i1=instances_run(1), iN=instances_run(32);
+  ck("instances: single instance completes with integrity", i1.all_ok && i1.per_inst_mops>0);
+  ck("instances: 32 instances all complete with integrity (still works)", iN.all_ok && iN.n==32);
+  ck("instances: many instances still produce throughput (>0)", iN.per_inst_mops>0);
   // gpu honestly not wired yet
   ck("gpu: stub reports -1 (not fabricated) until client GPU code lands", gpu_ops()<0);
   printf("\nselftest: %d passed, %d failed\n", g_pass, g_fail);
@@ -177,6 +219,8 @@ static int usage(){
    "  dramm [repeat]              DRAMM priority-table read/write timing (plan p.5)\n"
    "  friction [level0..1]        bus-friction knob: streaming vs random (add/remove friction)\n"
    "  fricsweep                   sweep friction 0..1, show performance up/down\n"
+   "  instances [N]               run N copies at once (loses per-instance speed, still works)\n"
+   "  instsweep                   sweep instance count, show it degrades but never breaks\n"
    "  power <V> <A> <ops_per_s>   electricity: P=V*I, energy per op\n"
    "  virt42 <baseMB> <fastns> <slowns> <hit0..1>   RAM virtualized x4.2 tiered model\n"
    "  selftest                    run checks (PASS/FAIL)\n"
@@ -222,6 +266,33 @@ int main(int argc, char** argv){
     FricResult hi=friction_run(0.0), lo=friction_run(1.0);
     printf("  => removing friction raised throughput %.1fx (%.0f -> %.0f Mops/s)\n",
            hi.mops/ (lo.mops>0?lo.mops:1), lo.mops, hi.mops);
+    return 0;
+  }
+  if(c=="instances"){
+    int N=(argc>=3)?atoi(argv[2]):8;
+    InstResult r=instances_run(N);
+    printf("instances=%d  aggregate %.0f Mops/s  per-instance %.0f Mops/s  integrity=%s\n",
+           r.n, r.agg_mops, r.per_inst_mops, r.all_ok?"ALL OK":"FAILED");
+    printf("  (hardware threads available: %u)\n", std::thread::hardware_concurrency());
+    return 0;
+  }
+  if(c=="instsweep"){
+    unsigned hw=std::thread::hardware_concurrency(); if(hw<1) hw=4;
+    printf("instance sweep — the invariant: many instances degrade throughput but never break:\n");
+    printf("  instances   aggregate Mops/s   per-instance Mops/s   integrity\n");
+    double first_per=0, last_per=0, first_agg=0, last_agg=0; bool everyone_ok=true;
+    for(int N : {1, (int)hw, (int)hw*2, (int)hw*4, (int)hw*8}){
+      InstResult r=instances_run(N);
+      if(first_per==0){ first_per=r.per_inst_mops; first_agg=r.agg_mops; }
+      last_per=r.per_inst_mops; last_agg=r.agg_mops;
+      if(!r.all_ok) everyone_ok=false;
+      printf("  %6d      %12.0f      %14.0f       %s\n",
+             r.n, r.agg_mops, r.per_inst_mops, r.all_ok?"OK":"BROKE");
+    }
+    printf("  => integrity across every instance count: %s\n", everyone_ok?"ALL OK (never breaks)":"FAILURE SEEN");
+    printf("     per-instance %.0f -> %.0f Mops/s, aggregate %.0f -> %.0f Mops/s across 1..%ux instances\n",
+           first_per, last_per, first_agg, last_agg, (unsigned)8);
+    printf("     (on a phone with fewer cores the per-instance drop is larger; the point is it keeps working)\n");
     return 0;
   }
   if(c=="power" && argc>=5){

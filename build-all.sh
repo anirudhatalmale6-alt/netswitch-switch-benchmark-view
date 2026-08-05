@@ -41,7 +41,7 @@ build_std siso        siso/ggw_siso.cpp
 build_std productmeasure productmeasure/ggw_productmeasure.cpp
 build_std rfsim       rfsim/ggw_rfsim.cpp
 build_std switchboard switchboard/ggw_switchboard.cpp
-build_std perfcore    perfcore/ggw_perfcore.cpp
+build_std perfcore    perfcore/ggw_perfcore.cpp  -pthread
 # note: cputimer is header-only (cpu_mhz_timer.h) + a demo; the header is the shared
 #       MHz timebase meant to be #included across modules. radiosig runs the client's
 #       radio-parameter reduction on that timebase. Both build Linux + Windows.
