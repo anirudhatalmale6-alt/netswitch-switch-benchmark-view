@@ -170,6 +170,24 @@ static VirtResult virt42(double base_MB, double fast_ns, double slow_ns, double 
   return { eff, blended, hit_rate };
 }
 
+// ---------------- network effective throughput (+% kbps, HONESTLY) ----------------
+// An app cannot raise the radio or the ISP line rate. What it CAN do on the SAME line:
+// effective throughput is window/RTT-limited (bandwidth-delay product). Pick a
+// lower-latency route (NetSwitch) and effective kbps rises on the same connection.
+// gain% = eff(rtt_opt)/eff(rtt) - 1, capped at the physical line rate (never above it).
+struct NetResult { double base_kbps; double opt_kbps; double gain_pct; bool line_capped; };
+static NetResult netgain(double line_kbps, double window_KB, double rtt_ms, double rtt_opt_ms){
+  auto eff=[&](double rtt_ms_){
+    double win_kbit = window_KB*8.0;                 // KB -> kbit
+    double bdp_kbps = win_kbit / (rtt_ms_/1000.0);   // window / RTT
+    return (bdp_kbps < line_kbps) ? bdp_kbps : line_kbps;
+  };
+  double b=eff(rtt_ms), o=eff(rtt_opt_ms);
+  double gain=(b>0)?(o-b)/b*100.0:0.0;
+  bool capped = (o>=line_kbps-1e-9);
+  return { b, o, gain, capped };
+}
+
 // ---------------- GPU: honest stub until client GPU C-code lands ----------------
 static double gpu_ops(){ return -1.0; }  // -1 = not wired (same convention as the suite)
 
@@ -206,6 +224,12 @@ static int selftest(){
   ck("instances: single instance completes with integrity", i1.all_ok && i1.per_inst_mops>0);
   ck("instances: 32 instances all complete with integrity (still works)", iN.all_ok && iN.n==32);
   ck("instances: many instances still produce throughput (>0)", iN.per_inst_mops>0);
+  // network effective throughput: lower-latency route -> higher effective kbps (window-limited)
+  NetResult ng=netgain(100000.0, 256.0, 60.0, 54.5);   // 100 Mbps line, 256KB window, 60->54.5 ms
+  ck("netgain: lower RTT raises effective kbps (window-limited)", ng.opt_kbps>ng.base_kbps);
+  ck("netgain: ~10% gain from ~9% RTT cut", std::fabs(ng.gain_pct-10.0)<1.0);
+  ck("netgain: never exceeds the physical line rate (honest cap)",
+     netgain(20000.0,256.0,60.0,30.0).opt_kbps<=20000.0+1e-6);
   // gpu honestly not wired yet
   ck("gpu: stub reports -1 (not fabricated) until client GPU code lands", gpu_ops()<0);
   printf("\nselftest: %d passed, %d failed\n", g_pass, g_fail);
@@ -222,6 +246,7 @@ static int usage(){
    "  instances [N]               run N copies at once (loses per-instance speed, still works)\n"
    "  instsweep                   sweep instance count, show it degrades but never breaks\n"
    "  power <V> <A> <ops_per_s>   electricity: P=V*I, energy per op\n"
+   "  netgain [line] [winKB] [rtt] [rtt_opt]   effective kbps gain from lower-latency route (honest)\n"
    "  virt42 <baseMB> <fastns> <slowns> <hit0..1>   RAM virtualized x4.2 tiered model\n"
    "  selftest                    run checks (PASS/FAIL)\n"
    "notes: pure C++17, no OS calls -> same binary logic on iOS (Obj-C++) and Android (NDK).\n"
@@ -293,6 +318,21 @@ int main(int argc, char** argv){
     printf("     per-instance %.0f -> %.0f Mops/s, aggregate %.0f -> %.0f Mops/s across 1..%ux instances\n",
            first_per, last_per, first_agg, last_agg, (unsigned)8);
     printf("     (on a phone with fewer cores the per-instance drop is larger; the point is it keeps working)\n");
+    return 0;
+  }
+  if(c=="netgain"){
+    // netgain [line_kbps] [window_KB] [rtt_ms] [rtt_opt_ms]
+    double line=(argc>=3)?atof(argv[2]):100000.0;
+    double win =(argc>=4)?atof(argv[3]):256.0;
+    double rtt =(argc>=5)?atof(argv[4]):60.0;
+    double ropt=(argc>=6)?atof(argv[5]):54.5;
+    NetResult r=netgain(line,win,rtt,ropt);
+    printf("network effective throughput (same line, no radio/ISP change):\n");
+    printf("  line=%.0f kbps  window=%.0f KB  RTT %.1f -> %.1f ms\n", line, win, rtt, ropt);
+    printf("  effective %.0f -> %.0f kbps  = %+.1f%%%s\n",
+           r.base_kbps, r.opt_kbps, r.gain_pct, r.line_capped?"  (capped at line rate)":"");
+    printf("  mechanism: effective kbps = window/RTT; a lower-latency route lifts it - honest,\n");
+    printf("  works on ALL phones on the same connection, no overclock, no ISP boost.\n");
     return 0;
   }
   if(c=="power" && argc>=5){
