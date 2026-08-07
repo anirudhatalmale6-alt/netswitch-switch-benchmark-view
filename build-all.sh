@@ -42,6 +42,7 @@ build_std productmeasure productmeasure/ggw_productmeasure.cpp
 build_std rfsim       rfsim/ggw_rfsim.cpp
 build_std switchboard switchboard/ggw_switchboard.cpp
 build_std perfcore    perfcore/ggw_perfcore.cpp  -pthread
+build_std elecclean   elecclean/ggw_elecclean.cpp
 # note: cputimer is header-only (cpu_mhz_timer.h) + a demo; the header is the shared
 #       MHz timebase meant to be #included across modules. radiosig runs the client's
 #       radio-parameter reduction on that timebase. Both build Linux + Windows.
@@ -132,6 +133,7 @@ run_selftest productmeasure/ggw_productmeasure
 run_selftest rfsim/ggw_rfsim
 run_selftest switchboard/ggw_switchboard
 run_selftest perfcore/ggw_perfcore
+run_selftest elecclean/ggw_elecclean
 echo "selftests: $stpass passed, $stfail failed"
 
 echo
