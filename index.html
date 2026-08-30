@@ -146,6 +146,63 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
 #rtGate .hint.on{display:block}
 #rtSrcTag{font-family:var(--mono);font-size:11px;color:#0b6b39;cursor:pointer;text-decoration:underline;white-space:nowrap}
 #rtInstall{font-family:var(--mono);font-size:11px;letter-spacing:1px;padding:7px 12px;border-radius:3px;cursor:pointer;font-weight:700;border:1px solid #0b6b39;background:#fff;color:#0b6b39;display:none}
+
+/* The plain-text twin of a drop-down. Paper only - see below. */
+.pmirror{display:none}
+
+/* ---------------------------------------------------------------
+   LINE LENGTH ON PAPER
+   A printed sheet has no sideways scroll bar. On screen the ROUTE
+   HOPS table sits in a sideways scroller and the test log sits in
+   a scroll box, so anything past the edge is reached by dragging.
+   Printed, that overflow is not scrolled - it is cut. The hop
+   table lost its whole Cumulative column, and the test log lost
+   its last lines, on every copy printed from a phone.
+   Everything below is inside @media print. It changes nothing on
+   screen; it only decides what happens at the paper edge.
+   --------------------------------------------------------------- */
+@media print{
+  /* A box that scrolls on screen shows all of itself on paper,
+     sideways and downwards both. The bars and the coloured day
+     strip are left alone - they clip their own labels on purpose
+     and spilling them would print rubbish over the colours. */
+  .section,#p-routes .rt-scroll,#p-routes .rt-mapwrap,
+  pre.log,#ctnLog,#rsLog,#logOut,#devOut{
+    overflow:visible !important;max-height:none !important}
+  pre.log,#logOut,#devOut{white-space:pre-wrap !important;
+    overflow-wrap:break-word;word-break:normal}
+  /* Tables are laid out to the width of the paper, not to the
+     width of their own contents: smaller type and tighter cells,
+     so the columns fit without any of them being cut.
+     break-word, NOT anywhere. anywhere lets the layout break a
+     word at any letter to make a column as narrow as it likes,
+     and the first run of this printed the addresses as
+     "195.66.22 4.21" and the cities as "Coventr y". break-word
+     keeps every word whole unless the word alone cannot fit. */
+  table{width:100% !important;font-size:7.5pt !important}
+  th,td{white-space:normal !important;word-break:normal;
+    overflow-wrap:break-word;hyphens:none;
+    padding:3px 4px !important}
+  /* One value too long to fit breaks instead of running past the
+     edge and taking the rest of its row with it. */
+  .stat .v,.rt-card .v,.row .val,.mono,code{
+    overflow-wrap:break-word;word-break:normal}
+  /* A drop-down prints the one line it is showing, and a native
+     drop-down cannot wrap it. On paper the drop-down stands down
+     and its plain-text twin takes its place, because text wraps
+     and a drop-down does not. */
+  select{display:none !important}
+  .pmirror{display:block !important;font-family:var(--mono);
+    font-size:8pt;padding:4px 6px;border:1px solid #999;
+    border-radius:3px;overflow-wrap:break-word;
+    word-break:normal;white-space:normal}
+  /* A row torn in half by a page break is as unreadable as a
+     clipped one. */
+  tr,.stat,.rt-card,.card,.section,.rt-eq{
+    break-inside:avoid;page-break-inside:avoid}
+  /* A drawing is scaled to the paper, never cropped by it. */
+  canvas,img{max-width:100% !important;height:auto !important}
+}
 </style>
 </head>
 <body class="light">
@@ -155,7 +212,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
     <h1>6GGW</h1>
     <div class="tagline">5G GATEWAY ROUTER</div>
     <div class="sub">SWITCH · PERFORMANCE MONITOR · 6G GATEWAY · CPU·GPU · AREA MAP · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.53.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.54.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
   </div>
 
   <div class="gsearch" style="display:flex;gap:8px;margin:0 0 12px;align-items:stretch">
@@ -3363,6 +3420,33 @@ try{amInit();}catch(e){}
 try{rtInit();}catch(e){}
 try{kbTodayShow();}catch(e){}
 try{ctnInit();}catch(e){}
+
+/* Printed line length - drop-downs.
+   A drop-down prints the one line it is showing, and a native
+   drop-down cannot wrap it. "On - segments cached at edge,
+   re-sent many times" came off the printer as "On - segments
+   cached at" and the rest was gone. So every drop-down carries a
+   plain-text twin of whatever it is showing. The twin is hidden
+   on screen and the drop-down is hidden on paper; the twin wraps,
+   so nothing is cut. It is kept in the page rather than built on
+   the print event, because a print event does not fire when the
+   page is printed to PDF by a tool, and then what is checked
+   here would not be what comes off his phone. */
+function printMirrors(){
+  var s=document.getElementsByTagName('select');
+  for(var i=0;i<s.length;i++){
+    var m=s[i].nextElementSibling;
+    if(!m||m.className!=='pmirror'){
+      m=document.createElement('span'); m.className='pmirror';
+      if(s[i].parentNode) s[i].parentNode.insertBefore(m,s[i].nextSibling);
+    }
+    var o=s[i].selectedOptions&&s[i].selectedOptions[0];
+    m.textContent=o?o.text:'';
+  }
+}
+try{printMirrors();
+    document.addEventListener('change',printMirrors);
+    window.addEventListener('beforeprint',printMirrors);}catch(e){}
 </script>
 </body>
 </html>
