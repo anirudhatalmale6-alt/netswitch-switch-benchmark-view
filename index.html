@@ -151,6 +151,22 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
 .pmirror{display:none}
 
 /* ---------------------------------------------------------------
+   THE SHAPE OF THE SHEET
+   The sheet is turned on its side and the whole view is laid out
+   and then scaled down onto it, the way the example deck does it:
+   one wide sheet, the arrangement kept, the type made smaller.
+   Portrait printed this app in a single narrow column 725 px
+   across, so one view ran to eight sheets. Turned sideways the
+   printable strip is 965 px, and scaling the layout down to 0.72
+   lets it be laid out at 1340 px before it is shrunk - wider than
+   the app is on a desktop screen - so the panels sit side by side
+   instead of one under the next.
+   size:landscape names the turn only. It does not name the paper,
+   so his phone still prints on whatever paper it is set to.
+   --------------------------------------------------------------- */
+@page{size:landscape;margin:12mm}
+
+/* ---------------------------------------------------------------
    LINE LENGTH ON PAPER
    A printed sheet has no sideways scroll bar. On screen the ROUTE
    HOPS table sits in a sideways scroller and the test log sits in
@@ -162,6 +178,25 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
    screen; it only decides what happens at the paper edge.
    --------------------------------------------------------------- */
 @media print{
+  /* The scale. zoom is used and not transform:scale, because a
+     transformed block is one block: it is drawn at the size asked
+     for and then whatever hangs off the bottom of the first sheet
+     is cut, with no second sheet. zoom changes the layout itself,
+     so the sheets are counted after the shrinking, and a view too
+     long for one sheet carries on to the next. */
+  /* 0.78 and not less. 0.72 was tried first and packed the app
+     onto fewer sheets, but it put the tables on the paper at
+     5.4 pt, and shrinking a sheet until it fits is worthless if
+     nobody can read what landed on it. Every type size on the
+     sheet is measured, and the smallest of them is in the report
+     beside the sheet count, so the two are read together. */
+  html{zoom:0.78}
+  /* The app is centred inside 1060 px on a screen. Scaled onto a
+     sideways sheet the strip is 1237 px wide, so that cap would
+     leave 177 px of paper empty down both edges. */
+  .container{max-width:none !important;width:100% !important;
+    padding:6px 0 !important}
+  body{min-height:0 !important}
   /* A box that scrolls on screen shows all of itself on paper,
      sideways and downwards both. The bars and the coloured day
      strip are left alone - they clip their own labels on purpose
@@ -178,8 +213,14 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
      word at any letter to make a column as narrow as it likes,
      and the first run of this printed the addresses as
      "195.66.22 4.21" and the cities as "Coventr y". break-word
-     keeps every word whole unless the word alone cannot fit. */
-  table{width:100% !important;font-size:7.5pt !important}
+     keeps every word whole unless the word alone cannot fit.
+     7.5 pt was what upright paper could take: 725 px of strip and
+     a hop table that wanted 727. Sideways there are 1237 px, so
+     the type goes back up to 9 pt - 7.0 pt once the sheet is
+     scaled - and the columns still fit. That is measured, not
+     assumed: the width of every table is checked against the
+     width of the strip. */
+  table{width:100% !important;font-size:9pt !important}
   th,td{white-space:normal !important;word-break:normal;
     overflow-wrap:break-word;hyphens:none;
     padding:3px 4px !important}
@@ -200,8 +241,52 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
      clipped one. */
   tr,.stat,.rt-card,.card,.section,.rt-eq{
     break-inside:avoid;page-break-inside:avoid}
-  /* A drawing is scaled to the paper, never cropped by it. */
-  canvas,img{max-width:100% !important;height:auto !important}
+  /* A drawing is scaled to the paper, never cropped by it - but
+     no longer with !important. On upright paper 100% was smaller
+     than every drawing in the app, so forcing it could only
+     shrink them. Sideways, 100% is 1237 px and larger than any of
+     them, and the force overrode the app's own caps: the route
+     map went from 560 px to full width, which made it 890 px tall
+     and pushed it onto a sheet of its own with the rest of the
+     first sheet left blank. Without the force the app's caps -
+     560 px for the route map, 920 px for the area and download
+     canvases - win, and 100% is only a floor under the paper. */
+  canvas,img{max-width:100%;height:auto}
+  /* Nothing on paper is allowed to be taller than the sheet it
+     lands on: a drawing taller than 660 px would leave the rest
+     of its sheet empty, and one taller than the sheet would be
+     cut. Width follows the shape of the drawing on its own. */
+  canvas{max-height:660px;width:auto}
+  /* The route map is capped at 560 px on a screen because that is
+     what a phone can hold. A sideways sheet is 1237 px, and at
+     560 the map sat in the middle of it with half the sheet
+     empty either side. At 900 it fills the sheet and the node
+     names are readable. Measured: same 31 sheets either way, so
+     the width is free. */
+  #p-routes canvas{max-width:900px !important}
+
+  /* ---- the top of the sheet ----------------------------------
+     Controls do not work on paper. The theme switch, the search
+     box and the nine views not being printed are all buttons a
+     reader cannot press, and together they were taking 210 px
+     off the top of the first sheet of every view. The one tab
+     still standing is the tab of the view being printed, which
+     is what names the sheet - the way the example deck names
+     each of its own.
+     Nothing is deleted here; it is display:none inside a print
+     block, so the screen keeps all of it. */
+  #themeBtn,.gsearch{display:none !important}
+  .tabs .tab{display:none !important}
+  .tabs .tab.active{display:inline-block !important;
+    font-weight:700;border-width:2px}
+  .tabs{margin:6px 0 6px !important}
+  .header{padding:6px 0 8px !important}
+  .header h1{font-size:24px !important;letter-spacing:6px}
+  .header .tagline{font-size:10px !important;margin-top:2px}
+  /* The one line of the header that is not a control and still
+     goes: it lists the same view names as the tabs under it. */
+  .header .sub{display:none !important}
+  .header .version{font-size:9px !important;margin-top:4px}
 }
 </style>
 </head>
@@ -212,7 +297,7 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
     <h1>6GGW</h1>
     <div class="tagline">5G GATEWAY ROUTER</div>
     <div class="sub">SWITCH · PERFORMANCE MONITOR · 6G GATEWAY · CPU·GPU · AREA MAP · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.54.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
+    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.55.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
   </div>
 
   <div class="gsearch" style="display:flex;gap:8px;margin:0 0 12px;align-items:stretch">
