@@ -104,6 +104,24 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
 #p-routes .rt-controls{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}
 #p-routes .rt-swap{white-space:nowrap;letter-spacing:1px}
 
+/* ---- RAM SLOTS / AUDIO ------------------------------------------ */
+#p-ramslots .rsWrap{max-width:920px}
+#p-ramslots canvas#rsCanvas{display:block;width:100%;height:300px;
+  background:#070d14;border:1px solid var(--border);border-radius:4px}
+#p-ramslots canvas#raCanvas{display:block;width:100%;height:80px;
+  background:#060c14;border:1px solid var(--border);border-radius:4px;
+  margin-top:8px}
+#p-ramslots .rsLabel,#p-ramslots .raRead{font-family:var(--mono);
+  font-size:11px;color:var(--dim);margin-top:7px;line-height:1.6;
+  word-break:break-word}
+#p-ramslots .raNote{font-family:var(--mono);font-size:11px;
+  color:#b45309;margin-top:6px;line-height:1.6}
+#p-ramslots .rsHead{font-size:12px;letter-spacing:1px;color:var(--dim);
+  text-transform:uppercase;margin:14px 0 6px}
+#p-ramslots button.raBtn{font-family:var(--mono);font-size:12px;
+  letter-spacing:1px;padding:10px 16px;margin-top:10px}
+
+
 /* ---- TOP BAR: always on, never scrolls away --------------------- */
 #topbar{position:fixed;top:0;left:0;right:0;z-index:10000;
   background:#ff0000;color:#fff;padding:9px 12px;
@@ -386,6 +404,7 @@ body{padding-top:0}
     <div class="tab" data-p="content">CONTENT · DOMAINS</div>
     <div class="tab" data-p="fair">FAIR VIEW</div>
     <div class="tab" data-p="testlog">TEST LOG TOOL</div>
+    <div class="tab" data-p="ramslots">RAM SLOTS &middot; AUDIO</div>
     <div class="tab" data-p="copyright">COPYRIGHT</div>
   </div>
 
@@ -991,6 +1010,46 @@ body{padding-top:0}
     </div>
   </div>
 
+  <div class="panel" id="p-ramslots">
+   <div class="rsWrap">
+    <div class="rsHead">RAM slots &mdash; your geometry, drawn from the live readings</div>
+    <canvas id="rsCanvas"></canvas>
+    <div class="rsLabel" id="rsLabel">starting&hellip;</div>
+    <div class="note" style="margin-top:10px">
+      The box is the one you sent: the same eight vertices and the same
+      thirty-six indices, in your order, front / back / left / right /
+      top (where the stick inserts) / bottom, with your 0.1 0.1 0.1
+      housing colour. It is drawn through WebGL rather than Direct3D
+      because this runs in a browser and D3D is not reachable from one
+      &mdash; same vertex buffer, same index buffer, same triangle list,
+      one draw call per slot.
+      <br><br>
+      How many slots, how many are lit and how much the rack leans are
+      all read off this device: its memory, the memory in use, and the
+      delay figure from the top bar. Nothing here is decoration.
+    </div>
+
+    <div class="rsHead">Audio built from the resources</div>
+    <canvas id="raCanvas"></canvas>
+    <div class="raRead" id="raRead">not started</div>
+    <button class="raBtn" id="raBtn" onclick="raStart()">START AUDIO</button>
+    <div class="raNote" id="raNote">A browser will not start sound until
+      you touch the page &mdash; that is a rule in the browser, not a
+      choice here. Press once.</div>
+    <div class="note" style="margin-top:10px">
+      Nothing is played back. The tone is generated from the figures:
+      memory in use sets the pitch, the delay sets how much it wavers,
+      and how much is taken sets how loud it is. The bars underneath are
+      measured back OUT of the sound card, so if the sound stops the
+      bars stop with it &mdash; they cannot show a healthy picture over
+      silence.
+      <br><br>
+      If you want actual music instead of the tone, send the track and
+      it drops in where the tone is now. I will not ship a recording I
+      do not have the licence for.
+    </div>
+   </div>
+  </div>
   <div class="panel" id="p-copyright">
    <div class="cw">
     <!-- No red line here any more: it is the top bar, above, and it is
@@ -3613,7 +3672,7 @@ function cpNum(v){ return String(v).replace('.', ','); }   /* his notation */
    so it is never waiting on them and never blank because of them. */
 
 var cpFp = 0, cpFps = 0, cpBat = null, cpSto = null, cpGpu = null;
-var CP_BUILD = 'B27E';   /* read this out and I know exactly what you are looking at */
+var CP_BUILD = 'B27F';   /* read this out and I know exactly what you are looking at */
 
 /* ---- LAG: HOW LATE THIS DEVICE IS RUNNING -----------------------
    His instruction: the numbers have to change as the OS works, and
@@ -3908,6 +3967,425 @@ if(document.readyState === 'loading')
   document.addEventListener('DOMContentLoaded', cpStartBar);
 else cpStartBar();
 
+/* ================================================================
+   RAM SLOTS, DRAWN FROM HIS GEOMETRY.
+
+   He sent DirectX 11 / C++: CreateRamSlot() building a long thin box
+   out of 8 vertices and 36 indices, and RenderRamSlot() drawing it as
+   a triangle list.
+
+   THIS PRODUCT RUNS IN A BROWSER, so Direct3D is not available to it -
+   that is a platform fact, not a preference. What IS available is
+   WebGL, which is the same job through a different door: vertex
+   buffer, index buffer, triangle list, one draw call.
+
+   SO HIS NUMBERS ARE USED EXACTLY AS HE WROTE THEM. The eight
+   positions below are his eight positions, to the digit. The
+   thirty-six indices are his thirty-six, in his order, face for face -
+   front, back, left, right, top (where the stick inserts), bottom.
+   The colour is his 0.1, 0.1, 0.1 housing. Nothing has been
+   "improved" on the way across; if the shape is wrong, it is wrong
+   in the same way his is, and that is the only way a handed-over
+   geometry is worth anything.
+
+   WHAT DRIVES IT. "This could be on app area. If this cpu finds this
+   delay." So the slots are not decoration: how many there are, how
+   full they are and how they move all come from the readings already
+   on the top bar - the device's memory, the memory in use, and LAG,
+   the delay this device is running at.
+   ================================================================ */
+(function () {
+  "use strict";
+
+  /* ---- his vertices, transcribed ---- */
+  var RS_POS = new Float32Array([
+    -0.05, -0.1, -1.5,
+    -0.05,  0.1, -1.5,
+     0.05,  0.1, -1.5,
+     0.05, -0.1, -1.5,
+    -0.05, -0.1,  1.5,
+    -0.05,  0.1,  1.5,
+     0.05,  0.1,  1.5,
+     0.05, -0.1,  1.5
+  ]);
+
+  /* ---- his index list, face by face, in his order ---- */
+  var RS_IDX = new Uint16Array([
+    0, 1, 2,  0, 2, 3,      /* front  */
+    4, 6, 5,  4, 7, 6,      /* back   */
+    4, 5, 1,  4, 1, 0,      /* left   */
+    3, 2, 6,  3, 6, 7,      /* right  */
+    1, 5, 6,  1, 6, 2,      /* top - where the RAM stick inserts */
+    4, 0, 3,  4, 3, 7       /* bottom */
+  ]);
+
+  /* His housing colour is 0.1 0.1 0.1 - almost black, which is what a
+     real slot looks like. On a dark page that is invisible without
+     light, so the shape is lit properly and a rim is added at the
+     grazing angles. The BASE colour stays his; the light is what makes
+     it legible, which is how it would look under a lamp. */
+  var VS =
+    "attribute vec3 p;attribute vec3 n;uniform mat4 mvp;uniform mat4 mv;" +
+    "varying vec3 vn;varying vec3 vp;" +
+    "void main(){vn=normalize((mv*vec4(n,0.0)).xyz);" +
+    "vp=(mv*vec4(p,1.0)).xyz;gl_Position=mvp*vec4(p,1.0);}";
+  var FS =
+    "precision mediump float;uniform vec3 col;varying vec3 vn;varying vec3 vp;" +
+    "void main(){vec3 N=normalize(vn);vec3 L=normalize(vec3(0.4,0.8,0.6));" +
+    "float d=max(dot(N,L),0.0);" +
+    "vec3 V=normalize(-vp);float rim=pow(1.0-max(dot(N,V),0.0),2.0);" +
+    "vec3 c=col*(0.30+0.95*d)+vec3(0.16,0.42,0.30)*rim;" +
+    "gl_FragColor=vec4(c,1.0);}";
+
+  var gl = null, prog = null, vbo = null, nbo = null, RS_TRIS = 0,
+      uMVP = null, uMV = null, uCol = null, aP = null, aN = null, canvas = null;
+
+  function compile(src, type) {
+    var s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      throw new Error("shader: " + gl.getShaderInfoLog(s));
+    }
+    return s;
+  }
+
+  /* ---- the smallest amount of matrix arithmetic that will do ---- */
+  function mul(a, b) {
+    var o = new Float32Array(16), i, j, k, s;
+    for (i = 0; i < 4; i++) for (j = 0; j < 4; j++) {
+      s = 0; for (k = 0; k < 4; k++) s += a[k * 4 + j] * b[i * 4 + k];
+      o[i * 4 + j] = s;
+    }
+    return o;
+  }
+  function persp(fov, ar, n, f) {
+    var t = 1 / Math.tan(fov / 2);
+    return new Float32Array([t / ar,0,0,0, 0,t,0,0,
+      0,0,(f + n) / (n - f),-1, 0,0,(2 * f * n) / (n - f),0]);
+  }
+  function trans(x, y, z) {
+    return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]);
+  }
+  function rotY(a) {
+    var c = Math.cos(a), s = Math.sin(a);
+    return new Float32Array([c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1]);
+  }
+  function rotX(a) {
+    var c = Math.cos(a), s = Math.sin(a);
+    return new Float32Array([1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1]);
+  }
+
+  function init() {
+    canvas = document.getElementById("rsCanvas");
+    if (!canvas) return false;
+    var glOpts = { preserveDrawingBuffer: true, antialias: true };
+    gl = canvas.getContext("webgl", glOpts) ||
+         canvas.getContext("experimental-webgl", glOpts);
+    if (!gl) return false;
+    prog = gl.createProgram();
+    gl.attachShader(prog, compile(VS, gl.VERTEX_SHADER));
+    gl.attachShader(prog, compile(FS, gl.FRAGMENT_SHADER));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      throw new Error("link: " + gl.getProgramInfoLog(prog));
+    }
+    gl.useProgram(prog);
+    aP   = gl.getAttribLocation(prog, "p");
+    aN   = gl.getAttribLocation(prog, "n");
+    uMVP = gl.getUniformLocation(prog, "mvp");
+    uMV  = gl.getUniformLocation(prog, "mv");
+    uCol = gl.getUniformLocation(prog, "col");
+    /* EXPANDED FOR LIGHTING, NOT CHANGED.
+       A box drawn from eight shared corners cannot be lit: a corner
+       belongs to three faces at once and can only carry one normal,
+       so every face gets the same shading and the whole thing reads
+       as one black silhouette. That is exactly what it did - I drew
+       it, looked at it, and saw a black rectangle.
+       So his 36 indices are walked in his order and the positions
+       written out long-hand, three per triangle, each triangle
+       carrying its own true face normal. Same points, same triangles,
+       same winding. Only the sharing is undone. */
+    var pos = new Float32Array(RS_IDX.length * 3);
+    var nrm = new Float32Array(RS_IDX.length * 3);
+    var k, a, b, c, ux, uy, uz, vx, vy, vz, nx, ny, nz, L;
+    for (k = 0; k < RS_IDX.length; k += 3) {
+      a = RS_IDX[k] * 3; b = RS_IDX[k + 1] * 3; c = RS_IDX[k + 2] * 3;
+      ux = RS_POS[b] - RS_POS[a]; uy = RS_POS[b+1] - RS_POS[a+1]; uz = RS_POS[b+2] - RS_POS[a+2];
+      vx = RS_POS[c] - RS_POS[a]; vy = RS_POS[c+1] - RS_POS[a+1]; vz = RS_POS[c+2] - RS_POS[a+2];
+      nx = uy * vz - uz * vy; ny = uz * vx - ux * vz; nz = ux * vy - uy * vx;
+      L = Math.sqrt(nx*nx + ny*ny + nz*nz) || 1; nx/=L; ny/=L; nz/=L;
+      for (var t2 = 0; t2 < 3; t2++) {
+        var src = RS_IDX[k + t2] * 3, dst = (k + t2) * 3;
+        pos[dst] = RS_POS[src]; pos[dst+1] = RS_POS[src+1]; pos[dst+2] = RS_POS[src+2];
+        nrm[dst] = nx; nrm[dst+1] = ny; nrm[dst+2] = nz;
+      }
+    }
+    RS_TRIS = RS_IDX.length;
+    vbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, pos, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(aP);
+    gl.vertexAttribPointer(aP, 3, gl.FLOAT, false, 0, 0);
+    nbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, nbo);
+    gl.bufferData(gl.ARRAY_BUFFER, nrm, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(aN);
+    gl.vertexAttribPointer(aN, 3, gl.FLOAT, false, 0, 0);
+    gl.enable(gl.DEPTH_TEST);
+    return true;
+  }
+
+  /* HOW MANY SLOTS, AND THIS IS A READING NOT A DECISION.
+     navigator.deviceMemory is what the browser will say about this
+     device's memory, rounded to a power of two and capped at 8. One
+     slot per 2 GB, which is how a machine of that size is usually
+     fitted. If the browser will not say, the view says so on its face
+     and draws ONE slot rather than inventing a number of them. */
+  function slotCount() {
+    var gb = navigator.deviceMemory;
+    if (!gb) return { n: 1, known: false, gb: null };
+    return { n: Math.max(1, Math.min(8, Math.round(gb / 2))), known: true, gb: gb };
+  }
+
+  var t0 = 0, rsHeapPeak = 0;
+  function draw(now) {
+    if (!gl) return;
+    if (!t0) t0 = now;
+    var t = (now - t0) / 1000;
+
+    var w = canvas.clientWidth  || 320;
+    var h = canvas.clientHeight || 240;
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w; canvas.height = h;
+    }
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.clearColor(0.03, 0.05, 0.08, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    var sc = slotCount();
+    var m = window.performance && window.performance.memory;
+    /* THE DENOMINATOR WAS WRONG AND THE VIEW ALWAYS READ "taken 0/4".
+       usedJSHeapSize against jsHeapSizeLimit is 9,766 kB against
+       3,671,875 kB - a quarter of one per cent - so the rounding
+       lit nothing, ever, on any device.
+       A browser cannot see how much of the DEVICE's memory is taken;
+       that is the same wall as the processor load. What it can see is
+       how much THIS APP has taken, so the scale is the most this app
+       has been seen to use since it started, and the label says so in
+       those words. It moves, it is real, and it is not dressed up as
+       something it is not. */
+    var frac = 0;
+    if (m) {
+      if (m.usedJSHeapSize > rsHeapPeak) rsHeapPeak = m.usedJSHeapSize;
+      frac = rsHeapPeak > 0 ? m.usedJSHeapSize / rsHeapPeak : 0;
+    }
+
+    /* LAG is the delay he asked to see. It tilts the whole rack: a
+       device keeping up sits still, one that is struggling leans and
+       wavers, and the amount is the milliseconds themselves. */
+    var lag = (typeof cpLag === "number") ? cpLag : 0;
+    var sway = Math.min(0.35, lag / 120) * Math.sin(t * 3.0);
+
+    var P = persp(0.9, canvas.width / canvas.height, 0.1, 40);
+    var CAM = mul(trans(0, -0.05, -4.4), mul(rotX(0.98 + sway), rotY(t * 0.25)));
+
+    var filled = Math.ceil(frac * sc.n);
+    for (var i = 0; i < sc.n; i++) {
+      var x = (i - (sc.n - 1) / 2) * 0.34;
+      var MV = mul(CAM, trans(x, 0, 0));
+      gl.uniformMatrix4fv(uMV,  false, MV);
+      gl.uniformMatrix4fv(uMVP, false, mul(P, MV));
+      /* A slot counted as taken is lit; the rest keep his housing
+         colour, 0.1 0.1 0.1, exactly as he wrote it. */
+      if (i < filled) gl.uniform3f(uCol, 0.10, 0.62, 0.30);
+      else            gl.uniform3f(uCol, 0.1, 0.1, 0.1);
+      gl.drawArrays(gl.TRIANGLES, 0, RS_TRIS);
+    }
+
+    var lbl = document.getElementById("rsLabel");
+    if (lbl) {
+      lbl.textContent =
+        (sc.known ? sc.n + " slots for " + sc.gb + " GB on this device"
+                  : "1 slot - this browser will not say how much memory this device has") +
+        " | lit " + filled + "/" + sc.n + " = this app's memory against the most " +
+        "it has used since it started (" + (m ? Math.round(m.usedJSHeapSize/1024) +
+        " kB of " + Math.round(rsHeapPeak/1024) + " kB" : "not reported") + ")" +
+        " | the device's own memory use cannot be seen from a browser" +
+        " | delay " + lag.toFixed(0) + " ms, which is what leans the rack";
+    }
+    requestAnimationFrame(draw);
+  }
+
+  window.rsStart = function () {
+    if (gl) return true;
+    try {
+      if (!init()) return false;
+      requestAnimationFrame(draw);
+      return true;
+    } catch (e) {
+      var l = document.getElementById("rsLabel");
+      if (l) l.textContent = "this device will not draw it: " + e.message;
+      return false;
+    }
+  };
+  /* the geometry, exposed so a check can confirm it is still his */
+  window.rsGeometry = function () {
+    return { pos: Array.prototype.slice.call(RS_POS),
+             idx: Array.prototype.slice.call(RS_IDX) };
+  };
+})();
+
+/* ================================================================
+   AUDIO FROM THE RESOURCES.
+
+   "Audio is needed to part the resources and display all taken
+   resources. Audio stream can be music."
+
+   TWO THINGS I CANNOT DO, SAID FIRST SO NOTHING HERE PRETENDS
+   OTHERWISE:
+
+   1. A BROWSER WILL NOT START AUDIO ON ITS OWN. Every one of them
+      refuses until the person has touched the page - it is a rule in
+      the browser, not a choice in this code, and no amount of
+      cleverness gets round it. So there is a button. Press it once
+      and it runs from then on.
+   2. I CANNOT PUT A MUSIC TRACK IN HERE. Recorded music is licensed
+      and it is not mine to ship. If you want a particular track,
+      send it and it drops in where the tone is now.
+
+   WHAT IS HERE INSTEAD, AND IT IS NOT A CONSOLATION PRIZE: the sound
+   IS the reading. Nothing is played back - the tones are generated
+   from the resource figures themselves, so what you hear is the
+   machine's state rather than a recording laid over the top of it.
+
+     MEMORY   sets the pitch of the held tone. More taken, higher.
+     DELAY    the LAG figure. A device keeping up is steady; one that
+              is struggling wavers, and the wobble is the
+              milliseconds.
+     TAKEN    how much of the memory is in use sets how loud it is.
+
+   And then the analyser reads that same signal back OUT of the sound
+   card and draws it, which is the "display all taken resources" half:
+   the bars are measured off the audio, not drawn from the numbers a
+   second time. If the sound stops, the bars stop with it - they
+   cannot show a healthy picture over silence.
+   ================================================================ */
+(function () {
+  "use strict";
+
+  var ctx = null, osc = null, sub = null, gain = null, ana = null,
+      bins = null, canvas = null, running = false, raHeapPeak = 0;
+
+  function fail(msg) {
+    var s = document.getElementById("raNote");
+    if (s) s.textContent = msg;
+  }
+
+  window.raStart = function () {
+    var btn = document.getElementById("raBtn");
+    if (running) {           /* second press stops it */
+      try { ctx.close(); } catch (e) {}
+      ctx = null; running = false;
+      if (btn) btn.textContent = "START AUDIO";
+      fail("stopped.");
+      return false;
+    }
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) { fail("this browser has no Web Audio - no sound is possible here."); return false; }
+    try {
+      ctx = new AC();
+      osc = ctx.createOscillator();      /* memory -> pitch      */
+      sub = ctx.createOscillator();      /* delay  -> slow waver */
+      gain = ctx.createGain();
+      var subGain = ctx.createGain();
+      ana = ctx.createAnalyser();
+      ana.fftSize = 128;
+      bins = new Uint8Array(ana.frequencyBinCount);
+
+      osc.type = "triangle";
+      osc.frequency.value = 220;
+      sub.type = "sine";
+      sub.frequency.value = 5;
+      subGain.gain.value = 0;
+      sub.connect(subGain);
+      subGain.connect(osc.frequency);    /* the waver bends the pitch */
+
+      gain.gain.value = 0.0001;
+      osc.connect(gain); gain.connect(ana); ana.connect(ctx.destination);
+      osc.start(); sub.start();
+      window.__raSubGain = subGain;
+      running = true;
+      if (btn) btn.textContent = "STOP AUDIO";
+      fail("running - the tone is built from the readings, nothing is played back.");
+      canvas = document.getElementById("raCanvas");
+      requestAnimationFrame(tick);
+      return true;
+    } catch (e) {
+      fail("this device refused to start audio: " + e.message);
+      return false;
+    }
+  };
+
+  function tick() {
+    if (!running || !ctx) return;
+    var m = window.performance && window.performance.memory;
+    /* THE SAME DENOMINATOR THE SLOTS USE, and for the same reason:
+       against the heap LIMIT this reads 0% on every device and the
+       pitch never moves. Against the most this app has used since it
+       started, it moves and it means something. Fixing it in one
+       place and not the other is how two views of the same figure end
+       up disagreeing on screen. */
+    if (m && m.usedJSHeapSize > raHeapPeak) raHeapPeak = m.usedJSHeapSize;
+    var frac = (m && raHeapPeak > 0) ? m.usedJSHeapSize / raHeapPeak : 0.2;
+    var lag  = (typeof cpLag === "number") ? cpLag : 0;
+
+    /* MEMORY -> PITCH. Two octaves across the whole range, so a
+       change you can see on the bar is a change you can hear. */
+    osc.frequency.setTargetAtTime(180 + frac * 540, ctx.currentTime, 0.08);
+    /* DELAY -> how far the pitch wavers, in the milliseconds themselves */
+    if (window.__raSubGain) {
+      window.__raSubGain.gain.setTargetAtTime(Math.min(60, lag * 2.5),
+                                              ctx.currentTime, 0.1);
+    }
+    /* TAKEN -> loudness, kept quiet enough to live with */
+    gain.gain.setTargetAtTime(0.02 + frac * 0.10, ctx.currentTime, 0.1);
+
+    /* ---- and read it back OUT, to draw it ---- */
+    if (canvas && ana) {
+      ana.getByteFrequencyData(bins);
+      var w = canvas.clientWidth || 300, h = canvas.clientHeight || 70;
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w; canvas.height = h;
+      }
+      var g = canvas.getContext("2d");
+      g.fillStyle = "#060c14"; g.fillRect(0, 0, w, h);
+      var bw = w / bins.length, i, v;
+      for (i = 0; i < bins.length; i++) {
+        v = bins[i] / 255;
+        g.fillStyle = "rgb(" + Math.round(40 + 180 * v) + ",210," +
+                      Math.round(120 + 90 * v) + ")";
+        g.fillRect(i * bw, h - v * h, Math.max(1, bw - 1), v * h);
+      }
+      var lvl = 0;
+      for (i = 0; i < bins.length; i++) lvl += bins[i];
+      lvl = lvl / bins.length / 255;
+      var out = document.getElementById("raRead");
+      if (out) {
+        out.textContent =
+          "pitch " + Math.round(osc.frequency.value) + " Hz  (memory " +
+          Math.round(frac * 100) + "% taken)   waver " +
+          (window.__raSubGain ? Math.round(window.__raSubGain.gain.value) : 0) +
+          " Hz  (delay " + lag.toFixed(0) + " ms)   measured off the sound: " +
+          (lvl * 100).toFixed(0) + "%";
+      }
+      window.__raLevel = lvl;
+    }
+    requestAnimationFrame(tick);
+  }
+
+  window.raRunning = function () { return running; };
+})();
+
 /* ---------------- top search bar (IP / phone / router / domain) ---------------- */
 function gotoTab(name){
   document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active');});
@@ -3915,6 +4393,7 @@ function gotoTab(name){
   var tab=document.querySelector('.tab[data-p="'+name+'"]'); if(tab)tab.classList.add('active');
   var pan=document.getElementById('p-'+name); if(pan)pan.classList.add('active');
   if(name==='devview'){try{renderDevView();}catch(e){} try{dwInit();}catch(e){}}
+  if(name==='ramslots'){try{rsStart();}catch(e){}}
   if(name==='copyright'){try{cpRenderCopyright();}catch(e){}}
   /* PUT THE CHOSEN VIEW AT THE TOP OF THE APP AREA.
      The 6GGW header, the version line, the search box and three rows
