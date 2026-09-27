@@ -104,6 +104,31 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
 #p-routes .rt-controls{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}
 #p-routes .rt-swap{white-space:nowrap;letter-spacing:1px}
 
+/* ---- TOP BAR: always on, never scrolls away --------------------- */
+#topbar{position:fixed;top:0;left:0;right:0;z-index:10000;
+  background:#ff0000;color:#fff;padding:9px 12px;
+  font-family:var(--mono);font-size:12px;line-height:1.45;
+  word-break:break-word;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+/* The page is pushed down by exactly the bar's height, and the height
+   is MEASURED at runtime rather than guessed - the line wraps to two
+   rows on a phone and to one on a desktop, and a hard-coded offset
+   would either cover the top of the app or leave a gap. */
+/* THE APP AREA SCROLLS, NOT THE PAGE. A fixed bar with the page
+   scrolling underneath it means content slides UNDER the bar and gets
+   sliced in half - which is exactly what it did, and the rectangle
+   check did not catch it because it measured the app area before
+   anything had been scrolled. It took looking at the picture.
+
+   So the area below the bar is its own scrolling region, the height of
+   the window minus the bar. Nothing can pass under the bar because
+   nothing above it moves. That is also the shape he described: a top
+   area that is there all the time, and an app area underneath it. */
+html,body{height:100%;overflow:hidden}
+body{padding-top:0}
+.container{position:fixed;left:0;right:0;bottom:0;overflow-y:auto;
+  -webkit-overflow-scrolling:touch}
+
+
 /* ---- COPYRIGHT VIEW ------------------------------------------------
    Laid out from the drawing: a red status line across the top, the
    two lines of text under it, and the Finnish key flag centred at the
@@ -323,6 +348,18 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
 </style>
 </head>
 <body class="light">
+<!-- THE TOP BAR IS THE PRODUCT'S OWN CHROME, NOT PART OF ANY VIEW.
+     It sits above everything, it never scrolls away, and it is there
+     whichever app is selected below it. The area underneath is the app
+     area: whatever is chosen renders there, and the copyright view is
+     one of those choices rather than the owner of this bar.
+
+     That is the correction. The first version of this put the red line
+     INSIDE the copyright view, so it only existed on one screen and
+     vanished the moment you went anywhere else. -->
+<div id="topbar" role="status" aria-live="polite">
+  <div id="topbarLine">reading this machine&hellip;</div>
+</div>
 <div class="container">
   <div class="header">
     <button class="ghost" id="themeBtn" onclick="toggleTheme()" style="position:absolute;right:14px;top:14px;padding:7px 14px">☀ LIGHT</button>
@@ -956,7 +993,8 @@ pre.log{background:#060a06;border:1px solid var(--border);border-radius:3px;padd
 
   <div class="panel" id="p-copyright">
    <div class="cw">
-    <div class="statusline" id="cpStatus">reading this machine&hellip;</div>
+    <!-- No red line here any more: it is the top bar, above, and it is
+         on screen whichever view this is. -->
     <div class="body">
       <div class="ace">Ace Square Deuce Star</div>
       <div class="place">Write sign to show placement in RAM DDR,<br>
@@ -3504,69 +3542,34 @@ function rtInit(){
    So the note underneath says, in plain words, which tokens on the
    line are live and which are fixed text. A red status line is
    believed on sight; it has to be possible to tell the two apart. */
-var cpCpu=null, cpFp=0, cpUnitBest=0, cpUnitNow=0, cpTimer=null;
+var cpFp=0;
 
-/* CPU, AND TWO EARLIER VERSIONS OF THIS SHIPPED A DEAD NOUGHT.
-   The first counted time between a mark() and a done() wrapped round
-   per-frame work, which is how the football pages do it because they
-   own an animation loop. This page does not, so nothing ever called
-   them and the red line carried a confident CPU0,0 for ever.
-   The second added up requestIdleCallback's timeRemaining() against
-   the wall clock. That looked right and was not: timeRemaining is
-   capped and generous, so the idle total always exceeded the wall
-   total and the answer was nought again - under a deliberate load
-   that pinned the thread, it still read nought.
+/* WHY THERE IS NO PROCESSOR FIGURE ON THE BAR, and it is not an
+   oversight - three different ways of measuring it were built here and
+   all three were thrown out.
+
+   (1) Counters between a mark() and a done() wrapped round per-frame
+       work. Nothing ever called them on this page, so the bar carried
+       a confident CPU0,0 for ever.
+   (2) requestIdleCallback's timeRemaining() summed against the wall
+       clock. Looks principled; the value is capped and generous, so
+       the idle total always exceeded the elapsed total. Nought again.
+   (3) Timing a fixed piece of work and watching it slow down. This one
+       moved - but the check that pins the thread on purpose showed it
+       reading nought WHILE the load ran and 33 per cent a second AFTER
+       it stopped. A figure that reports a load once it has gone is not
+       a load figure.
 
    A NOUGHT THAT NEVER MOVES IS NOT A MEASUREMENT, and on an idle page
-   it is indistinguishable from a correct one. So what is measured now
-   is something that must respond: a small fixed piece of work is run
-   every second and timed. When something else is using this thread,
-   that same work takes longer. The share is how much slower it is
-   running now than at its fastest - and the check that goes with this
-   puts the thread under load on purpose and fails if the figure does
-   not move. */
-function cpUnit(){
-  var t0=performance.now(), x=0;
-  for(var i=0;i<300000;i++){ x += (i&7) + 1; }
-  cpUnitGuard = x;                    /* read, so it cannot be deleted */
-  return performance.now()-t0;
-}
-var cpUnitGuard=0;
+   it cannot be told apart from a correct one. A browser tab is one
+   thread and cannot see what the rest of the machine is doing, which
+   is the same answer as the memory type and speed and for the same
+   reason. The native tool measures it properly, on the machine rather
+   than in a page: network-calculator hardware.
 
-/* AND THEN THE THIRD VERSION WAS THROWN OUT TOO, WHICH IS THE POINT.
-   Timing a fixed piece of work and watching it slow down does respond
-   to interference - but only to interference that lands DURING the
-   sample itself. The check that puts the thread under load on purpose
-   showed it: nought while the load was running, and 33 per cent a
-   moment AFTER it stopped. A figure that reports the load once it has
-   gone is not a load figure.
-
-   So this page does not show a processor figure at all. A browser tab
-   is one thread; when it is running, it is running, and it cannot see
-   what else the machine is doing. That is the same answer as the
-   memory type and speed, and for the same reason - the honest
-   response to "cannot be known from here" is to say so.
-
-   THE PROCESSOR IS MEASURED PROPERLY BY THE NATIVE TOOL, which runs on
-   the machine rather than in a page: network-calculator hardware. It
-   reads the name, the core count and every cache size, and it measures
-   the memory as a ladder.
-
-   The slowdown figure is still worked out, because it is genuinely
-   useful for a different question - is THIS PAGE getting a fair share
-   of its own thread - and it is reported under that name, not as a
-   processor load. */
-function cpSample(){
-  var ms=cpUnit();
-  if(!cpUnitBest || ms<cpUnitBest) cpUnitBest=ms;
-  cpUnitNow=ms;
-}
-function cpStartSampling(){
-  if(cpTimer) return;
-  cpSample();
-  cpTimer=setInterval(function(){ cpSample(); cpRenderCopyright(); }, 1000);
-}
-function cpStopSampling(){ if(cpTimer){ clearInterval(cpTimer); cpTimer=null; } }
+   The code for all three is gone rather than left commented out. Dead
+   measuring code is how a number nobody trusts finds its way back onto
+   a screen. */
 
 /* Floating point work per second, measured by doing some and timing it.
    The total is READ afterwards - a loop whose answer nobody uses is
@@ -3586,49 +3589,90 @@ function cpMeasureFp(){
 function cpNum(v){ return String(v).replace('.', ','); }   /* his notation */
 
 
-function cpRenderCopyright(){
-  var el=document.getElementById('cpStatus'); if(!el) return;
+/* ---- WHAT GOES ON THE BAR ----------------------------------------
+   Two of the figures are read off this machine and move: RAM, and FP.
+   The rest is the wording from the drawing and is NOT a reading of
+   anything - the copyright view says which is which in words, because
+   a red bar gets believed on sight.
+
+   FP is measured ONCE, at start, and not on a loop. It is a property
+   of the machine rather than something that changes second to second,
+   and re-running a 60 ms benchmark every second on a phone would be
+   the bar heating the very thing it claims to be reporting. */
+function cpBarText(){
   var ramKb = (window.performance && performance.memory)
       ? Math.round(performance.memory.usedJSHeapSize/1024) : null;
   if(!cpFp) cpFp = cpMeasureFp();
-  var fpK = Math.round(cpFp/1000);
+  return 'RAM' + (ramKb===null ? '--' : ramKb) +
+         ' FP' + Math.round(cpFp/1000) +
+         ' CPU--' +
+         ' 0,094 CM04 DDR1c2party1chipset3/44tack+-()/ +atyg' +
+         ' phase version status checker.';
+}
 
-  el.textContent =
-    'RAM' + (ramKb===null ? '--' : ramKb) +
-    ' FP' + fpK +
-    ' CPU' + '--' +
-    ' 0,094 CM04 DDR1c2party1chipset3/44tack+-()/ +atyg' +
-    ' phase version status checker.';
+/* THE OFFSET IS MEASURED, NOT ASSUMED. The line wraps to two rows on a
+   phone and one on a desktop, so a fixed number either covers the top
+   of the app area or leaves a gap above it. This reads the bar's real
+   height and pushes the page down by exactly that. */
+function cpFitBar(){
+  var bar = document.getElementById('topbar');
+  if(!bar) return;
+  var h = bar.getBoundingClientRect().height;
+  var app = document.querySelector('.container');
+  if(app) app.style.top = h + 'px';
+}
 
-  var note=document.getElementById('cpSrc');
-  if(note){
-    note.innerHTML =
-      'ON THE RED LINE, WHAT IS A READING AND WHAT IS NOT.<br><br>' +
-      'READ from this machine, and it changes as you watch:<br>' +
-      '&nbsp;&nbsp;RAM&nbsp;' + (ramKb===null ? '&mdash; this browser does not report it'
-          : ramKb + ' &mdash; kB this page is using') + '<br>' +
-      '&nbsp;&nbsp;FP&nbsp;' + fpK + ' &mdash; thousand floating point operations a second, ' +
-        'timed here just now<br>' +
-      '<br>CANNOT be read from a web page:<br>' +
-      '&nbsp;&nbsp;CPU&nbsp;-- &mdash; a browser tab is one thread and cannot ' +
-        'see what the rest of the machine is doing. Three ways of ' +
-        'guessing it were tried here and all three were thrown out: ' +
-        'each one printed a steady nought whatever the machine was ' +
-        'doing. The native tool measures the processor properly &mdash; ' +
-        'run <b>network-calculator hardware</b>.<br>' +
-      '&nbsp;&nbsp;this page\'s own work is currently running in ' +
-        cpNum(cpUnitNow.toFixed(2)) + ' ms against its best of ' +
-        cpNum(cpUnitBest.toFixed(2)) + ' ms, which says whether the page ' +
-        'is getting a fair share of its thread &mdash; not what the ' +
-        'processor is doing.<br><br>' +
-      'FIXED TEXT, exactly as written on the drawing, and NOT a ' +
-      'reading of anything: 0,094 &middot; CM04 &middot; ' +
-      'DDR1c2party1chipset3/44tack+-()/ +atyg &middot; phase version ' +
-      'status checker.<br><br>' +
-      'Tell me which of those are meant to be live fields and what ' +
-      'each should hold, and I will wire them the same way.';
+function cpRenderBar(){
+  var el = document.getElementById('topbarLine');
+  if(!el) return;
+  el.textContent = cpBarText();
+  cpFitBar();
+}
+
+/* The note under the copyright view - what on the bar is a reading and
+   what is not. It belongs with the copyright view because that is
+   where somebody goes to ask; the bar itself stays short. */
+function cpRenderCopyright(){
+  var note=document.getElementById('cpSrc'); if(!note) return;
+  var ramKb = (window.performance && performance.memory)
+      ? Math.round(performance.memory.usedJSHeapSize/1024) : null;
+  note.innerHTML =
+    'ON THE RED BAR AT THE TOP, WHAT IS A READING AND WHAT IS NOT.<br><br>' +
+    'READ from this machine:<br>' +
+    '&nbsp;&nbsp;RAM&nbsp;' + (ramKb===null
+        ? '&mdash; this browser does not report it'
+        : ramKb + ' &mdash; kB this page is using, updated every second') + '<br>' +
+    '&nbsp;&nbsp;FP&nbsp;' + Math.round(cpFp/1000) + ' &mdash; thousand ' +
+      'floating point operations a second, measured once when the app ' +
+      'started<br><br>' +
+    'CANNOT be read from a web page:<br>' +
+    '&nbsp;&nbsp;CPU&nbsp;-- &mdash; a browser tab is one thread and cannot ' +
+      'see what the rest of the machine is doing. Three ways of guessing ' +
+      'it were tried and all three printed a steady nought whatever the ' +
+      'machine was doing. The native tool measures the processor ' +
+      'properly &mdash; run <b>network-calculator hardware</b>.<br><br>' +
+    'FIXED TEXT, exactly as drawn, and NOT a reading: 0,094 &middot; ' +
+    'CM04 &middot; DDR1c2party1chipset3/44tack+-()/ +atyg &middot; ' +
+    'phase version status checker.<br><br>' +
+    'Tell me which of those are meant to be live fields and what each ' +
+    'should hold, and I will wire them the same way as RAM and FP.';
+}
+
+/* THE BAR IS LIVE FROM THE MOMENT THE APP OPENS AND STAYS LIVE.
+   It is not tied to any one view - that was the whole mistake. RAM is
+   free to read, so it ticks every second whichever app is showing. */
+function cpStartBar(){
+  cpRenderBar();
+  setInterval(cpRenderBar, 1000);
+  window.addEventListener('resize', cpFitBar);
+  if(window.ResizeObserver){
+    try{ new ResizeObserver(cpFitBar).observe(document.getElementById('topbar')); }
+    catch(e){}
   }
 }
+if(document.readyState==='loading')
+  document.addEventListener('DOMContentLoaded', cpStartBar);
+else cpStartBar();
 
 /* ---------------- top search bar (IP / phone / router / domain) ---------------- */
 function gotoTab(name){
@@ -3637,10 +3681,7 @@ function gotoTab(name){
   var tab=document.querySelector('.tab[data-p="'+name+'"]'); if(tab)tab.classList.add('active');
   var pan=document.getElementById('p-'+name); if(pan)pan.classList.add('active');
   if(name==='devview'){try{renderDevView();}catch(e){} try{dwInit();}catch(e){}}
-  /* Sampling only runs while the view is open - a benchmark ticking
-     every second behind a page nobody is looking at is a battery leak. */
-  if(name==='copyright'){try{cpStartSampling();cpRenderCopyright();}catch(e){}}
-  else {try{cpStopSampling();}catch(e){}}
+  if(name==='copyright'){try{cpRenderCopyright();}catch(e){}}
   if(name==='content'){try{ctInit();}catch(e){}}
   if(name==='fair'){try{updateFair();}catch(e){}}
   if(name==='routes' && !rtSrcConfirmed){try{rtOpenGate();}catch(e){}}
