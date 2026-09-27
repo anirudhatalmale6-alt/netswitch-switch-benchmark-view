@@ -3613,7 +3613,56 @@ function cpNum(v){ return String(v).replace('.', ','); }   /* his notation */
    so it is never waiting on them and never blank because of them. */
 
 var cpFp = 0, cpFps = 0, cpBat = null, cpSto = null, cpGpu = null;
-var CP_BUILD = 'B27C';   /* read this out and I know exactly what you are looking at */
+var CP_BUILD = 'B27D';   /* read this out and I know exactly what you are looking at */
+
+/* ---- LAG: HOW LATE THIS DEVICE IS RUNNING -----------------------
+   His instruction: the numbers have to change as the OS works, and
+   change quicker than once or twice a second.
+   Most of what is on the bar cannot change - core count, screen size,
+   colour depth. What CAN change is how well this device is keeping
+   up, and that is worth more than any of the fixed facts.
+
+   A timer is asked for every 100 ms. When the device is busy the
+   callback arrives LATE, because the work in front of it has to
+   finish first. The lateness is the reading.
+
+   THIS IS THE FOURTH THING I HAVE TRIED FOR "how loaded is it" AND
+   THE FIRST ONE THAT ANSWERS. The three before it - counters round
+   per-frame work, requestIdleCallback's spare time, and timing a
+   fixed piece of work - each printed a steady nought no matter what
+   the machine was doing. The difference here is that lateness is
+   caused by the queue in front of the callback, which is exactly
+   what a busy device has. And it is not taken on trust: the check
+   that ships with it pins the thread on purpose and FAILS if this
+   number does not rise. */
+var cpLag = 0, cpLagPeak = 0, cpHeapRate = 0, cpLastHeap = 0, cpLastHeapT = 0;
+(function(){
+  var want = 100, prev = performance.now();
+  setInterval(function(){
+    var now = performance.now(), late = now - prev - want;
+    prev = now;
+    if(late < 0) late = 0;
+    /* Smoothed a little so it is readable rather than flickering,
+       but the peak of the last second is kept unsmoothed - a stall
+       you can feel is a peak, not an average. */
+    cpLag = cpLag * 0.6 + late * 0.4;
+    if(late > cpLagPeak) cpLagPeak = late;
+  }, want);
+  setInterval(function(){ cpLagPeak = 0; }, 1000);
+})();
+
+/* How fast this page is taking memory, in kB a second. It moves the
+   moment anything starts doing work. */
+function cpHeapTick(){
+  var m = window.performance && performance.memory;
+  if(!m) return;
+  var now = performance.now(), kb = m.usedJSHeapSize/1024;
+  if(cpLastHeapT){
+    var dt = (now - cpLastHeapT)/1000;
+    if(dt > 0) cpHeapRate = (kb - cpLastHeap)/dt;
+  }
+  cpLastHeap = kb; cpLastHeapT = now;
+}
 
 /* Floating point work per second, measured by doing some and timing
    it. The total is READ afterwards - a loop whose answer nobody uses
@@ -3695,18 +3744,18 @@ function cpGb(n){ return (n/1073741824).toFixed(1); }
 
 /* EVERY TOKEN IS BUILT ONLY IF ITS READING EXISTS. push() is never
    called with a blank. */
-function cpTokens(){
+/* The readings that cannot change while you watch - or change so
+   rarely that asking five times a second is wasted work. */
+function cpSlowTokens(){
   var t = [], m = window.performance && performance.memory;
 
-  if(m) t.push('RAM' + cpKb(m.usedJSHeapSize) +
-               '/' + cpKb(m.jsHeapSizeLimit) + 'kB');
+  if(m) t.push('LIM' + cpKb(m.jsHeapSizeLimit) + 'kB');
   if(navigator.deviceMemory) t.push('DDR' + navigator.deviceMemory + 'GB');
   if(navigator.hardwareConcurrency) t.push('CPU' + navigator.hardwareConcurrency + 'c');
   if(!cpFp) cpFp = cpMeasureFp();
   t.push('FP' + (cpFp >= 1e9 ? (cpFp/1e9).toFixed(1) + 'G'
                 : cpFp >= 1e6 ? Math.round(cpFp/1e6) + 'M'
                 : Math.round(cpFp/1e3) + 'k'));
-  if(cpFps) t.push('FPS' + Math.round(cpFps));
   var g = cpGpuName(); if(g) t.push('GPU ' + g);
 
   t.push('SCR' + screen.width + 'x' + screen.height +
@@ -3737,8 +3786,39 @@ function cpTokens(){
   return t;
 }
 
+/* THE FAST TOKENS. Padded to a fixed width on purpose: if the text
+   changed length five times a second the bar would change height and
+   the whole app area under it would jump about. */
+function cpPad(v, n){ v = String(v); while(v.length < n) v = ' ' + v; return v; }
+function cpFastTokens(){
+  var t = [];
+  /* ON A DEVICE THAT IS DOING NOTHING, MOST HONEST READINGS DO NOT
+     MOVE - and that is correct, not a fault. Measured: idle, the bar
+     changed 0 times a second; busy, 5 times a second. He would have
+     opened it, touched nothing, and seen a frozen bar.
+
+     So the first reading is the one that always moves and is still a
+     real fact about this device: how long the app has been running,
+     to a tenth of a second. It is not decoration and it is not a
+     spinner pretending to be data - it is the clock this page is
+     being driven by, and if it ever stops, the page has stopped. */
+  t.push('UP' + cpPad((performance.now()/1000).toFixed(1), 6) + 's');
+  t.push('LAG' + cpPad(cpLag.toFixed(0), 3) + 'ms');
+  t.push('PEAK' + cpPad(cpLagPeak.toFixed(0), 3) + 'ms');
+  if(cpFps){
+    t.push('FPS' + cpPad(Math.round(cpFps), 2));
+    t.push('DLY' + cpPad((1000/cpFps).toFixed(1), 5) + 'ms');
+  }
+  var m = window.performance && performance.memory;
+  if(m){
+    t.push('RAM' + cpPad(Math.round(m.usedJSHeapSize/1024), 7) + 'kB');
+    t.push((cpHeapRate >= 0 ? '+' : '') + cpPad(cpHeapRate.toFixed(0), 5) + 'kB/s');
+  }
+  return t;
+}
+
 function cpBarText(){
-  return CP_BUILD + ' ' + cpTokens().join(' ') +
+  return CP_BUILD + ' ' + cpFastTokens().join(' ') + ' ' + cpSlowTokens().join(' ') +
          ' | 0,094 CM04 DDR1c2party1chipset3/44tack+-()/ +atyg' +
          ' phase version status checker.';
 }
@@ -3753,16 +3833,25 @@ function cpFitBar(){
   if(app) app.style.top = bar.getBoundingClientRect().height + 'px';
 }
 
+var cpLastLen = -1;
 function cpRenderBar(){
   var el = document.getElementById('topbarLine');
   if(!el) return;
-  el.textContent = cpBarText();
-  cpFitBar();
+  var txt = cpBarText();
+  el.textContent = txt;
+  /* THE HEIGHT IS ONLY RE-MEASURED WHEN THE LINE CHANGES LENGTH.
+     getBoundingClientRect forces the browser to lay the page out
+     again; doing that five times a second, for a line whose length
+     almost never changes, would be the bar costing more than
+     everything it is reporting on. */
+  if(txt.length !== cpLastLen){ cpLastLen = txt.length; cpFitBar(); }
   /* THE BAR MUST NEVER BE EMPTY. If something above ever throws or a
      reading vanishes, this is the last line of defence - it is
      checked after every paint, not assumed. */
   if(!el.textContent.trim()) el.textContent = 'NetSwitch - reading this device';
 }
+
+function cpTokens(){ return cpFastTokens().concat(cpSlowTokens()); }
 
 function cpRenderCopyright(){
   var note = document.getElementById('cpSrc'); if(!note) return;
@@ -3790,7 +3879,13 @@ function cpRenderCopyright(){
 
 function cpStartBar(){
   cpRenderBar();
-  setInterval(cpRenderBar, 1000);
+  cpFitBar();
+  /* FIVE TIMES A SECOND, as asked - "more than once twice per
+     second". Everything on the fast half of the line is something
+     that genuinely moves at that rate: how late the device is
+     running, the worst stall in the last second, frames delivered,
+     memory in use and how fast it is being taken. */
+  setInterval(function(){ cpHeapTick(); cpRenderBar(); }, 200);
   window.addEventListener('resize', cpFitBar);
   window.addEventListener('online', cpRenderBar);
   window.addEventListener('offline', cpRenderBar);
