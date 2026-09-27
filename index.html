@@ -3613,7 +3613,7 @@ function cpNum(v){ return String(v).replace('.', ','); }   /* his notation */
    so it is never waiting on them and never blank because of them. */
 
 var cpFp = 0, cpFps = 0, cpBat = null, cpSto = null, cpGpu = null;
-var CP_BUILD = 'B27D';   /* read this out and I know exactly what you are looking at */
+var CP_BUILD = 'B27E';   /* read this out and I know exactly what you are looking at */
 
 /* ---- LAG: HOW LATE THIS DEVICE IS RUNNING -----------------------
    His instruction: the numbers have to change as the OS works, and
@@ -3648,7 +3648,15 @@ var cpLag = 0, cpLagPeak = 0, cpHeapRate = 0, cpLastHeap = 0, cpLastHeapT = 0;
     cpLag = cpLag * 0.6 + late * 0.4;
     if(late > cpLagPeak) cpLagPeak = late;
   }, want);
-  setInterval(function(){ cpLagPeak = 0; }, 1000);
+  /* THE PEAK DECAYS, IT DOES NOT RESET TO NOUGHT.
+     It used to be zeroed every second, and measuring it showed the
+     flaw: two runs with the device genuinely stalling reported a
+     peak of 0.0, because the reading happened to be taken just
+     after the reset. A stall you felt a moment ago should still be
+     on the bar. Halving it each second keeps it visible for a few
+     seconds and lets it fade, and it can never wipe a real stall
+     the instant after it happened. */
+  setInterval(function(){ cpLagPeak = cpLagPeak * 0.5; }, 1000);
 })();
 
 /* How fast this page is taking memory, in kB a second. It moves the
