@@ -3589,37 +3589,167 @@ function cpMeasureFp(){
 function cpNum(v){ return String(v).replace('.', ','); }   /* his notation */
 
 
-/* ---- WHAT GOES ON THE BAR ----------------------------------------
-   Two of the figures are read off this machine and move: RAM, and FP.
-   The rest is the wording from the drawing and is NOT a reading of
-   anything - the copyright view says which is which in words, because
-   a red bar gets believed on sight.
+/* ---- WHAT GOES ON THE BAR ---------------------------------------
+   HIS INSTRUCTION, TWICE: "read and calc all data from phone to top
+   bar. Top bar cannot be empty. It is populated with data at all
+   times."
 
-   FP is measured ONCE, at start, and not on a loop. It is a property
-   of the machine rather than something that changes second to second,
-   and re-running a 60 ms benchmark every second on a phone would be
-   the bar heating the very thing it claims to be reporting. */
-function cpBarText(){
-  var ramKb = (window.performance && performance.memory)
-      ? Math.round(performance.memory.usedJSHeapSize/1024) : null;
+   So everything this device will actually answer is read and put up
+   there. NOTHING IS INVENTED to fill a gap, and nothing shows a dash:
+   if a browser will not answer a question, that token is LEFT OUT
+   ALTOGETHER rather than printed empty. A bar of real readings with
+   four things missing is populated; a bar with four dashes on it is
+   not, and it is also a lie about what was asked.
+
+   That is what replaced the CPU-- that was sitting there. A browser
+   tab still cannot see the machine's processor load - that has not
+   changed and no number here pretends otherwise. What it CAN see is
+   the core count, and it can time the processor doing real work. Both
+   are genuine processor facts from this phone, so both go up, and the
+   thing that could not be measured is simply not claimed.
+
+   Asynchronous readings - battery and storage - arrive after the
+   first paint. They are folded in when they land and the bar redraws,
+   so it is never waiting on them and never blank because of them. */
+
+var cpFp = 0, cpFps = 0, cpBat = null, cpSto = null, cpGpu = null;
+
+/* Floating point work per second, measured by doing some and timing
+   it. The total is READ afterwards - a loop whose answer nobody uses
+   is removed by the compiler, and then the machine looks infinitely
+   fast. This project has been caught by that before. */
+var cpFpGuard = 0;
+function cpMeasureFp(){
+  var t0 = performance.now(), a = 0.0, b = 1.0000001, n = 0;
+  while(performance.now() - t0 < 60){
+    for(var i = 0; i < 20000; i++){ a += b*1.000001; b = b*0.9999999 + 0.0000001; }
+    n += 20000;
+  }
+  cpFpGuard = a + b;
+  return n / ((performance.now() - t0)/1000);
+}
+
+/* Frames actually delivered, counted over a real second. Not the
+   panel's declared rate - what arrived. */
+(function(){
+  var n = 0, t0 = 0;
+  function f(now){
+    requestAnimationFrame(f);
+    if(!t0){ t0 = now; return; }
+    n++;
+    if(now - t0 >= 1000){ cpFps = n*1000/(now-t0); n = 0; t0 = now; }
+  }
+  requestAnimationFrame(f);
+})();
+
+function cpGpuName(){
+  if(cpGpu !== null) return cpGpu;
+  cpGpu = '';
+  try{
+    var c = document.createElement('canvas');
+    var gl = c.getContext('webgl2') || c.getContext('webgl');
+    if(gl){
+      var d = gl.getExtension('WEBGL_debug_renderer_info');
+      var r = d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL)
+                : gl.getParameter(gl.RENDERER);
+      if(r){
+        /* The full string is a paragraph on some phones. The bar gets
+           the maker and model, the copyright view gets all of it. */
+        cpGpuFull = String(r);
+        /* The real part is looked for FIRST, in its own pass. Only if
+           none of them is in the string does the wrapper's name get
+           used, and then it is labelled as the wrapper. */
+        var m = cpGpuFull.match(/(Adreno|Mali-?\w*|PowerVR[\w ]*|Apple \w+|GeForce[\w ]*|Radeon[\w ]*|Iris[\w ]*|Intel[\w ]*|Xclipse[\w ]*|Immortalis[\w-]*)/i);
+        if(m){ cpGpu = m[0].trim().slice(0,22); }
+        else if(/SwiftShader/i.test(cpGpuFull)){ cpGpu = 'software (no GPU)'; }
+        else if(/ANGLE/i.test(cpGpuFull)){ cpGpu = 'ANGLE wrapper'; }
+        else { cpGpu = cpGpuFull.slice(0,22); }
+      }
+    }
+  }catch(e){}
+  return cpGpu;
+}
+var cpGpuFull = '';
+
+/* Battery and storage answer late, or not at all. Either way the bar
+   is already up by then. */
+(function(){
+  if(navigator.getBattery){
+    navigator.getBattery().then(function(b){
+      function upd(){ cpBat = {pct: Math.round(b.level*100), ch: b.charging}; cpRenderBar(); }
+      upd();
+      b.addEventListener('levelchange', upd);
+      b.addEventListener('chargingchange', upd);
+    }).catch(function(){});
+  }
+  if(navigator.storage && navigator.storage.estimate){
+    navigator.storage.estimate().then(function(e){
+      if(e && e.quota){ cpSto = e; cpRenderBar(); }
+    }).catch(function(){});
+  }
+})();
+
+function cpKb(n){ return Math.round(n/1024); }
+function cpGb(n){ return (n/1073741824).toFixed(1); }
+
+/* EVERY TOKEN IS BUILT ONLY IF ITS READING EXISTS. push() is never
+   called with a blank. */
+function cpTokens(){
+  var t = [], m = window.performance && performance.memory;
+
+  if(m) t.push('RAM' + cpKb(m.usedJSHeapSize) +
+               '/' + cpKb(m.jsHeapSizeLimit) + 'kB');
+  if(navigator.deviceMemory) t.push('DDR' + navigator.deviceMemory + 'GB');
+  if(navigator.hardwareConcurrency) t.push('CPU' + navigator.hardwareConcurrency + 'c');
   if(!cpFp) cpFp = cpMeasureFp();
-  return 'RAM' + (ramKb===null ? '--' : ramKb) +
-         ' FP' + Math.round(cpFp/1000) +
-         ' CPU--' +
-         ' 0,094 CM04 DDR1c2party1chipset3/44tack+-()/ +atyg' +
+  t.push('FP' + (cpFp >= 1e9 ? (cpFp/1e9).toFixed(1) + 'G'
+                : cpFp >= 1e6 ? Math.round(cpFp/1e6) + 'M'
+                : Math.round(cpFp/1e3) + 'k'));
+  if(cpFps) t.push('FPS' + Math.round(cpFps));
+  var g = cpGpuName(); if(g) t.push('GPU ' + g);
+
+  t.push('SCR' + screen.width + 'x' + screen.height +
+         '@' + (window.devicePixelRatio||1).toFixed(1));
+  if(screen.colorDepth) t.push('COL' + screen.colorDepth + 'b');
+  /* FROM THE WINDOW'S OWN SHAPE, not screen.orientation.type - that
+     reported LAND on a 412x915 portrait screen. Which way up a window
+     is cannot be got wrong by measuring it. */
+  t.push(innerHeight >= innerWidth ? 'PORT' : 'LAND');
+  if(navigator.maxTouchPoints) t.push('TCH' + navigator.maxTouchPoints);
+
+  if(cpBat) t.push('BAT' + cpBat.pct + '%' + (cpBat.ch ? '+' : ''));
+  if(cpSto){
+    var u = cpSto.usage||0;
+    t.push('STO' + (u < 1073741824 ? Math.round(u/1048576) + 'MB'
+                                   : cpGb(u) + 'GB')
+           + '/' + cpGb(cpSto.quota) + 'GB');
+  }
+
+  var c = navigator.connection ||
+          navigator.mozConnection || navigator.webkitConnection;
+  if(c){
+    if(c.effectiveType) t.push('NET' + c.effectiveType.toUpperCase());
+    if(c.downlink)      t.push(c.downlink + 'Mb');
+    if(c.rtt)           t.push(c.rtt + 'ms');
+  }
+  t.push(navigator.onLine ? 'ONLINE' : 'OFFLINE');
+  return t;
+}
+
+function cpBarText(){
+  return cpTokens().join(' ') +
+         ' | 0,094 CM04 DDR1c2party1chipset3/44tack+-()/ +atyg' +
          ' phase version status checker.';
 }
 
-/* THE OFFSET IS MEASURED, NOT ASSUMED. The line wraps to two rows on a
-   phone and one on a desktop, so a fixed number either covers the top
-   of the app area or leaves a gap above it. This reads the bar's real
-   height and pushes the page down by exactly that. */
+/* THE OFFSET IS MEASURED, NOT ASSUMED. The line wraps to more rows on
+   a phone than on a desktop, so a fixed number either covers the top
+   of the app area or leaves a gap above it. */
 function cpFitBar(){
   var bar = document.getElementById('topbar');
   if(!bar) return;
-  var h = bar.getBoundingClientRect().height;
   var app = document.querySelector('.container');
-  if(app) app.style.top = h + 'px';
+  if(app) app.style.top = bar.getBoundingClientRect().height + 'px';
 }
 
 function cpRenderBar(){
@@ -3627,50 +3757,49 @@ function cpRenderBar(){
   if(!el) return;
   el.textContent = cpBarText();
   cpFitBar();
+  /* THE BAR MUST NEVER BE EMPTY. If something above ever throws or a
+     reading vanishes, this is the last line of defence - it is
+     checked after every paint, not assumed. */
+  if(!el.textContent.trim()) el.textContent = 'NetSwitch - reading this device';
 }
 
-/* The note under the copyright view - what on the bar is a reading and
-   what is not. It belongs with the copyright view because that is
-   where somebody goes to ask; the bar itself stays short. */
 function cpRenderCopyright(){
-  var note=document.getElementById('cpSrc'); if(!note) return;
-  var ramKb = (window.performance && performance.memory)
-      ? Math.round(performance.memory.usedJSHeapSize/1024) : null;
+  var note = document.getElementById('cpSrc'); if(!note) return;
+  var rows = cpTokens().map(function(x){ return '&nbsp;&nbsp;' + x; }).join('<br>');
   note.innerHTML =
-    'ON THE RED BAR AT THE TOP, WHAT IS A READING AND WHAT IS NOT.<br><br>' +
-    'READ from this machine:<br>' +
-    '&nbsp;&nbsp;RAM&nbsp;' + (ramKb===null
-        ? '&mdash; this browser does not report it'
-        : ramKb + ' &mdash; kB this page is using, updated every second') + '<br>' +
-    '&nbsp;&nbsp;FP&nbsp;' + Math.round(cpFp/1000) + ' &mdash; thousand ' +
-      'floating point operations a second, measured once when the app ' +
-      'started<br><br>' +
-    'CANNOT be read from a web page:<br>' +
-    '&nbsp;&nbsp;CPU&nbsp;-- &mdash; a browser tab is one thread and cannot ' +
-      'see what the rest of the machine is doing. Three ways of guessing ' +
-      'it were tried and all three printed a steady nought whatever the ' +
-      'machine was doing. The native tool measures the processor ' +
-      'properly &mdash; run <b>network-calculator hardware</b>.<br><br>' +
-    'FIXED TEXT, exactly as drawn, and NOT a reading: 0,094 &middot; ' +
-    'CM04 &middot; DDR1c2party1chipset3/44tack+-()/ +atyg &middot; ' +
-    'phase version status checker.<br><br>' +
+    'EVERYTHING ON THE RED BAR, AND WHERE IT CAME FROM.<br><br>' +
+    'READ or MEASURED on this device, right now:<br>' + rows + '<br><br>' +
+    (cpGpuFull ? 'Full graphics string, as the browser gives it: ' +
+                 cpGpuFull + '<br><br>' : '') +
+    'NOT SHOWN, because it cannot be read from a web page: the ' +
+    'processor\'s load. A browser tab is one thread and cannot see ' +
+    'what the rest of the machine is doing - three ways of guessing ' +
+    'it were built here and all three printed a steady nought whatever ' +
+    'the machine was doing, so none of them ship. The core count and ' +
+    'the FP rate above ARE real processor readings from this phone. ' +
+    'For the processor\'s own figures run the native tool: ' +
+    '<b>network-calculator hardware</b>.<br><br>' +
+    'FIXED TEXT, exactly as drawn, and NOT a reading of anything: ' +
+    '0,094 &middot; CM04 &middot; DDR1c2party1chipset3/44tack+-()/ ' +
+    '+atyg &middot; phase version status checker.<br><br>' +
     'Tell me which of those are meant to be live fields and what each ' +
-    'should hold, and I will wire them the same way as RAM and FP.';
+    'should hold, and I will wire them the same way as the rest.';
 }
 
-/* THE BAR IS LIVE FROM THE MOMENT THE APP OPENS AND STAYS LIVE.
-   It is not tied to any one view - that was the whole mistake. RAM is
-   free to read, so it ticks every second whichever app is showing. */
 function cpStartBar(){
   cpRenderBar();
   setInterval(cpRenderBar, 1000);
   window.addEventListener('resize', cpFitBar);
+  window.addEventListener('online', cpRenderBar);
+  window.addEventListener('offline', cpRenderBar);
+  if(screen.orientation && screen.orientation.addEventListener)
+    screen.orientation.addEventListener('change', cpRenderBar);
   if(window.ResizeObserver){
     try{ new ResizeObserver(cpFitBar).observe(document.getElementById('topbar')); }
     catch(e){}
   }
 }
-if(document.readyState==='loading')
+if(document.readyState === 'loading')
   document.addEventListener('DOMContentLoaded', cpStartBar);
 else cpStartBar();
 
@@ -3682,6 +3811,21 @@ function gotoTab(name){
   var pan=document.getElementById('p-'+name); if(pan)pan.classList.add('active');
   if(name==='devview'){try{renderDevView();}catch(e){} try{dwInit();}catch(e){}}
   if(name==='copyright'){try{cpRenderCopyright();}catch(e){}}
+  /* PUT THE CHOSEN VIEW AT THE TOP OF THE APP AREA.
+     The 6GGW header, the version line, the search box and three rows
+     of tabs come to about 750 px on a phone, so selecting a view left
+     its content that far down - you had to scroll to find it. On the
+     copyright view that meant the key flag sat at y=839 on a 915 px
+     screen, ie. off the bottom, and it read as simply not being
+     there. It was there the whole time. Nobody should have to hunt
+     for the thing they just asked for. */
+  try{
+    var app = document.querySelector('.container'), pan2 = document.getElementById('p-'+name);
+    if(app && pan2){
+      var delta = pan2.getBoundingClientRect().top - app.getBoundingClientRect().top;
+      app.scrollTop = Math.max(0, app.scrollTop + delta - 8);
+    }
+  }catch(e){}
   if(name==='content'){try{ctInit();}catch(e){}}
   if(name==='fair'){try{updateFair();}catch(e){}}
   if(name==='routes' && !rtSrcConfirmed){try{rtOpenGate();}catch(e){}}
