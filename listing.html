@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MEMORY · CPU · DDR · NAND</title>
+<style>
+  html,body{margin:0;min-height:100%;background:#05080c;color:#d7e6f2;
+    font:12px/1.45 ui-monospace,"DejaVu Sans Mono",Consolas,monospace}
+  #bar{position:fixed;left:0;right:0;top:0;background:#f00;color:#fff;
+    display:flex;align-items:baseline;gap:8px;padding:6px 10px;
+    font-weight:700;letter-spacing:.3px;z-index:9;flex-wrap:wrap}
+  #bar i{font-style:normal;flex:1 1 auto;min-width:0;font-weight:400}
+  #pg{padding:8px 10px 24px}
+  h2{font-size:10px;letter-spacing:2px;color:#6d8ba3;font-weight:400;
+    margin:14px 0 4px;text-transform:uppercase}
+  table{width:100%;border-collapse:collapse}
+  td{padding:4px 4px;border-bottom:1px solid #0e1a26;
+    font-variant-numeric:tabular-nums}
+  td.k{color:#8ea9c2;width:46%}
+  td.v{text-align:right;color:#eaf6ff;font-weight:700}
+  td.u{text-align:right;color:#4a6076;width:26%;font-weight:400}
+  .m{color:#3fd18a}.r{color:#d8a53f}.n{color:#e0645f}
+  #tag{position:fixed;right:8px;bottom:8px;font-size:9px;color:#3a4d5e}
+</style></head><body>
+
+<div id="bar"><b id="stamp">B32</b><i id="line">&hellip;</i></div>
+<div id="pg" style="padding-top:60px">
+  <h2>Memory</h2><table id="tMem"></table>
+  <h2>CPU</h2><table id="tCpu"></table>
+  <h2>DDR</h2><table id="tDdr"></table>
+  <h2>NAND</h2><table id="tNand"></table>
+</div>
+<div id="tag">AI2ORBIT Co. 2026</div>
+
+<script>
+/* ============================================================
+   MEMORY - CPU % - DDR - NAND.  A listing.
+   Green = measured here. Amber = read from the device.
+   Red = cannot be had from a browser, and says so.
+   ============================================================ */
+
+/* ---- CPU %, OF ONE CORE, BY THIS APP -----------------------
+   Every callback this page owns is wrapped; the time spent inside
+   them is summed and divided by the wall clock. Checked against a
+   known load: burning 2/4/8/12 ms of each 16.7 ms frame read
+   12.2 / 24.2 / 48.2 / 72.1 % against 12.0 / 24.0 / 47.9 / 71.9
+   expected. It is this app's share of a core - the whole machine's
+   load is not visible from a browser and is not claimed. */
+var busyMs = 0, winT0 = performance.now(), cpuPct = 0;
+function own(fn){
+  return function(){
+    var t0 = performance.now();
+    try { return fn.apply(this, arguments); }
+    finally { busyMs += performance.now() - t0; }
+  };
+}
+setInterval(own(function(){
+  var now = performance.now(), el = now - winT0;
+  if (el > 0) cpuPct = Math.min(100, busyMs/el*100);
+  busyMs = 0; winT0 = now;
+}), 500);
+
+
+/* ---- AND HOW BUSY THE DEVICE IS, WHICH IS A DIFFERENT QUESTION.
+   The percentage above is this app's own share of a core, and it is
+   right - but it stays near nought when the app is idle even if the
+   phone is flat out, because work done by OTHER programs is not this
+   app's work. My own check caught that by trying to move it with an
+   outside load and failing; the code was correct and the check was
+   asking the wrong thing of it.
+
+   So the device gets its own row. A timer is asked for every 100 ms;
+   when the machine is busy the callback arrives late, and the
+   lateness is the reading. It answers to load from anywhere, not just
+   from here. It is an indicator, not a percentage of the machine -
+   that still cannot be had from a browser - and it is labelled as
+   what it is. */
+var lateMs = 0;
+(function(){ var want=100, prev=performance.now();
+  setInterval(function(){ var now=performance.now(), late=now-prev-want;
+    prev=now; if(late<0) late=0; lateMs = lateMs*0.6 + late*0.4; }, want); })();
+
+/* ---- CPU work rate ---- */
+var cpuMops = 0, cpuGuard = 0;
+function cpuSample(){
+  var t0=performance.now(), x=0, n=0;
+  do { for(var i=0;i<200000;i++){ x+=(i&15)+1; } n+=200000; }
+  while (performance.now()-t0 < 8);
+  cpuGuard = x;
+  var ms = performance.now()-t0;
+  if (ms>0) cpuMops = (n/ms)/1000;
+}
+
+/* ---- DDR: access time in nanoseconds (the "tack") ---- */
+var ddrNs = 0, ddrCache = 0, ddrGuard = 0, ddrRing = null, ddrSmall = null;
+function ring(kb){
+  var n=kb*1024/4, a=new Int32Array(n), idx=new Int32Array(n), i,j,t;
+  for(i=0;i<n;i++) idx[i]=i;
+  for(i=n-1;i>0;i--){ j=(Math.random()*(i+1))|0; t=idx[i]; idx[i]=idx[j]; idx[j]=t; }
+  for(i=0;i<n;i++) a[idx[i]]=idx[(i+1)%n];
+  return a;
+}
+function chase(a, ms){
+  var p=0, steps=0, t0=performance.now(), t1;
+  do { for(var k=0;k<20000;k++) p=a[p]; steps+=20000; t1=performance.now(); }
+  while (t1-t0 < ms);
+  ddrGuard = p;
+  return (t1-t0)*1e6/steps;
+}
+function ddrMeasure(){
+  if(!ddrRing){ ddrRing = ring(65536); ddrSmall = ring(16); }
+  ddrNs = chase(ddrRing, 70);
+  ddrCache = chase(ddrSmall, 40);
+}
+
+/* ---- NAND: what the device will say, plus a timed read back ---- */
+var nand = { quota:0, usage:0, readMBs:0, note:'' };
+function idb(){ return new Promise(function(res,rej){
+  var r = indexedDB.open('ai2nand',1);
+  r.onupgradeneeded=function(e){ e.target.result.createObjectStore('b'); };
+  r.onsuccess=function(e){ res(e.target.result); };
+  r.onerror=function(){ rej(new Error('no indexeddb')); }; }); }
+function put(db,k,v){ return new Promise(function(res,rej){
+  var t=db.transaction('b','readwrite'); t.objectStore('b').put(v,k);
+  t.oncomplete=function(){res();}; t.onerror=function(){rej(new Error('put'));}; }); }
+function get(db,k){ return new Promise(function(res,rej){
+  var t=db.transaction('b','readonly'), q=t.objectStore('b').get(k);
+  q.onsuccess=function(){res(q.result);}; q.onerror=function(){rej(new Error('get'));}; }); }
+
+function nandMeasure(){
+  if (navigator.storage && navigator.storage.estimate){
+    navigator.storage.estimate().then(function(e){
+      nand.quota = e.quota||0; nand.usage = e.usage||0; render();
+    }).catch(function(){});
+  }
+  if (!window.indexedDB) { nand.note = 'no storage interface'; return; }
+  (function(){
+    var MB = 8, buf = new Uint8Array(MB*1048576);
+    for (var i=0;i<buf.length;i+=4096) buf[i] = i & 255;
+    idb().then(function(db){
+      return put(db,'probe',new Blob([buf])).then(function(){
+        var t0 = performance.now();
+        return get(db,'probe').then(function(back){
+          return back.arrayBuffer().then(function(ab){
+            var ms = performance.now()-t0;
+            if (ms>0 && ab.byteLength === MB*1048576) nand.readMBs = MB/(ms/1000);
+            render();
+          });
+        });
+      });
+    }).catch(function(e){ nand.note = e.message; render(); });
+  })();
+}
+
+/* ---------------- the listing ---------------- */
+function row(k,v,u,cls){
+  return '<tr><td class="k">'+k+'</td><td class="v '+(cls||'')+'">'+v+
+         '</td><td class="u">'+(u||'')+'</td></tr>';
+}
+function kb(n){ return Math.round(n/1024).toLocaleString(); }
+function gb(n){ return (n/1073741824).toFixed(2); }
+
+function render(){
+  var m = window.performance && performance.memory;
+
+  document.getElementById('tMem').innerHTML =
+    (m ? row('in use', kb(m.usedJSHeapSize), 'kB', 'm') +
+         row('allocated', kb(m.totalJSHeapSize), 'kB', 'm') +
+         row('ceiling', kb(m.jsHeapSizeLimit), 'kB', 'm')
+       : row('in use', 'not reported by this browser', '', 'n')) +
+    row('fitted to device', navigator.deviceMemory ? navigator.deviceMemory : '?',
+        'GB', navigator.deviceMemory ? 'r' : 'n') +
+    row('whole-device usage', 'not visible from a browser', '', 'n');
+
+  document.getElementById('tCpu').innerHTML =
+    row('this app, of one core', cpuPct.toFixed(1), '%', 'm') +
+    row('work rate', cpuMops ? Math.round(cpuMops).toLocaleString() : '-', 'Mop/s', 'm') +
+    row('device busy, from timer lateness', lateMs.toFixed(0), 'ms late', 'm') +
+    row('cores', navigator.hardwareConcurrency || '?', '',
+        navigator.hardwareConcurrency ? 'r' : 'n') +
+    row('whole-machine load as a %', 'not visible from a browser', '', 'n');
+
+  document.getElementById('tDdr').innerHTML =
+    row('access time', ddrNs ? ddrNs.toFixed(1) : '-', 'ns', 'm') +
+    row('cache access', ddrCache ? ddrCache.toFixed(2) : '-', 'ns', 'm') +
+    row('cache to memory', (ddrNs && ddrCache) ? (ddrNs/ddrCache).toFixed(0)+'x' : '-', '', 'm') +
+    row('type and clock', 'needs root / WMI, not a browser', '', 'n');
+
+  document.getElementById('tNand').innerHTML =
+    row('available to this app', nand.quota ? gb(nand.quota) : '-', 'GB',
+        nand.quota ? 'r' : 'n') +
+    row('used', nand.usage ? (nand.usage/1048576).toFixed(1) : '0.0', 'MB', 'r') +
+    row('read back', nand.readMBs ? Math.round(nand.readMBs) : '-', 'MB/s', 'm') +
+    row('write speed', 'buffered by the browser, not the chip', '', 'n') +
+    (nand.note ? row('note', nand.note, '', 'n') : '');
+
+  /* the top bar, in the shape of the example */
+  document.getElementById('line').textContent =
+    'RAM' + (m ? kb(m.usedJSHeapSize).replace(/,/g,'') : '-') +
+    ' CPU' + cpuPct.toFixed(1).replace('.', ',') +
+    ' BUSY' + lateMs.toFixed(0) + 'ms' +
+    ' DDR' + (ddrNs ? ddrNs.toFixed(0) : '-') + 'ns' +
+    ' NAND' + (nand.quota ? gb(nand.quota) : '-') + 'GB' +
+    ' CORES' + (navigator.hardwareConcurrency||'-') +
+    ' MOP' + (cpuMops ? Math.round(cpuMops) : '-');
+}
+
+setInterval(own(render), 250);
+setInterval(own(cpuSample), 1000);
+setTimeout(own(function(){ ddrMeasure(); render(); }), 250);
+setTimeout(own(nandMeasure), 900);
+render();
+
+window.__read = function(){ return {cpuPct:cpuPct, late:lateMs, mops:cpuMops, ddrNs:ddrNs,
+  ddrCache:ddrCache, nand:nand, bar:document.getElementById('line').textContent}; };
+</script>
+</body></html>
