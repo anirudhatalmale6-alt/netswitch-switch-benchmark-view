@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>RAM TIMING</title>
+<style>
+  html,body{margin:0;height:100%;background:#05080c;color:#d7e6f2;
+    font:12px/1.5 ui-monospace,"DejaVu Sans Mono",Consolas,monospace}
+  #bar{position:fixed;left:0;right:0;top:0;background:#f00;color:#fff;
+    display:flex;align-items:baseline;gap:8px;padding:6px 10px;
+    font-weight:700;letter-spacing:.3px;z-index:9;flex-wrap:wrap}
+  #bar i{font-style:normal;flex:1 1 auto;min-width:0;opacity:.85;font-weight:400}
+  #pg{padding:10px}
+  canvas{display:block;width:100%;background:#070d15;
+    border:1px solid #16293a;border-radius:4px}
+  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:11px}
+  th{text-align:right;color:#6d8ba3;font-weight:400;padding:3px 4px;
+    border-bottom:1px solid #16293a;letter-spacing:1px;font-size:9px}
+  th:first-child,td:first-child{text-align:left}
+  td{text-align:right;padding:3px 4px;border-bottom:1px solid #0e1a26;
+    font-variant-numeric:tabular-nums}
+  .rd{color:#4fd1ff}.wr{color:#ffc24f}.rw{color:#ff6b8a}
+  #k{margin-top:8px;display:flex;gap:14px;flex-wrap:wrap;font-size:11px}
+  button{font:inherit;font-weight:700;letter-spacing:1px;padding:9px 14px;
+    margin-top:10px;background:#12507f;color:#eaf6ff;border:1px solid #2b6ea8;
+    border-radius:5px;cursor:pointer}
+  #q{margin-top:12px;padding:9px 11px;border:1px solid #6b4a12;
+    background:#1a1304;color:#e8c98a;border-radius:4px;font-size:11px}
+</style></head><body>
+
+<div id="bar"><b id="stamp">B30</b><i id="line">measuring&hellip;</i></div>
+<div id="pg" style="padding-top:64px">
+
+  <canvas id="g" height="300"></canvas>
+  <div id="k">
+    <span class="rd">&#9632; read</span>
+    <span class="wr">&#9632; write</span>
+    <span class="rw">&#9632; read&ndash;write&ndash;write&ndash;read</span>
+  </div>
+
+  <table id="t"><thead><tr>
+    <th>part of chip</th><th>read</th><th>write</th><th>RWWR</th><th>vs smallest</th>
+  </tr></thead><tbody id="tb"></tbody></table>
+
+  <canvas id="th" height="150" style="margin-top:14px"></canvas>
+  <div id="k" style="color:#6d8ba3;margin-top:6px">thermal drift &mdash;
+    the same 64 MB read, taken again every 3 s</div>
+
+  <button id="go" onclick="runAll()">MEASURE AGAIN</button>
+
+  <div id="q">Not built, because I do not know them and will not invent
+    them: the <b>Karli Karlav&auml;gen model</b> and its
+    <b>1/3 log 900.000.000 ^ 250.000.000</b>, and which
+    <b>DDR1&ndash;6/8</b> figures you want the measured time compared
+    against. Send those two and they go straight on this chart.</div>
+</div>
+
+<script>
+/* RAM TIMING, PART BY PART OF THE CHIP.
+   read, write, and read-write-write-read, over rising regions, on a
+   logarithmic scale, plus thermal drift over time. */
+var SIZES = [16, 64, 256, 1024, 4096, 16384, 65536];   /* kB */
+var rings = {}, res = {}, guard = 0, busy = false, blinkMs = 0;
+
+function ring(kb){
+  if (rings[kb]) return rings[kb];
+  var n = kb*1024/4;
+  var a = new Int32Array(n), idx = new Int32Array(n), i, j, t;
+  for (i=0;i<n;i++) idx[i]=i;
+  for (i=n-1;i>0;i--){ j=(Math.random()*(i+1))|0; t=idx[i]; idx[i]=idx[j]; idx[j]=t; }
+  for (i=0;i<n;i++) a[idx[i]] = idx[(i+1)%n];
+  /* THE RING IS KEPT. Rebuilding a 64 MB shuffled ring on every pass
+     costs more than the measurement and shows up as a stall in
+     everything else on the page. Built once, timed many times. */
+  rings[kb] = a;
+  return a;
+}
+
+/* Every pattern is DEPENDENT - the next address comes out of the last
+   read - so the processor cannot run ahead and the number is a real
+   access time rather than a throughput figure. */
+function timeIt(a, ms, mode){
+  var p=0, steps=0, t0=performance.now(), t1, k, q;
+  do {
+    for (k=0;k<20000;k++){
+      if (mode === 'r')      { p = a[p]; }
+      else if (mode === 'w') { q = a[p]; a[p] = q; p = q; }
+      else                   { q = a[p]; a[p] = q; a[q] = a[q]; p = a[q]; }
+    }
+    steps += 20000; t1 = performance.now();
+  } while (t1 - t0 < ms);
+  guard = p;                       /* read, so the loop is not removed */
+  return (t1 - t0) * 1e6 / steps;  /* nanoseconds per access */
+}
+
+function runAll(){
+  if (busy) return;
+  busy = true;
+  document.getElementById('go').textContent = 'MEASURING…';
+  setTimeout(function(){
+    for (var i=0;i<SIZES.length;i++){
+      var a = ring(SIZES[i]);
+      res[SIZES[i]] = { r: timeIt(a,70,'r'), w: timeIt(a,70,'w'), x: timeIt(a,70,'x') };
+    }
+    busy = false;
+    document.getElementById('go').textContent = 'MEASURE AGAIN';
+    draw(); table(); bar();
+  }, 30);
+}
+
+/* ---- the screen's own write time: the shortest gap between frames ---- */
+(function(){
+  var last=0, best=1e9;
+  function f(now){ requestAnimationFrame(f);
+    if(last){ var g=now-last; if(g>1 && g<best){ best=g; blinkMs=best; } }
+    last=now; }
+  requestAnimationFrame(f);
+})();
+
+/* ---- thermal drift: the same big read, taken again and again ---- */
+var drift = [];
+setInterval(function(){
+  if (busy || !rings[65536]) return;
+  drift.push(timeIt(rings[65536], 40, 'r'));
+  if (drift.length > 120) drift.shift();
+  drawDrift(); bar();
+}, 3000);
+
+/* ---------------- drawing, both axes logarithmic ---------------- */
+function fit(cv){
+  var w = cv.clientWidth || 320;
+  if (cv.width !== w) cv.width = w;
+  return cv.getContext('2d');
+}
+function lg(v){ return Math.log(v)/Math.LN10; }
+
+function draw(){
+  var cv = document.getElementById('g'), g = fit(cv);
+  var W = cv.width, H = cv.height, L = 42, R = 8, T = 10, B = 26;
+  g.fillStyle = '#070d15'; g.fillRect(0,0,W,H);
+  var xs = SIZES.map(lg), x0 = xs[0], x1 = xs[xs.length-1];
+  var all = [];
+  SIZES.forEach(function(s){ if(res[s]){ all.push(res[s].r,res[s].w,res[s].x); } });
+  if (!all.length) return;
+  var y0 = lg(Math.max(0.5, Math.min.apply(null,all)/1.6));
+  var y1 = lg(Math.max.apply(null,all)*1.6);
+  function X(kb){ return L + (lg(kb)-x0)/(x1-x0)*(W-L-R); }
+  function Y(ns){ return T + (1-(lg(ns)-y0)/(y1-y0))*(H-T-B); }
+
+  /* decade lines, because the scale is logarithmic and has to look it */
+  g.strokeStyle='#12202c'; g.fillStyle='#4a6076'; g.font='9px monospace';
+  for (var d=-1; d<=4; d++){
+    var v = Math.pow(10,d);
+    if (lg(v) < y0 || lg(v) > y1) continue;
+    var y = Y(v); g.beginPath(); g.moveTo(L,y); g.lineTo(W-R,y); g.stroke();
+    g.fillText(v+' ns', 3, y+3);
+  }
+  SIZES.forEach(function(s){
+    var x=X(s); g.strokeStyle='#0e1a26'; g.beginPath();
+    g.moveTo(x,T); g.lineTo(x,H-B); g.stroke();
+    g.fillStyle='#4a6076';
+    g.fillText(s>=1024 ? (s/1024)+'M' : s+'k', x-9, H-10);
+  });
+  [['r','#4fd1ff'],['w','#ffc24f'],['x','#ff6b8a']].forEach(function(p){
+    g.strokeStyle=p[1]; g.lineWidth=2; g.beginPath();
+    var first=true;
+    SIZES.forEach(function(s){ if(!res[s])return;
+      var x=X(s), y=Y(res[s][p[0]]);
+      if(first){ g.moveTo(x,y); first=false; } else g.lineTo(x,y); });
+    g.stroke();
+    SIZES.forEach(function(s){ if(!res[s])return;
+      g.fillStyle=p[1]; g.beginPath();
+      g.arc(X(s),Y(res[s][p[0]]),2.5,0,6.283); g.fill(); });
+  });
+}
+
+function drawDrift(){
+  var cv = document.getElementById('th'), g = fit(cv);
+  var W=cv.width, H=cv.height, L=42, R=8, T=8, B=16;
+  g.fillStyle='#070d15'; g.fillRect(0,0,W,H);
+  if (drift.length < 2) return;
+  var lo=Math.min.apply(null,drift)*0.97, hi=Math.max.apply(null,drift)*1.03;
+  if (hi-lo < 1) { hi=lo+1; }
+  g.strokeStyle='#12202c'; g.fillStyle='#4a6076'; g.font='9px monospace';
+  [lo,(lo+hi)/2,hi].forEach(function(v){
+    var y=T+(1-(v-lo)/(hi-lo))*(H-T-B);
+    g.beginPath(); g.moveTo(L,y); g.lineTo(W-R,y); g.stroke();
+    g.fillText(v.toFixed(1), 3, y+3);
+  });
+  g.strokeStyle='#ff6b8a'; g.lineWidth=2; g.beginPath();
+  drift.forEach(function(v,i){
+    var x=L+(i/(Math.max(1,drift.length-1)))*(W-L-R);
+    var y=T+(1-(v-lo)/(hi-lo))*(H-T-B);
+    if(i===0) g.moveTo(x,y); else g.lineTo(x,y);
+  });
+  g.stroke();
+}
+
+function table(){
+  var tb = document.getElementById('tb'), rows='';
+  var base = res[SIZES[0]] ? res[SIZES[0]].r : 0;
+  SIZES.forEach(function(s){
+    var v = res[s]; if(!v) return;
+    rows += '<tr><td>'+(s>=1024?(s/1024)+' MB':s+' kB')+'</td>'+
+      '<td class="rd">'+v.r.toFixed(2)+'</td>'+
+      '<td class="wr">'+v.w.toFixed(2)+'</td>'+
+      '<td class="rw">'+v.x.toFixed(2)+'</td>'+
+      '<td>'+(base?(v.r/base).toFixed(1)+'x':'-')+'</td></tr>';
+  });
+  tb.innerHTML = rows;
+}
+
+function bar(){
+  var big = res[65536], sm = res[16];
+  var d = drift.length>1 ? (drift[drift.length-1]-drift[0]) : 0;
+  document.getElementById('line').textContent =
+    (big ? 'MEMORY read '+big.r.toFixed(1)+'ns  write '+big.w.toFixed(1)+
+           'ns  RWWR '+big.x.toFixed(1)+'ns' : 'measuring') +
+    (sm ? '   CACHE read '+sm.r.toFixed(1)+'ns' : '') +
+    (blinkMs ? '   SCREEN blink '+blinkMs.toFixed(1)+'ms = '+
+       (big ? Math.round(blinkMs*1e6/big.r).toLocaleString()+' memory reads' : '') : '') +
+    (drift.length>1 ? '   THERMAL '+(d>=0?'+':'')+d.toFixed(1)+'ns over '+
+                      ((drift.length-1)*3)+'s' : '');
+}
+
+window.addEventListener('resize', function(){ draw(); drawDrift(); });
+setTimeout(runAll, 200);
+window.__read = function(){ return {res:res, drift:drift, blink:blinkMs, busy:busy}; };
+</script>
+</body></html>
