@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>RAM SLOT</title>
+<style>
+  html,body{margin:0;height:100%;background:#05080c;color:#d7e6f2;
+    font:12px/1.45 ui-monospace,"DejaVu Sans Mono",Consolas,monospace;
+    overflow:hidden}
+  #bar{position:fixed;left:0;right:0;top:0;height:34px;background:#f00;
+    color:#fff;display:flex;align-items:center;gap:14px;padding:0 10px;
+    font-weight:700;letter-spacing:.5px;white-space:nowrap;overflow-x:auto;
+    z-index:9}
+  #bar b{font-weight:700}
+  #bar i{font-style:normal;opacity:.75;font-weight:400}
+  canvas{position:fixed;left:0;right:0;top:34px;bottom:96px;width:100%;
+    height:calc(100% - 130px);display:block;background:#05080c}
+  #rd{position:fixed;left:0;right:0;bottom:0;height:96px;display:grid;
+    grid-template-columns:repeat(4,1fr);gap:1px;background:#12202c}
+  #rd div{background:#0a121a;padding:8px 6px;display:flex;
+    flex-direction:column;justify-content:center;align-items:center}
+  #rd .k{font-size:9px;letter-spacing:1.5px;color:#6d8ba3}
+  #rd .v{font-size:19px;font-weight:700;color:#eaf6ff;
+    font-variant-numeric:tabular-nums;margin-top:3px}
+  #rd .u{font-size:9px;color:#6d8ba3}
+  #rd .hot .v{color:#ff5b4d}
+</style></head><body>
+
+<div id="bar"><b id="stamp">B28</b><i id="line">&hellip;</i></div>
+<canvas id="c"></canvas>
+<div id="rd">
+  <div id="dCpu"><span class="k">CPU</span><span class="v" id="vCpu">-</span><span class="u" id="uCpu">Mop/s</span></div>
+  <div id="dGpu"><span class="k">GPU LAG</span><span class="v" id="vGpu">-</span><span class="u">ms</span></div>
+  <div id="dRam"><span class="k">RAM</span><span class="v" id="vRam">-</span><span class="u" id="uRam">kB</span></div>
+  <div id="dLag"><span class="k">DELAY</span><span class="v" id="vLag">-</span><span class="u">ms</span></div>
+</div>
+
+<script>
+/* ONE RAM SLOT. His CreateRamSlot() makes one, so this draws one.
+   His eight vertices and his thirty-six indices, unchanged. */
+var POS = new Float32Array([
+  -0.05,-0.1,-1.5, -0.05, 0.1,-1.5,  0.05, 0.1,-1.5,  0.05,-0.1,-1.5,
+  -0.05,-0.1, 1.5, -0.05, 0.1, 1.5,  0.05, 0.1, 1.5,  0.05,-0.1, 1.5]);
+var IDX = new Uint16Array([
+  0,1,2, 0,2,3,   4,6,5, 4,7,6,   4,5,1, 4,1,0,
+  3,2,6, 3,6,7,   1,5,6, 1,6,2,   4,0,3, 4,3,7]);
+
+var c = document.getElementById('c');
+/* preserveDrawingBuffer so a check can read the rendered pixels back.
+   Without it readPixels outside the draw callback returns an empty
+   buffer and every visibility measurement is meaningless - which has
+   now caught me twice. */
+var GLOPT = {antialias:true, preserveDrawingBuffer:true};
+var gl = c.getContext('webgl', GLOPT) ||
+         c.getContext('experimental-webgl', GLOPT);
+var prog, aP, aN, uMVP, uMV, uCol, TRIS = 0;
+
+function sh(src, t){ var s=gl.createShader(t); gl.shaderSource(s,src);
+  gl.compileShader(s); return s; }
+function setup(){
+  prog = gl.createProgram();
+  gl.attachShader(prog, sh(
+    "attribute vec3 p;attribute vec3 n;uniform mat4 mvp;uniform mat4 mv;" +
+    "varying vec3 vn,vp;void main(){vn=normalize((mv*vec4(n,0.)).xyz);" +
+    "vp=(mv*vec4(p,1.)).xyz;gl_Position=mvp*vec4(p,1.);}", gl.VERTEX_SHADER));
+  gl.attachShader(prog, sh(
+    "precision mediump float;uniform vec3 col;varying vec3 vn,vp;" +
+    "void main(){vec3 N=normalize(vn),L=normalize(vec3(.4,.85,.5));" +
+    "float d=max(dot(N,L),0.);vec3 V=normalize(-vp);" +
+    "float r=pow(1.-max(dot(N,V),0.),2.);" +
+    "gl_FragColor=vec4(col*(.28+1.0*d)+vec3(.12,.40,.28)*r,1.);}",
+    gl.FRAGMENT_SHADER));
+  gl.linkProgram(prog); gl.useProgram(prog);
+  aP=gl.getAttribLocation(prog,"p"); aN=gl.getAttribLocation(prog,"n");
+  uMVP=gl.getUniformLocation(prog,"mvp"); uMV=gl.getUniformLocation(prog,"mv");
+  uCol=gl.getUniformLocation(prog,"col");
+  /* His indices expanded so each face carries its own normal - eight
+     shared corners cannot be lit and draw as a black silhouette. */
+  var P=new Float32Array(IDX.length*3), N=new Float32Array(IDX.length*3), k,a,b2,d;
+  for(k=0;k<IDX.length;k+=3){
+    a=IDX[k]*3; b2=IDX[k+1]*3; d=IDX[k+2]*3;
+    var ux=POS[b2]-POS[a],uy=POS[b2+1]-POS[a+1],uz=POS[b2+2]-POS[a+2];
+    var vx=POS[d]-POS[a],vy=POS[d+1]-POS[a+1],vz=POS[d+2]-POS[a+2];
+    var nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;
+    var L=Math.sqrt(nx*nx+ny*ny+nz*nz)||1; nx/=L;ny/=L;nz/=L;
+    for(var t=0;t<3;t++){ var s2=IDX[k+t]*3, o=(k+t)*3;
+      P[o]=POS[s2];P[o+1]=POS[s2+1];P[o+2]=POS[s2+2];
+      N[o]=nx;N[o+1]=ny;N[o+2]=nz; }
+  }
+  TRIS=IDX.length;
+  var vb=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,vb);
+  gl.bufferData(gl.ARRAY_BUFFER,P,gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(aP); gl.vertexAttribPointer(aP,3,gl.FLOAT,false,0,0);
+  var nb=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,nb);
+  gl.bufferData(gl.ARRAY_BUFFER,N,gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(aN); gl.vertexAttribPointer(aN,3,gl.FLOAT,false,0,0);
+  gl.enable(gl.DEPTH_TEST);
+}
+function mul(a,b){var o=new Float32Array(16),i,j,k,s;
+  for(i=0;i<4;i++)for(j=0;j<4;j++){s=0;for(k=0;k<4;k++)s+=a[k*4+j]*b[i*4+k];
+  o[i*4+j]=s;}return o;}
+function persp(f,ar,n,fa){var t=1/Math.tan(f/2);
+  return new Float32Array([t/ar,0,0,0,0,t,0,0,0,0,(fa+n)/(n-fa),-1,0,0,(2*fa*n)/(n-fa),0]);}
+function tr(x,y,z){return new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,x,y,z,1]);}
+function rx(a){var c2=Math.cos(a),s=Math.sin(a);
+  return new Float32Array([1,0,0,0,0,c2,s,0,0,-s,c2,0,0,0,0,1]);}
+function ry(a){var c2=Math.cos(a),s=Math.sin(a);
+  return new Float32Array([c2,0,-s,0,0,1,0,0,s,0,c2,0,0,0,0,1]);}
+
+/* ---- CPU: work done per second, sampled continuously. It moves when
+        the system loads the processor or the phone throttles it. ---- */
+var cpuMops=0, cpuPrev=0, cpuGuard=0;
+function cpuSample(){
+  /* THE SAMPLE HAS TO RUN LONG ENOUGH TO BE TIMED.
+     250,000 operations finish in about a third of a millisecond, and
+     the browser's clock is coarser than that - so the reading was
+     quantisation noise, not the processor: 1250, 625, 500, 833 with
+     nothing happening, and a nonsense 2500 while the processor was
+     deliberately contended. Now it runs in chunks until at least
+     8 ms of real time has passed and counts what it got through.
+     That costs about 3 per cent of one core at four samples a
+     second, and it is the price of the figure being real. */
+  var t0=performance.now(), x=0, n=0, CH=200000;
+  do {
+    for(var i=0;i<CH;i++){ x+=(i&15)+1; }
+    n+=CH;
+  } while(performance.now()-t0 < 8);
+  cpuGuard=x;                              /* read, so it is not deleted */
+  var ms=performance.now()-t0;
+  cpuPrev=cpuMops;
+  if(ms>0) cpuMops = (n/ms)/1000;          /* millions of ops a second */
+}
+
+/* ---- GPU LAG: how far past the display's own rhythm each drawn frame
+        lands. best = the shortest gap ever seen = this screen's period.
+        Anything above that is the frame arriving late. ---- */
+var fGap=0, fBest=1e9, gpuLag=0, fps=0, fN=0, fT=0, lastF=0;
+/* ---- DELAY: how late a 100 ms timer runs = the device is busy ---- */
+var delay=0;
+(function(){ var want=100, prev=performance.now();
+  setInterval(function(){ var now=performance.now(), late=now-prev-want;
+    prev=now; if(late<0)late=0; delay=delay*0.6+late*0.4; }, want); })();
+
+var t0=0;
+function frame(now){
+  requestAnimationFrame(frame);
+  if(lastF){ fGap=now-lastF; if(fGap<fBest&&fGap>1) fBest=fGap;
+    gpuLag=Math.max(0,fGap-fBest); fN++; fT+=fGap;
+    if(fT>=500){ fps=fN*1000/fT; fN=0; fT=0; } }
+  lastF=now;
+  if(!t0) t0=now;
+  var t=(now-t0)/1000;
+
+  var w=c.clientWidth||300, h=c.clientHeight||300;
+  if(c.width!==w||c.height!==h){ c.width=w; c.height=h; }
+  gl.viewport(0,0,c.width,c.height);
+  gl.clearColor(0.02,0.031,0.047,1);
+  gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+
+  var m=window.performance&&performance.memory;
+  /* the slot lights with the memory this app is holding */
+  var lit = m ? Math.min(1, m.usedJSHeapSize/(m.jsHeapSizeLimit*0.02)) : 0;
+  /* DISTANCE FROM THE GEOMETRY, NOT FROM GUESSWORK.
+     The slot turns, so at some angles its 3.0 length lies straight
+     across the screen. The thing that must fit is therefore its
+     bounding sphere: radius = sqrt(1.5^2 + 0.1^2 + 0.05^2) = 1.503.
+     To fit a sphere of radius R inside a half-angle a, the camera has
+     to be at least R / sin(a) away - and on a portrait phone the
+     HORIZONTAL half-angle is the tighter of the two, which is what my
+     first attempt missed: it ran off both edges. */
+  var ar=c.width/c.height;
+  var halfV=0.45, halfH=Math.atan(Math.tan(halfV)*ar);
+  var dist=1.503/Math.sin(Math.min(halfV,halfH))*1.12;
+  var MV=mul(tr(0,0,-dist),mul(rx(0.62),ry(t*0.5)));
+  gl.uniformMatrix4fv(uMV,false,MV);
+  gl.uniformMatrix4fv(uMVP,false,mul(persp(0.9,c.width/c.height,0.1,40),MV));
+  gl.uniform3f(uCol, 0.12, 0.16+lit*0.70, 0.20+lit*0.22);
+  gl.drawArrays(gl.TRIANGLES,0,TRIS);
+}
+
+function show(id,v,hot){ document.getElementById(id).textContent=v;
+  var d=document.getElementById(id.replace('v','d'));
+  if(d) d.className = hot ? 'hot' : ''; }
+setInterval(function(){
+  cpuSample();
+  var d=cpuMops-cpuPrev;
+  show('vCpu', cpuMops.toFixed(0), false);
+  document.getElementById('uCpu').textContent =
+    'Mop/s ' + (d>=0?'+':'') + d.toFixed(0);
+  show('vGpu', gpuLag.toFixed(1), gpuLag>4);
+  var m=window.performance&&performance.memory;
+  show('vRam', m?Math.round(m.usedJSHeapSize/1024):'-', false);
+  show('vLag', delay.toFixed(0), delay>8);
+  document.getElementById('line').textContent =
+    'FPS '+fps.toFixed(0)+'  screen '+(fBest<1e9?fBest.toFixed(1):'-')+
+    'ms  cores '+(navigator.hardwareConcurrency||'-')+
+    '  mem '+(navigator.deviceMemory||'-')+'GB';
+}, 250);
+
+try{ setup(); requestAnimationFrame(frame); }
+catch(e){ document.getElementById('line').textContent='no WebGL: '+e.message; }
+window.__read=function(){return {cpu:cpuMops,gpu:gpuLag,delay:delay,fps:fps,
+  best:fBest,idx:Array.prototype.slice.call(IDX)};};
+</script>
+</body></html>
