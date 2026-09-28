@@ -27,7 +27,7 @@
     background:#1a1304;color:#e8c98a;border-radius:4px;font-size:11px}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B30</b><i id="line">measuring&hellip;</i></div>
+<div id="bar"><b id="stamp">B31</b><i id="line">measuring&hellip;</i></div>
 <div id="pg" style="padding-top:64px">
 
   <canvas id="g" height="300"></canvas>
@@ -35,6 +35,7 @@
     <span class="rd">&#9632; read</span>
     <span class="wr">&#9632; write</span>
     <span class="rw">&#9632; read&ndash;write&ndash;write&ndash;read</span>
+    <span style="color:#8f7bff">&#9472; sigmoid fitted to the reads</span>
   </div>
 
   <table id="t"><thead><tr>
@@ -103,6 +104,7 @@ function runAll(){
     }
     busy = false;
     document.getElementById('go').textContent = 'MEASURE AGAIN';
+    sigFit = fitSigmoid();
     draw(); table(); bar();
   }, 30);
 }
@@ -124,6 +126,76 @@ setInterval(function(){
   if (drift.length > 120) drift.shift();
   drawDrift(); bar();
 }, 3000);
+
+
+/* ---- THE SIGMOID, FITTED TO THE MEASURED READS -----------------
+   The access-time curve is an S: flat while the working set fits in
+   cache, rising through the middle, flat again once everything has to
+   come from the memory. So a sigmoid describes it, and its parameters
+   are the two numbers worth having:
+
+     MIDPOINT  the working set at which the memory area takes over -
+               halfway between the cache floor and the memory top.
+     SIGMA     how sharp that change is, in decades. Small sigma is an
+               abrupt edge; large sigma is a gradual hand-over.
+
+   FITTED IN LOG SPACE ON BOTH AXES, and that is not a detail. The
+   values run from 3 ns to 120 ns - three decades - so fitting raw
+   nanoseconds makes the largest point worth a thousand of the
+   smallest, and the curve gets dragged onto the right-hand end: the
+   cache end came out 70% wrong while the error total still looked
+   small. Fitting log10(y) makes it RATIO error, which is what the eye
+   reads off a log chart and what treats every point alike.
+
+   ONE SIGMOID IS A SUMMARY, NOT THE TRUTH. A real memory system has
+   several steps - one per cache level - and a single S cannot bend
+   through all of them. The worst miss is printed next to the fit so
+   nobody reads more precision into the smooth line than is there. */
+var sigFit = null;   /* NOT `fit` - that name is already the canvas sizer */
+function sigAt(x, p){ return p.base + (p.top-p.base)/(1+Math.exp(-(x-p.mid)/p.sig)); }
+function fitSigmoid(){
+  var X=[], Y=[];
+  SIZES.forEach(function(s){ if(res[s]){ X.push(Math.log(s)/Math.LN10);
+                                         Y.push(Math.log(res[s].r)/Math.LN10); } });
+  if (X.length < 4) return null;
+  function sse(p){
+    if (p.sig <= 0.02) return 1e18;
+    var e=0; for(var i=0;i<X.length;i++){ var d=sigAt(X[i],p)-Y[i]; e+=d*d; }
+    return e;
+  }
+  var best=null, bE=1e18, b,t,m,g;
+  for (b=0.2;b<=1.2;b+=0.06)
+    for (t=1.5;t<=2.5;t+=0.06)
+      for (m=2.0;m<=5.2;m+=0.12)
+        for (g=0.15;g<=1.6;g+=0.07){
+          var p={base:b,top:t,mid:m,sig:g}, e=sse(p);
+          if (e<bE){ bE=e; best=p; }
+        }
+  if (!best) return null;
+  var keys=['base','top','mid','sig'];
+  for (var it=0; it<1200; it++){
+    var moved=false;
+    for (var ki=0; ki<4; ki++){
+      for (var di=0; di<2; di++){
+        var f=di?1.02:0.98, q={base:best.base,top:best.top,mid:best.mid,sig:best.sig};
+        q[keys[ki]] *= f;
+        if (sse(q) < sse(best)) { best=q; moved=true; }
+      }
+    }
+    if (!moved) break;
+  }
+  /* the worst RELATIVE miss, which is the honest quality figure */
+  var worst=0;
+  for (var i=0;i<X.length;i++){
+    var f2=Math.pow(10, sigAt(X[i],best)), y2=Math.pow(10,Y[i]);
+    worst = Math.max(worst, Math.abs(f2-y2)/y2*100);
+  }
+  best.worst = worst;
+  best.midKb = Math.pow(10,best.mid);
+  best.floorNs = Math.pow(10,best.base);
+  best.topNs = Math.pow(10,best.top);
+  return best;
+}
 
 /* ---------------- drawing, both axes logarithmic ---------------- */
 function fit(cv){
@@ -160,6 +232,24 @@ function draw(){
     g.fillStyle='#4a6076';
     g.fillText(s>=1024 ? (s/1024)+'M' : s+'k', x-9, H-10);
   });
+  /* the fitted S, drawn under the measured lines */
+  if (sigFit){
+    g.strokeStyle='#8f7bff'; g.lineWidth=1.5; g.setLineDash([5,3]);
+    g.beginPath();
+    for (var q=0; q<=120; q++){
+      var lx = lg(SIZES[0]) + (lg(SIZES[SIZES.length-1])-lg(SIZES[0]))*q/120;
+      var ns = Math.pow(10, sigAt(lx, sigFit));
+      var px = L + (lx-x0)/(x1-x0)*(W-L-R), py = Y(ns);
+      if(q===0) g.moveTo(px,py); else g.lineTo(px,py);
+    }
+    g.stroke(); g.setLineDash([]);
+    /* the midpoint, where the memory area takes over */
+    var mx = L + (sigFit.mid-x0)/(x1-x0)*(W-L-R);
+    if (mx>L && mx<W-R){
+      g.strokeStyle='#8f7bff'; g.setLineDash([2,3]); g.beginPath();
+      g.moveTo(mx,T); g.lineTo(mx,H-B); g.stroke(); g.setLineDash([]);
+    }
+  }
   [['r','#4fd1ff'],['w','#ffc24f'],['x','#ff6b8a']].forEach(function(p){
     g.strokeStyle=p[1]; g.lineWidth=2; g.beginPath();
     var first=true;
@@ -219,11 +309,14 @@ function bar(){
     (blinkMs ? '   SCREEN blink '+blinkMs.toFixed(1)+'ms = '+
        (big ? Math.round(blinkMs*1e6/big.r).toLocaleString()+' memory reads' : '') : '') +
     (drift.length>1 ? '   THERMAL '+(d>=0?'+':'')+d.toFixed(1)+'ns over '+
-                      ((drift.length-1)*3)+'s' : '');
+                      ((drift.length-1)*3)+'s' : '') +
+    (sigFit ? '   SIGMOID sigma '+sigFit.sig.toFixed(2)+' decades, memory area from '+
+           (sigFit.midKb>=1024 ? (sigFit.midKb/1024).toFixed(1)+' MB' : Math.round(sigFit.midKb)+' kB')+
+           ' (worst miss '+sigFit.worst.toFixed(0)+'%)' : '');
 }
 
 window.addEventListener('resize', function(){ draw(); drawDrift(); });
 setTimeout(runAll, 200);
-window.__read = function(){ return {res:res, drift:drift, blink:blinkMs, busy:busy}; };
+window.__read = function(){ return {res:res, drift:drift, blink:blinkMs, busy:busy, fit:sigFit}; };
 </script>
 </body></html>
