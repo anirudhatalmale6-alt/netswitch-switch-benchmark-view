@@ -28,13 +28,12 @@
   #tag{margin-top:18px;font-size:9px;color:#3a4d5e}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B33</b><i id="line">sampling&hellip;</i></div>
+<div id="bar"><b id="stamp">B34</b><i id="line">sampling&hellip;</i></div>
 <div id="pg" style="padding-top:58px">
 
   <h2>Control chart &mdash; memory access time</h2>
   <canvas id="g" height="260"></canvas>
   <table id="t"></table>
-  <button id="go" onclick="runAll()">TAKE SAMPLES AGAIN</button>
 
   <h2>Good and bad by sigma</h2>
   <table id="s"></table>
@@ -118,7 +117,6 @@ function control(sampleList){
 function runAll(){
   if (busy) return;
   busy = true;
-  document.getElementById('go').textContent = 'SAMPLING…';
   setTimeout(function(){
     if (!ring) ring = makeRing(65536);
     samples = [];
@@ -129,7 +127,6 @@ function runAll(){
     }
     stat = control(samples);
     busy = false;
-    document.getElementById('go').textContent = 'TAKE SAMPLES AGAIN';
     draw(); table(); sigmaTable(); bar();
   }, 30);
 }
@@ -248,6 +245,8 @@ function selfCheck(){
 
 selfCheck();
 setTimeout(runAll, 150);
+/* no button on screen - it re-samples on its own */
+setInterval(runAll, 20000);
 window.__read = function(){ return {stat:stat, fails:window.__selfCheckFails,
   bar:document.getElementById('line').textContent}; };
 </script>
