@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SIGMA · CONTROL CHART</title>
+<style>
+  html,body{margin:0;min-height:100%;background:#05080c;color:#d7e6f2;
+    font:12px/1.45 ui-monospace,"DejaVu Sans Mono",Consolas,monospace}
+  #bar{position:fixed;left:0;right:0;top:0;background:#f00;color:#fff;
+    display:flex;align-items:baseline;gap:8px;padding:6px 10px;
+    font-weight:700;letter-spacing:.3px;z-index:9;flex-wrap:wrap}
+  #bar i{font-style:normal;flex:1 1 auto;min-width:0;font-weight:400}
+  #pg{padding:8px 10px 26px}
+  h2{font-size:10px;letter-spacing:2px;color:#6d8ba3;font-weight:400;
+    margin:14px 0 5px;text-transform:uppercase}
+  canvas{display:block;width:100%;background:#070d15;
+    border:1px solid #16293a;border-radius:4px}
+  table{width:100%;border-collapse:collapse}
+  td{padding:4px;border-bottom:1px solid #0e1a26;font-variant-numeric:tabular-nums}
+  td.k{color:#8ea9c2;width:52%}
+  td.v{text-align:right;color:#eaf6ff;font-weight:700}
+  td.u{text-align:right;color:#4a6076;width:22%;font-weight:400}
+  .ok{color:#3fd18a}.bad{color:#ff5b4d}
+  button{font:inherit;font-weight:700;letter-spacing:1px;padding:9px 14px;
+    margin-top:10px;background:#12507f;color:#eaf6ff;border:1px solid #2b6ea8;
+    border-radius:5px;cursor:pointer}
+  #chk{margin-top:12px;padding:8px 10px;border:1px solid #1d4a33;
+    background:#08160f;border-radius:4px;font-size:11px;line-height:1.6}
+  #tag{margin-top:18px;font-size:9px;color:#3a4d5e}
+</style></head><body>
+
+<div id="bar"><b id="stamp">B33</b><i id="line">sampling&hellip;</i></div>
+<div id="pg" style="padding-top:58px">
+
+  <h2>Control chart &mdash; memory access time</h2>
+  <canvas id="g" height="260"></canvas>
+  <table id="t"></table>
+  <button id="go" onclick="runAll()">TAKE SAMPLES AGAIN</button>
+
+  <h2>Good and bad by sigma</h2>
+  <table id="s"></table>
+
+  <div id="chk">verifying the arithmetic&hellip;</div>
+  <div id="tag">AI2ORBIT Co. 2026 &middot; method from AMM1 KOE3 q.2 and q.3</div>
+</div>
+
+<script>
+/* ==================================================================
+   SIGMA - CONTROL CHART, on the memory access time this device
+   actually shows.
+
+   THE METHOD IS HIS, out of the exam he sent (AMM1 KOE3):
+
+     q3  sample mean Xh and sample deviation S over all readings,
+         then control limits Xh +- 3S/sqrt(n) for samples of n.
+         His worked case has n=4, so 3/sqrt(4) = 1.5 and the limits
+         are his "Xh -+ 3/2*S". The general form is used here so the
+         sample size can change without the arithmetic going wrong.
+
+     q2  a unit is GOOD if it lies within mu +- 1.5 sigma, which is
+         2*Phi(1.5) - 1 = 0.8664, and then the count of bad ones in
+         a batch is binomial.
+
+   AND THE ARITHMETIC IS CHECKED AGAINST HIS OWN ANSWER SHEET at the
+   bottom of the page, using his twenty-four numbers. If my mean,
+   deviation, limits or sample means ever stop landing on his, the
+   page says so instead of drawing a confident chart.
+   ================================================================== */
+
+var N_PER = 4, N_SAMPLES = 8;          /* 8 samples of 4 readings */
+var ring = null, guard = 0, busy = false;
+var samples = [], stat = null;
+
+function makeRing(kb){
+  var n = kb*1024/4, a = new Int32Array(n), idx = new Int32Array(n), i, j, t;
+  for(i=0;i<n;i++) idx[i]=i;
+  for(i=n-1;i>0;i--){ j=(Math.random()*(i+1))|0; t=idx[i]; idx[i]=idx[j]; idx[j]=t; }
+  for(i=0;i<n;i++) a[idx[i]]=idx[(i+1)%n];
+  return a;
+}
+/* dependent reads, so this is an access time and not a throughput */
+function chase(a, ms){
+  var p=0, steps=0, t0=performance.now(), t1;
+  do { for(var k=0;k<20000;k++) p=a[p]; steps+=20000; t1=performance.now(); }
+  while (t1-t0 < ms);
+  guard = p;
+  return (t1-t0)*1e6/steps;
+}
+
+function mean(v){ var s=0,i; for(i=0;i<v.length;i++) s+=v[i]; return s/v.length; }
+function sd(v){                       /* sample deviation, n-1 */
+  if (v.length < 2) return 0;
+  var m=mean(v), s=0, i;
+  for(i=0;i<v.length;i++) s += (v[i]-m)*(v[i]-m);
+  return Math.sqrt(s/(v.length-1));
+}
+function Phi(z){                      /* normal cdf, Abramowitz-Stegun 7.1.26 */
+  var t = 1/(1+0.2316419*Math.abs(z));
+  var d = 0.3989422804014327*Math.exp(-z*z/2);
+  var p = d*t*(0.319381530 + t*(-0.356563782 + t*(1.781477937 +
+              t*(-1.821255978 + t*1.330274429))));
+  return z >= 0 ? 1-p : p;
+}
+
+/* ---- his method, applied to any set of samples ---- */
+function control(sampleList){
+  var flat = [], i, j;
+  for(i=0;i<sampleList.length;i++)
+    for(j=0;j<sampleList[i].length;j++) flat.push(sampleList[i][j]);
+  var Xh = mean(flat), S = sd(flat), n = sampleList[0].length;
+  var half = 3*S/Math.sqrt(n);
+  var ms = sampleList.map(mean);
+  var out = ms.filter(function(m){ return m < Xh-half || m > Xh+half; }).length;
+  return { Xh:Xh, S:S, n:n, L1:Xh-half, L2:Xh+half, means:ms, outside:out,
+           /* q2: within mu +- 1.5 sigma is good */
+           pGood: 2*Phi(1.5)-1 };
+}
+
+function runAll(){
+  if (busy) return;
+  busy = true;
+  document.getElementById('go').textContent = 'SAMPLING…';
+  setTimeout(function(){
+    if (!ring) ring = makeRing(65536);
+    samples = [];
+    for (var s=0; s<N_SAMPLES; s++){
+      var one = [];
+      for (var k=0; k<N_PER; k++) one.push(chase(ring, 28));
+      samples.push(one);
+    }
+    stat = control(samples);
+    busy = false;
+    document.getElementById('go').textContent = 'TAKE SAMPLES AGAIN';
+    draw(); table(); sigmaTable(); bar();
+  }, 30);
+}
+
+/* ---------------- drawing ---------------- */
+function fit(cv){ var w=cv.clientWidth||320; if(cv.width!==w) cv.width=w;
+                  return cv.getContext('2d'); }
+function draw(){
+  var cv=document.getElementById('g'), g=fit(cv);
+  var W=cv.width, H=cv.height, L=52, R=10, T=12, B=22;
+  g.fillStyle='#070d15'; g.fillRect(0,0,W,H);
+  if(!stat) return;
+  var lo = Math.min(stat.L1, Math.min.apply(null,stat.means));
+  var hi = Math.max(stat.L2, Math.max.apply(null,stat.means));
+  var pad = (hi-lo)*0.18 || 1; lo-=pad; hi+=pad;
+  function Y(v){ return T + (1-(v-lo)/(hi-lo))*(H-T-B); }
+  function X(i){ return L + (stat.means.length<2?0.5:i/(stat.means.length-1))*(W-L-R); }
+
+  g.font='9px monospace';
+  /* the limits, and the centre line */
+  [[stat.L2,'#ff5b4d','upper'],[stat.Xh,'#4a6076','centre'],
+   [stat.L1,'#ff5b4d','lower']].forEach(function(p){
+    var y=Y(p[0]);
+    g.strokeStyle=p[1]; g.setLineDash(p[2]==='centre'?[]:[5,3]);
+    g.beginPath(); g.moveTo(L,y); g.lineTo(W-R,y); g.stroke(); g.setLineDash([]);
+    g.fillStyle=p[1]; g.fillText(p[0].toFixed(1), 3, y+3);
+  });
+  /* the sample means */
+  g.strokeStyle='#4fd1ff'; g.lineWidth=2; g.beginPath();
+  stat.means.forEach(function(m,i){ var x=X(i), y=Y(m);
+    if(i===0) g.moveTo(x,y); else g.lineTo(x,y); });
+  g.stroke();
+  stat.means.forEach(function(m,i){
+    var outside = m<stat.L1 || m>stat.L2;
+    g.fillStyle = outside ? '#ff5b4d' : '#4fd1ff';
+    g.beginPath(); g.arc(X(i),Y(m), outside?4:3, 0, 6.283); g.fill();
+    g.fillStyle='#4a6076'; g.fillText(String(i+1), X(i)-3, H-8);
+  });
+}
+
+function row(k,v,u,cls){
+  return '<tr><td class="k">'+k+'</td><td class="v '+(cls||'')+'">'+v+
+         '</td><td class="u">'+(u||'')+'</td></tr>';
+}
+function table(){
+  if(!stat) return;
+  document.getElementById('t').innerHTML =
+    row('samples', stat.means.length+' of '+stat.n, 'readings each') +
+    row('sample mean Xh', stat.Xh.toFixed(2), 'ns') +
+    row('sample deviation S', stat.S.toFixed(3), 'ns') +
+    row('limits Xh &plusmn; 3S/&radic;n', stat.L1.toFixed(2)+' … '+stat.L2.toFixed(2), 'ns') +
+    row('outside the limits', stat.outside, 'of '+stat.means.length,
+        stat.outside ? 'bad' : 'ok') +
+    row('verdict', stat.outside ? 'OUT OF CONTROL' : 'IN CONTROL', '',
+        stat.outside ? 'bad' : 'ok');
+}
+function sigmaTable(){
+  if(!stat) return;
+  var lo = stat.Xh - 1.5*stat.S, hi = stat.Xh + 1.5*stat.S;
+  var flat=[], i, j;
+  for(i=0;i<samples.length;i++) for(j=0;j<samples[i].length;j++) flat.push(samples[i][j]);
+  var bad = flat.filter(function(v){ return v<lo || v>hi; }).length;
+  var p = 1-stat.pGood, n16 = 16;
+  var atLeast2 = 1 - (Math.pow(1-p,n16) + n16*p*Math.pow(1-p,n16-1));
+  document.getElementById('s').innerHTML =
+    row('good band &mu; &plusmn; 1.5&sigma;', lo.toFixed(1)+' … '+hi.toFixed(1), 'ns') +
+    row('expected good', (stat.pGood*100).toFixed(2), '%') +
+    row('readings outside the band', bad, 'of '+flat.length,
+        bad > flat.length*0.2 ? 'bad' : 'ok') +
+    row('P(at least 2 bad in 16)', atLeast2.toFixed(2), '');
+}
+function bar(){
+  if(!stat){ return; }
+  document.getElementById('line').textContent =
+    'Xh ' + stat.Xh.toFixed(1) + 'ns   S ' + stat.S.toFixed(2) +
+    '   limits ' + stat.L1.toFixed(1) + '…' + stat.L2.toFixed(1) +
+    '   ' + (stat.outside ? 'OUT OF CONTROL ('+stat.outside+')' : 'IN CONTROL');
+}
+
+/* ---- THE ARITHMETIC, CHECKED AGAINST HIS ANSWER SHEET ----
+   His twenty-four numbers, his stated results. This runs in the page
+   so the check travels with the product rather than living in a note
+   I wrote once. */
+function selfCheck(){
+  var rows = [
+    [6.7498,7.3800,7.2084,6.1764,6.3915,7.0772],
+    [7.8492,7.0044,6.6021,7.9274,6.2325,7.5404],
+    [6.4534,6.5858,7.4319,7.3969,7.7146,6.3715],
+    [7.7901,7.9400,6.9369,7.5232,7.3348,6.9324]];
+  var cols = [], c, r;
+  for (c=0;c<6;c++){ var col=[]; for(r=0;r<4;r++) col.push(rows[r][c]); cols.push(col); }
+  var st = control(cols);
+  var hisMeans = [7.2106,7.2275,7.0448,7.2560,6.9184,6.9804];
+  var fails = [];
+  function near(a,b,t){ return Math.abs(a-b) < t; }
+  if(!near(st.Xh,7.1063,5e-4)) fails.push('Xh '+st.Xh.toFixed(4));
+  if(!near(st.S,0.5625,5e-4))  fails.push('S '+st.S.toFixed(4));
+  if(!near(st.L1,6.2626,5e-4)) fails.push('L1 '+st.L1.toFixed(4));
+  if(!near(st.L2,7.9500,5e-4)) fails.push('L2 '+st.L2.toFixed(4));
+  st.means.forEach(function(m,i){
+    if(!near(m,hisMeans[i],5e-4)) fails.push('mean'+(i+1)+' '+m.toFixed(4)); });
+  if(!near(st.pGood,0.8664,5e-4)) fails.push('P(good) '+st.pGood.toFixed(4));
+  var el = document.getElementById('chk');
+  if (fails.length){
+    el.style.borderColor='#5a1d1d'; el.style.background='#1a0808';
+    el.innerHTML = '<b class="bad">THE ARITHMETIC DOES NOT MATCH THE ANSWER ' +
+      'SHEET</b><br>' + fails.join(', ') + '<br>Nothing above should be trusted.';
+  } else {
+    el.innerHTML = '<b class="ok">Checked against your answer sheet</b> ' +
+      '(AMM1 KOE3 q.3, your 24 readings): Xh 7.1063, S 0.5625, ' +
+      'limits 6.2626 … 7.9500, all six sample means, and P(good) 0.8664 ' +
+      '&mdash; every one reproduced here.';
+  }
+  window.__selfCheckFails = fails;
+}
+
+selfCheck();
+setTimeout(runAll, 150);
+window.__read = function(){ return {stat:stat, fails:window.__selfCheckFails,
+  bar:document.getElementById('line').textContent}; };
+</script>
+</body></html>
