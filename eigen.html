@@ -32,7 +32,7 @@
   #crText{color:#111;font-weight:700;font-size:13px;line-height:1.4}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B35</b><i id="line">gathering readings&hellip;</i></div>
+<div id="bar"><b id="stamp">B36</b><i id="line">gathering readings&hellip;</i></div>
 <div id="pg" style="padding-top:58px">
 
   <h2>Main axis of the two readings</h2>
@@ -80,11 +80,16 @@
    whichever reading is really moving more - which is the thing worth
    knowing.
 
-   AND THE ARITHMETIC IS CHECKED AGAINST HIS OWN WORKED EXAMPLE at the
-   bottom of the page. If the solver ever stops landing on the answer
-   he wrote out, the page says so instead of drawing a confident
-   picture. Same rule as the sigma page: the check travels with the
-   product, it does not live in a note I wrote once.
+   AND THE ARITHMETIC IS CHECKED AGAINST THE WORKED EXAMPLE in the
+   supplied sheet. If the solver ever stops landing on the printed
+   answer, the page says so instead of drawing a confident picture.
+   Same rule as the sigma page: the check travels with the product, it
+   does not live in a note written once and filed.
+
+   NOTHING IS PRINTED WHEN IT PASSES. Prose saying the sums came out
+   right is not a result, it is decoration - it was asked to come off.
+   The block appears only when the arithmetic stops matching, which is
+   the one time it carries information.
    ================================================================== */
 
 /* ---- the pair solver ----
@@ -110,7 +115,7 @@ function vecFor(a,b,c,d,l){
   if (Math.abs(c) > 1e-12) return scale1(l-d, c);
   return (Math.abs(l-a) < 1e-12) ? [1,0] : [0,1];
 }
-/* written the way he writes them: first part one, so t(1, 3/2) */
+/* written in the sheet's form: first part one, so t(1, 3/2) */
 function scale1(x,y){
   if (Math.abs(x) > 1e-12) return [1, y/x];
   return [0, 1];
@@ -268,18 +273,18 @@ function bar(){
     ' DIR1:' + E.v2[1].toFixed(2).replace('.',',');
 }
 
-/* ---- THE ARITHMETIC, CHECKED AGAINST HIS WORKED EXAMPLE ----
-   The four numbers 2 -2 / -3 1 out of the sheet he sent. His answer:
-   the two values are -1 and 4, with directions 1 : 3/2 and 1 : -1.
+/* ---- THE ARITHMETIC, CHECKED AGAINST THE WORKED EXAMPLE ----
+   The four numbers 2 -2 / -3 1 out of the supplied sheet. The printed
+   answer: the two values are -1 and 4, directions 1 : 3/2 and 1 : -1.
    Both values and both directions are asserted here, and the picture
    above is not to be believed if this block turns red. */
 function selfCheck(){
   var r = eig2(2,-2,-3,1);
   var fails = [];
   function near(a,b){ return Math.abs(a-b) < 1e-9; }
-  if (r.complex) fails.push('solver called his example complex');
+  if (r.complex) fails.push('solver called the worked case complex');
   else {
-    /* his pair listed smaller first; the solver returns larger first */
+    /* the sheet lists smaller first; the solver returns larger first */
     if (!near(r.l1, 4))  fails.push('larger value ' + r.l1);
     if (!near(r.l2, -1)) fails.push('smaller value ' + r.l2);
     if (!near(r.v1[0],1) || !near(r.v1[1],-1))
@@ -299,15 +304,12 @@ function selfCheck(){
   var el = document.getElementById('chk');
   if (fails.length){
     el.style.borderColor='#5a1d1d'; el.style.background='#1a0808';
-    el.innerHTML = '<b class="bad">THE ARITHMETIC DOES NOT MATCH YOUR ' +
+    el.innerHTML = '<b class="bad">THE ARITHMETIC DOES NOT MATCH THE ' +
       'WORKED EXAMPLE</b><br>' + fails.join(', ') +
       '<br>Nothing above should be trusted.';
   } else {
-    el.innerHTML = '<b class="ok">Checked against your worked example</b> ' +
-      '(the four numbers 2 &minus;2 / &minus;3 1): the two values come out ' +
-      '&minus;1 and 4 and the directions 1 : 1,5 and 1 : &minus;1, the same ' +
-      'as your sheet &mdash; and each direction is then put back through ' +
-      'the four numbers and holds.';
+    el.innerHTML = '';                  /* silent while it passes */
+    el.style.display = 'none';
   }
   window.__selfCheckFails = fails;
 }
