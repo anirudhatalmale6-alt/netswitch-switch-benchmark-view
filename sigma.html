@@ -28,7 +28,7 @@
   #tag{margin-top:18px;font-size:9px;color:#3a4d5e}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B34</b><i id="line">sampling&hellip;</i></div>
+<div id="bar"><b id="stamp">B36</b><i id="line">sampling&hellip;</i></div>
 <div id="pg" style="padding-top:58px">
 
   <h2>Control chart &mdash; memory access time</h2>
@@ -47,12 +47,12 @@
    SIGMA - CONTROL CHART, on the memory access time this device
    actually shows.
 
-   THE METHOD IS HIS, out of the exam he sent (AMM1 KOE3):
+   THE METHOD IS FROM THE SUPPLIED PAPER (AMM1 KOE3):
 
      q3  sample mean Xh and sample deviation S over all readings,
          then control limits Xh +- 3S/sqrt(n) for samples of n.
          His worked case has n=4, so 3/sqrt(4) = 1.5 and the limits
-         are his "Xh -+ 3/2*S". The general form is used here so the
+         give the stated "Xh -+ 3/2*S". The general form is used so the
          sample size can change without the arithmetic going wrong.
 
      q2  a unit is GOOD if it lies within mu +- 1.5 sigma, which is
@@ -60,9 +60,16 @@
          a batch is binomial.
 
    AND THE ARITHMETIC IS CHECKED AGAINST HIS OWN ANSWER SHEET at the
-   bottom of the page, using his twenty-four numbers. If my mean,
-   deviation, limits or sample means ever stop landing on his, the
-   page says so instead of drawing a confident chart.
+   bottom of the page, against the twenty-four numbers printed in it.
+   If the mean, deviation, limits or sample means ever stop landing on
+   the published ones, the page says so instead of drawing a confident
+   chart.
+
+   NOTHING IS PRINTED WHEN IT PASSES. A line of prose saying the sums
+   came out right is not a result, it is decoration - it was asked to
+   come off, and it should not have been there. The block appears only
+   when the arithmetic stops matching, which is the one time it
+   carries information.
    ================================================================== */
 
 var N_PER = 4, N_SAMPLES = 8;          /* 8 samples of 4 readings */
@@ -100,7 +107,7 @@ function Phi(z){                      /* normal cdf, Abramowitz-Stegun 7.1.26 */
   return z >= 0 ? 1-p : p;
 }
 
-/* ---- his method, applied to any set of samples ---- */
+/* ---- that method, applied to any set of samples ---- */
 function control(sampleList){
   var flat = [], i, j;
   for(i=0;i<sampleList.length;i++)
@@ -206,10 +213,10 @@ function bar(){
     '   ' + (stat.outside ? 'OUT OF CONTROL ('+stat.outside+')' : 'IN CONTROL');
 }
 
-/* ---- THE ARITHMETIC, CHECKED AGAINST HIS ANSWER SHEET ----
-   His twenty-four numbers, his stated results. This runs in the page
-   so the check travels with the product rather than living in a note
-   I wrote once. */
+/* ---- THE ARITHMETIC, CHECKED AGAINST THE PUBLISHED ANSWERS ----
+   The twenty-four numbers from the paper and the results printed with
+   them. This runs inside the page so the check travels with the
+   product rather than living in a note written once and filed. */
 function selfCheck(){
   var rows = [
     [6.7498,7.3800,7.2084,6.1764,6.3915,7.0772],
@@ -232,13 +239,12 @@ function selfCheck(){
   var el = document.getElementById('chk');
   if (fails.length){
     el.style.borderColor='#5a1d1d'; el.style.background='#1a0808';
-    el.innerHTML = '<b class="bad">THE ARITHMETIC DOES NOT MATCH THE ANSWER ' +
-      'SHEET</b><br>' + fails.join(', ') + '<br>Nothing above should be trusted.';
+    el.innerHTML = '<b class="bad">THE ARITHMETIC DOES NOT MATCH THE ' +
+      'REFERENCE FIGURES</b><br>' + fails.join(', ') +
+      '<br>Nothing above should be trusted.';
   } else {
-    el.innerHTML = '<b class="ok">Checked against your answer sheet</b> ' +
-      '(AMM1 KOE3 q.3, your 24 readings): Xh 7.1063, S 0.5625, ' +
-      'limits 6.2626 … 7.9500, all six sample means, and P(good) 0.8664 ' +
-      '&mdash; every one reproduced here.';
+    el.innerHTML = '';                  /* silent while it passes */
+    el.style.display = 'none';
   }
   window.__selfCheckFails = fails;
 }
