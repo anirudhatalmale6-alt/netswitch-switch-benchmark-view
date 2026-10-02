@@ -141,6 +141,56 @@ var frameGap = 0, frameBest = 1e9, fps = 0, fN = 0, fT = 0, lastF = 0;
   requestAnimationFrame(f);
 })();
 
+/* ---- GPU GRAPHIC TURN: how many 90-degree turns of a graphic the
+        graphics can complete a second, measured off-screen so it is the
+        drawing cost and not the screen's refresh. "no graphic can match
+        any phone" - this rate is the device's own. ---- */
+var turnCv = document.createElement('canvas');
+turnCv.width = 256; turnCv.height = 256;
+var turnG = turnCv.getContext('2d');
+function graphicTurnRate(){
+  var t0 = performance.now(), turns = 0, a = 0;
+  do {
+    /* a quarter turn, drawn - rotate 90 degrees and paint a shape */
+    a += Math.PI/2;
+    turnG.setTransform(1,0,0,1,128,128); turnG.rotate(a);
+    turnG.clearRect(-128,-128,256,256);
+    turnG.fillStyle = '#4fd1ff';
+    turnG.fillRect(-60,-8,120,16);
+    turnG.fillRect(-8,-60,16,120);
+    turns++;
+  } while (performance.now() - t0 < 8);
+  guard += a & 1;
+  var ms = performance.now() - t0;
+  return ms > 0 ? turns / ms * 1000 : 0;    /* 90-degree turns a second */
+}
+
+/* ---- DEVICE TORSION: the phone's own turning rate, from the motion
+        sensor where there is one. A browser on a desktop has none, and
+        then the ratio cannot be formed and says so rather than faking a
+        rotation that is not happening. ---- */
+var torsion = { haveSensor: false, noApi: false, rate: 0, note: '' };
+(function(){
+  if (typeof DeviceMotionEvent === 'undefined'){
+    torsion.noApi = true;
+    torsion.note = 'this device exposes no motion sensor to a web page';
+    return;
+  }
+  torsion.note = 'waiting for a turn';
+  window.addEventListener('devicemotion', function(e){
+    var r = e.rotationRate;
+    if (r && (r.alpha != null || r.beta != null || r.gamma != null)){
+      torsion.haveSensor = true;
+      torsion.rate = Math.abs(r.alpha||0) + Math.abs(r.beta||0) + Math.abs(r.gamma||0);
+      torsion.note = '';
+    }
+  });
+  /* if the API is there but no live reading has arrived, the phone is
+     simply being held still - say that, rather than leaving it blank */
+  setTimeout(function(){ if (!torsion.haveSensor && !torsion.noApi)
+    torsion.note = 'a motion sensor is present but the phone is being held still'; }, 3000);
+})();
+
 /* ---- each channel keeps its own recent readings and its own band ---- */
 function Channel(name, unit, read, decimals, lowerBetter){
   this.name = name; this.unit = unit; this.read = read;
@@ -179,7 +229,8 @@ Channel.prototype.sample = function(){
 var channels = [
   new Channel('DDR access', 'ns', ddrRead, 1, true),
   new Channel('CPU work rate', 'Mop/s', cpuRead, 0, false),
-  new Channel('GPU frame rate', 'fps', function(){ return fps; }, 0, false)
+  new Channel('GPU frame rate', 'fps', function(){ return fps; }, 0, false),
+  new Channel('GPU graphic turn', 'turns/s', graphicTurnRate, 0, false)
 ];
 
 /* ---- the nested-square mark ---- */
@@ -231,10 +282,22 @@ function render(){
     var st = document.getElementById('s'+i);
     st.textContent = c.status;
     st.className = 'st ' + (c.color === 'settling' ? 'dev' : 'on'+c.color);
-    document.getElementById('d'+i).textContent = c.hist.length >= 8 ?
+    var dline = c.hist.length >= 8 ?
       ('steady ' + c.mid.toFixed(c.dec) + ' ' + c.unit + '   ' +
        (c.devPct>=0?'+':'') + c.devPct.toFixed(1) + '% now') :
       ('settling - ' + c.hist.length + ' of 8 readings');
+    /* the graphic-turn channel also carries the torsion ratio: graphic
+       turns against the phone's own turning. No sensor, no ratio - and
+       it says so rather than inventing a rotation. */
+    if (c.name === 'GPU graphic turn'){
+      if (torsion.haveSensor && torsion.rate > 0.01){
+        dline += '   vs device turn ' +
+          (c.value / torsion.rate).toFixed(1) + ' per deg/s';
+      } else {
+        dline += '   device turn: ' + torsion.note;
+      }
+    }
+    document.getElementById('d'+i).textContent = dline;
     drawMark(document.getElementById('mk'+i), c);
   });
 
