@@ -42,7 +42,7 @@
 
   <h2>Six versions, each one instance, 43 ms a run</h2>
   <table id="tV"><thead><tr>
-    <th>version</th><th>work rate</th><th></th><th>vs best</th><th>spread</th>
+    <th>version (slowest first)</th><th>work rate</th><th></th><th>vs best</th><th>spread</th>
   </tr></thead><tbody id="body"></tbody></table>
 
   <h2>The run</h2>
@@ -164,7 +164,9 @@ function runAll(done){
 function finish(){
   var best = Math.max.apply(null, results.map(function(r){ return r.rate; }));
   results.forEach(function(r){ r.vsBest = best > 0 ? r.rate / best : 0; });
-  results.sort(function(a,b){ return b.rate - a.rate; });
+  /* SLOWEST FIRST, as asked - the benchmark is looking for the weakest
+     performer, so the slowest version leads the table. */
+  results.sort(function(a,b){ return a.rate - b.rate; });
   runInfo = { window: WINDOW_MS, warm: WARM, scored: SCORED,
     processors: navigator.hardwareConcurrency || 1, versions: results.length };
   render();
@@ -207,11 +209,12 @@ function render(){
     row('looper window', WINDOW_MS, 'ms', 'w') +
     row('note', 'spec values are for display beside the product', '', 'w');
 
-  var top = results[0];
+  var slow = results[0], fast = results[results.length-1];
   document.getElementById('line').textContent =
     'WIN' + WINDOW_MS + 'ms' +
     ' VER' + results.length + '/' + VERSIONS.length +
-    (top ? ' BEST:' + top.key + ' ' + Math.round(kops(top.rate)).toLocaleString() + 'k' : '') +
+    (slow ? ' SLOWEST:' + slow.key + ' ' + Math.round(kops(slow.rate)).toLocaleString() + 'k' : '') +
+    (fast ? ' FASTEST:' + fast.key : '') +
     ' CPU' + (navigator.hardwareConcurrency || '-');
 }
 
@@ -237,7 +240,8 @@ function selfCheck(){
   var hundred = results.filter(function(r){ return r.vsBest >= 0.999; }).length;
   if (results.length && hundred < 1) fails.push('no version is the benchmark best');
   for (var i = 1; i < results.length; i++){
-    if (results[i].rate > results[i-1].rate + 1e-9)
+    /* slowest first: each row must be at least as fast as the one above */
+    if (results[i].rate < results[i-1].rate - 1e-9)
       fails.push('the ranking is out of order at ' + results[i].key);
   }
 
