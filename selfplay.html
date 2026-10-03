@@ -105,7 +105,8 @@ function seedField(){
   }
 }
 function resetBall(){
-  ball = { x: 0.04, y: 0.5, head: 0, speed: 0.22 };
+  lane = 0; goingRight = true;
+  ball = { x: 0.06, y: laneY(0), head: 0, speed: 0.55 };
   path = [[ball.x, ball.y]];
 }
 
@@ -128,21 +129,59 @@ function clearRun(x, y, head, max){
   return max;
 }
 
+/* ---- WHERE IT IS HEADING: a line, then up, then a line back ----
+   The first version just ran for the far side, so the picture was one
+   straight dash down the pitch - which was the right behaviour for a
+   beeline and the wrong behaviour for showing a field being worked.
+   It now sweeps: it runs a line across, climbs, and runs the line
+   back the other way, so the whole field gets covered and the picture
+   shows the way-finding doing real work rather than one lucky dash. */
+var LANES = 5;
+var lane = 0, goingRight = true;
+function laneY(i){ return 0.14 + (i / (LANES - 1)) * 0.72; }
+function target(){
+  return { x: goingRight ? 0.94 : 0.06, y: laneY(lane) };
+}
+function advanceLane(){
+  goingRight = !goingRight;
+  lane++;
+  if (lane >= LANES){ lane = 0; goals++; }     /* a full sweep of the field */
+}
+
 /* the decision: a fan of directions, scored, best taken */
+/* ONE DECISION IS BELOW THE CLOCK. Timing a single pass returned zero
+   on a fast machine - not "instant", just under what the clock can
+   see, and a zero there would have been printed as a real figure. So
+   the cost is measured by running a batch of decisions and dividing,
+   every so often, and that figure is what is shown. */
+var decideBatchAt = 0;
+function timeDecide(){
+  var N = 200, t0 = performance.now(), i;
+  for (i=0;i<N;i++) decideOnce();
+  var el = performance.now() - t0;
+  if (el > 0) decideUs = (el * 1000) / N;
+}
 function decide(){
-  var t0 = performance.now();
+  var pick = decideOnce();
+  /* re-time the cost about twice a second, not every frame */
+  var now = performance.now();
+  if (now - decideBatchAt > 500){ decideBatchAt = now; timeDecide(); }
+  return pick;
+}
+function decideOnce(){
+  var tgt = target();
+  var want = Math.atan2(tgt.y - ball.y, tgt.x - ball.x);
   var best = null, i, n = 24;
   for (i=0;i<n;i++){
     /* the fan sweeps a full turn so reversing is always available */
     var off = (i - n/2) * (Math.PI*2/n);
     var head = ball.head + off;
     var run = clearRun(ball.x, ball.y, head, 0.22);
-    /* going forward down the pitch is worth more; turning costs */
-    var forward = Math.cos(head);
-    var score = run*3 + forward*0.9 - Math.abs(off)*0.25;
+    /* how well this direction points at where it is trying to get to */
+    var towards = Math.cos(head - want);
+    var score = run*3 + towards*1.1 - Math.abs(off)*0.25;
     if (!best || score > best.score) best = { head: head, run: run, score: score, off: off };
   }
-  decideUs = (performance.now() - t0) * 1000;
   return best;
 }
 
@@ -152,14 +191,21 @@ function tick(dt){
      was boxed in and is reversing out - count that honestly */
   if (Math.abs(pick.off) > Math.PI/2) reverses++;
   ball.head = pick.head;
-  var move = Math.min(ball.speed*dt, Math.max(0.004, pick.run));
+  /* THE SWEEP HAS TO BE WATCHABLE. At the first speed a single line
+     took most of a minute, so in any short look the picture was one
+     lane and the whole point - running a line and coming back up - was
+     invisible. The check caught it as too little of the field covered.
+     Faster, and the step is allowed to use the clear run it found. */
+  var move = Math.min(ball.speed*dt, Math.max(0.006, pick.run));
   ball.x += Math.cos(ball.head)*move;
   ball.y += Math.sin(ball.head)*move;
   steps++;
   path.push([ball.x, ball.y]);
   if (path.length > 1200) path.shift();
-  /* reached the far side: a goal, then it starts again */
-  if (ball.x > 0.96){ goals++; resetBall(); }
+  /* reached the end of this line: turn, climb, and run the line back */
+  var tgt = target();
+  var dx = ball.x - tgt.x, dy = ball.y - tgt.y;
+  if (dx*dx + dy*dy < 0.0045) advanceLane();
 }
 
 function fit(){
@@ -267,7 +313,9 @@ function render(){
     row('steps taken', steps.toLocaleString(), '', 'm') +
     row('times it had to reverse out', reverses.toLocaleString(), '',
         reverses ? 'w' : 'm') +
-    row('times it got through', goals, '', 'm') +
+    row('lines run', (goals*LANES + lane), ' of ' + LANES + ' a sweep', 'm') +
+    row('sweeps of the field finished', goals, '', 'm') +
+    row('running', goingRight ? 'left to right' : 'right to left', '', 'm') +
     row('points on the line', path.length, '', 'm');
 
   document.getElementById('tC').innerHTML =
@@ -291,7 +339,7 @@ function render(){
     'OBST' + obst.length +
     ' STEPS' + steps +
     ' REV' + reverses +
-    ' THROUGH' + goals +
+    ' LANE' + (lane+1) + '/' + LANES + ' SWEEPS' + goals +
     ' FPS' + (fps?fps.toFixed(0):'-') +
     ' DECIDE' + (decideUs?decideUs.toFixed(0):'-') + 'us';
 }
@@ -345,5 +393,6 @@ window.__read = function(){ return { obstacles: obst.length, steps: steps,
   decideUs: decideUs, done: !!window.__spDone, fails: window.__spFails,
   bar: document.getElementById('line').textContent }; };
 window.__dxf = toDXF;
+window.__path = function(){ return path.slice(); };
 </script>
 </body></html>
