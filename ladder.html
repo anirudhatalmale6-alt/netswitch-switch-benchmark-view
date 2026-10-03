@@ -34,8 +34,11 @@
   #crText{color:#12261a;font-weight:700;font-size:12px;line-height:1.4}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B38</b><i id="line">measuring the ladder&hellip;</i></div>
+<div id="bar"><b id="stamp">B55</b><i id="line">measuring the ladder&hellip;</i></div>
 <div id="pg" style="padding-top:60px">
+
+  <h2>Secondary and tertiary</h2><table id="tST"></table>
+  <div id="stNote" style="margin-top:8px;padding:9px 11px;border:1px solid #16293a;background:#0a121a;border-radius:4px;font-size:11px;line-height:1.7;color:#8ea9c2"></div>
 
   <h2>How long the processor waits</h2><table id="tAns"></table>
 
@@ -190,6 +193,49 @@ function render(){
   var main = levels.length ? levels[levels.length-1] : null;
   var top = levels.length ? levels[0] : null;
 
+  /* ---- SECONDARY AND TERTIARY, ON THEIR OWN ----
+     These two are the ones that matter for tuning: the primary is
+     fixed by the chip and main memory is the wall, but secondary and
+     tertiary are where a working set either fits or does not, and
+     that is the difference a product can actually act on. Reported
+     separately from the full ladder so they are not buried in it. */
+  var sec = null, ter = null;
+  if (levels.length >= 2) sec = levels[1];
+  if (levels.length >= 3) ter = levels[2];
+  var prim = levels.length ? levels[0] : null;
+  var stRows = '';
+  function stBlock(name, L, prev){
+    if (!L){
+      return row(name, 'not found on this device', '', 'n') +
+        row('&nbsp;&nbsp;why', 'the ladder shows no separate step here', '', '');
+    }
+    return row('<b>' + name + '</b>', fmt(L.ns, L.ns < 10 ? 2 : 1), 'ns', 'm') +
+      row('&nbsp;&nbsp;working set', sz(L.from) + (L.from !== L.to ? ' to ' + sz(L.to) : ''), '') +
+      row('&nbsp;&nbsp;the processor waits', fmt(work(L.ns), 1), 'operations') +
+      row('&nbsp;&nbsp;against the nearest level',
+          prim && prim.ns ? fmt(L.ns/prim.ns, 1) + 'x slower' : '-', '') +
+      (prev ? row('&nbsp;&nbsp;against the level before it',
+          prev.ns ? fmt(L.ns/prev.ns, 1) + 'x slower' : '-', '') : '');
+  }
+  stRows += stBlock('secondary', sec, prim);
+  stRows += stBlock('tertiary', ter, sec);
+  if (sec && ter){
+    stRows += row('the step between them',
+      fmt(ter.ns/sec.ns, 1) + 'x', '', 'm') +
+      row('work lost falling from secondary to tertiary',
+        fmt(work(ter.ns) - work(sec.ns), 1), 'operations a read', 'w');
+  }
+  document.getElementById('tST').innerHTML = stRows;
+
+  document.getElementById('stNote').innerHTML =
+    '<b>Why these two.</b> The nearest level is whatever the chip gives ' +
+    'and main memory is the wall - neither moves. Secondary and tertiary ' +
+    'are where a working set either fits or spills, and that is the one ' +
+    'thing a product can be tuned against. The figures above are this ' +
+    'device\'s own, found from the shape of its readings, not looked up: ' +
+    'where a device has no separate step the line says so instead of ' +
+    'inventing a level.';
+
   document.getElementById('tAns').innerHTML =
     row('work rate measured here',
         opsPerNs ? fmt(opsPerNs*1000, 0) : '-', 'ops per microsecond', 'm') +
@@ -229,7 +275,9 @@ function render(){
   document.getElementById('ladBody').innerHTML = rows;
 
   document.getElementById('line').textContent =
-    'LEVELS' + (levels.length || '-') +
+    'SEC' + (levels.length>1 ? fmt(levels[1].ns,1) : '-') + 'ns' +
+    ' TER' + (levels.length>2 ? fmt(levels[2].ns,1) : '-') + 'ns' +
+    ' LEVELS' + (levels.length || '-') +
     ' NEAR' + (top ? fmt(top.ns, 2).replace('.', ',') : '-') + 'ns' +
     ' MAIN' + (main ? fmt(main.ns, 0) : '-') + 'ns' +
     ' WAIT' + (main ? fmt(work(main.ns), 0).replace(/,/g,'') : '-') + 'ops' +
