@@ -49,7 +49,7 @@
   #crText{color:#12261a;font-weight:700;font-size:12px;line-height:1.4}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B57</b><i id="line">reading the startup&hellip;</i></div>
+<div id="bar"><b id="stamp">B58</b><i id="line">reading the startup&hellip;</i></div>
 
 <div id="top">
   <div id="topText">Startup and boot, logged. Every leg timed on this device.</div>
@@ -72,14 +72,7 @@
 
   <h2>What a browser cannot see</h2><table id="tNo"></table>
 
-  <h2>htaccess for this startup</h2>
-  <table id="tHt"><thead><tr>
-    <th>directive</th><th>which leg it shortens</th>
-  </tr></thead><tbody id="htBody"></tbody></table>
-  <pre id="htText"></pre>
-  <div style="margin-top:8px">
-    <a class="dl" id="dlHt" download=".htaccess">download this htaccess</a>
-    &nbsp;&middot;&nbsp;
+  <div style="margin-top:10px">
     <a class="dl" id="dlDxf" download="startup.dxf">download the startup as DXF</a>
   </div>
 
@@ -205,7 +198,7 @@ function fmtLeg(l){
   return l.why === 'absent' ? 'did not happen' : 'no measurable time';
 }
 
-var nav = null, legs = [], total = 0, paint = 0, again = null, dxf = '', ht = '';
+var nav = null, legs = [], total = 0, paint = 0, again = null, dxf = '';
 
 function readNav(){
   var e = performance.getEntriesByType && performance.getEntriesByType('navigation');
@@ -241,88 +234,6 @@ function askAgain(done){
     done({ possible:false, why:'the page could not be asked for again: ' + e });
   });
 }
-
-/* ================= the htaccess =================
-   REAL DIRECTIVES, each one tied to a leg above. Nothing in here is
-   decoration: if a line does not shorten a measured leg it is not in
-   the file. */
-var HT_ROWS = [
-  ['RewriteCond %{HTTPS} off / RewriteRule -> https',
-   'forces the secure address once, so it is not guessed every start'],
-  ['Header set Strict-Transport-Security max-age=31536000',
-   'redirects - the next start skips the redirect leg entirely'],
-  ['Header set Cache-Control "public, max-age=31536000, immutable" (assets)',
-   'lookup, connection, download - a cached file is not fetched at all'],
-  ['Header set Cache-Control "no-store" (index.html, sw.js)',
-   'nothing - deliberately. A stale shell is a broken start, not a fast one'],
-  ['AddOutputFilterByType DEFLATE text/html text/css application/javascript',
-   'download of the document'],
-  ['AddType application/manifest+json .webmanifest',
-   'service worker start - a manifest served as the wrong type is ignored'],
-  ['KeepAlive On / MaxKeepAliveRequests 100',
-   'connection and handshake on every file after the first'],
-  ['FileETag MTime Size',
-   'wait for the first byte, on a repeat start that only needs a check'],
-  ['Options -Indexes / RewriteRule ^ index.html [L] (unknown paths)',
-   'nothing measured - it keeps a wrong address from starting at all']
-];
-var HT_TEXT = [
-  '# AI2ORBIT Co. (c) 2026 - startup',
-  '# Each block below shortens a leg that is measured on this page.',
-  '',
-  '<IfModule mod_rewrite.c>',
-  '  RewriteEngine On',
-  '  RewriteCond %{HTTPS} off',
-  '  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]',
-  '</IfModule>',
-  '',
-  '<IfModule mod_headers.c>',
-  '  # the next start skips the redirect leg completely',
-  '  Header always set Strict-Transport-Security "max-age=31536000"',
-  '  Header always set X-Content-Type-Options "nosniff"',
-  '</IfModule>',
-  '',
-  '<IfModule mod_deflate.c>',
-  '  AddOutputFilterByType DEFLATE text/html text/css text/plain',
-  '  AddOutputFilterByType DEFLATE application/javascript application/json',
-  '  AddOutputFilterByType DEFLATE image/svg+xml application/manifest+json',
-  '</IfModule>',
-  '',
-  '<IfModule mod_mime.c>',
-  '  AddType application/manifest+json .webmanifest',
-  '  AddType application/wasm .wasm',
-  '  AddType image/vnd.dxf .dxf',
-  '</IfModule>',
-  '',
-  '<IfModule mod_expires.c>',
-  '  ExpiresActive On',
-  '</IfModule>',
-  '',
-  '# a file that never changes is never fetched twice',
-  '<FilesMatch "\\.(css|js|png|jpg|jpeg|svg|woff2|wasm)$">',
-  '  <IfModule mod_headers.c>',
-  '    Header set Cache-Control "public, max-age=31536000, immutable"',
-  '  </IfModule>',
-  '</FilesMatch>',
-  '',
-  '# the shell and the worker must never be stale',
-  '<FilesMatch "^(index\\.html|sw\\.js|manifest\\.webmanifest)$">',
-  '  <IfModule mod_headers.c>',
-  '    Header set Cache-Control "no-store, must-revalidate"',
-  '  </IfModule>',
-  '</FilesMatch>',
-  '',
-  'FileETag MTime Size',
-  'Options -Indexes',
-  '',
-  '<IfModule mod_rewrite.c>',
-  '  RewriteEngine On',
-  '  RewriteCond %{REQUEST_FILENAME} !-f',
-  '  RewriteCond %{REQUEST_FILENAME} !-d',
-  '  RewriteRule ^ index.html [L]',
-  '</IfModule>',
-  ''
-].join('\n');
 
 /* ================= the DXF =================
    THE STARTUP AS REAL GEOMETRY, not a picture of it. One line per leg
@@ -489,16 +400,6 @@ function render(){
   row(tN, 'what the server sent and when',
       '<span class="r">READ</span>', 'the device\'s own stamps');
 
-  var th = document.getElementById('htBody'); th.innerHTML = '';
-  HT_ROWS.forEach(function(r){
-    var tr = document.createElement('tr');
-    tr.innerHTML = '<td class="k">' + r[0] + '</td><td class="u" '
-      + 'style="text-align:left;width:46%">' + r[1] + '</td>';
-    th.appendChild(tr);
-  });
-  document.getElementById('htText').textContent = HT_TEXT;
-  ht = HT_TEXT;
-  dataLink(document.getElementById('dlHt'), ht, 'text/plain');
   dxf = toDXF(legs, total, paint);
   dataLink(document.getElementById('dlDxf'), dxf, 'image/vnd.dxf');
   window.__dxf = dxf;
@@ -516,10 +417,7 @@ function render(){
     'words, not as a zero - a reused connection has no handshake to ' +
     'time, and printing 0.0 ms there would read as an instant handshake. ' +
     'The device switching on is not in here at all and cannot be: a ' +
-    'browser is not handed the power-on clock. The htaccess underneath ' +
-    'is the server side of the same thing - every directive in it is ' +
-    'tied to a leg above, and the two cache lines pull in opposite ' +
-    'directions on purpose.';
+    'browser is not handed the power-on clock.';
 
   document.getElementById('line').textContent =
     'STARTUP' + total.toFixed(0) + 'ms ' + kv(total).toFixed(0) + 'kv'
@@ -601,6 +499,13 @@ function selfCheck(){
   if (/[:;][-^]?[)(DPp]/.test(topText))
     fails.push('there is a typed smiley in the top text');
 
+  /* NO SOURCE CODE ON VIEW. Asked for twice. The first version of this
+     page put a server configuration file on screen as a block of text,
+     which is exactly what that rule forbids - so now the page refuses
+     to show a clean result if any code block gets back onto it. */
+  if (document.querySelector('pre, code, textarea'))
+    fails.push('there is a code block on the page');
+
   /* the clock stamp: fourteen digits, no dots, no separators */
   var s = stampNow();
   if (/[.\-: ]/.test(s)) fails.push('the clock stamp has separators in it: ' + s);
@@ -646,16 +551,6 @@ function selfCheck(){
       fails.push('the DXF holds ' + lines + ' lines, expected ' + want);
     if (dxf.indexOf('ENDSEC') < 0 || dxf.slice(-5).indexOf('EOF') < 0)
       fails.push('the DXF is not closed off properly');
-  }
-
-  /* the htaccess must be the real thing: every row in the table has to
-     appear in the file, or the table is describing a file that is not
-     being handed over */
-  if (ht){
-    ['RewriteEngine On', 'Strict-Transport-Security', 'immutable',
-     'no-store', 'DEFLATE', 'manifest+json', 'FileETag'].forEach(function(k){
-      if (ht.indexOf(k) < 0) fails.push('the htaccess is missing ' + k);
-    });
   }
 
   /* the phrase, exactly, and the mark beside it */
@@ -714,7 +609,7 @@ window.__read = function(){ return {
   topText: document.getElementById('top').textContent,
   dxfLines: (window.__dxf||'').split(/\r\n/).filter(function(v,i,a){
     return v === 'LINE' && a[i-1] === '0'; }).length,
-  htBytes: ht.length, stamp: stampNow(),
+  stamp: stampNow(),
   bar: document.getElementById('line').textContent }; };
 </script>
 </body></html>
