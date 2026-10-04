@@ -105,8 +105,9 @@ function seedField(){
   }
 }
 function resetBall(){
-  lane = 0; goingRight = true;
-  ball = { x: 0.06, y: laneY(0), head: 0, speed: 0.55 };
+  lane = 0; goingUp = true;
+  /* starts at the BOTTOM of the first line, heading up */
+  ball = { x: laneX(0), y: 0.92, head: -Math.PI/2, speed: 0.55 };
   path = [[ball.x, ball.y]];
 }
 
@@ -129,21 +130,27 @@ function clearRun(x, y, head, max){
   return max;
 }
 
-/* ---- WHERE IT IS HEADING: a line, then up, then a line back ----
-   The first version just ran for the far side, so the picture was one
-   straight dash down the pitch - which was the right behaviour for a
-   beeline and the wrong behaviour for showing a field being worked.
-   It now sweeps: it runs a line across, climbs, and runs the line
-   back the other way, so the whole field gets covered and the picture
-   shows the way-finding doing real work rather than one lucky dash. */
-var LANES = 5;
-var lane = 0, goingRight = true;
-function laneY(i){ return 0.14 + (i / (LANES - 1)) * 0.72; }
+/* ---- WHERE IT IS HEADING: BOTTOM TO TOP, THEN TOP TO BOTTOM ----
+   The lines run UP and DOWN the pitch, not across it. It climbs a
+   line from the bottom to the top, steps sideways, comes back down,
+   steps again, and so on until the field is covered.
+
+   This is the second correction to this path and both were about the
+   same thing: what the picture SAYS. A single straight dash said
+   nothing; side-to-side lines were a sweep but the wrong way round.
+   Up and down is the way a pitch is actually worked, and the line now
+   reads that way at a glance. */
+var LANES = 6;
+var lane = 0, goingUp = true;
+function laneX(i){ return 0.10 + (i / (LANES - 1)) * 0.80; }
 function target(){
-  return { x: goingRight ? 0.94 : 0.06, y: laneY(lane) };
+  /* y is 0 at the top of the picture, so going UP means heading for a
+     small y. Getting that the wrong way round would have drawn a
+     perfectly tidy sweep running exactly backwards. */
+  return { x: laneX(lane), y: goingUp ? 0.08 : 0.92 };
 }
 function advanceLane(){
-  goingRight = !goingRight;
+  goingUp = !goingUp;
   lane++;
   if (lane >= LANES){ lane = 0; goals++; }     /* a full sweep of the field */
 }
@@ -315,7 +322,7 @@ function render(){
         reverses ? 'w' : 'm') +
     row('lines run', (goals*LANES + lane), ' of ' + LANES + ' a sweep', 'm') +
     row('sweeps of the field finished', goals, '', 'm') +
-    row('running', goingRight ? 'left to right' : 'right to left', '', 'm') +
+    row('running', goingUp ? 'bottom to top' : 'top to bottom', '', 'm') +
     row('points on the line', path.length, '', 'm');
 
   document.getElementById('tC').innerHTML =
@@ -326,7 +333,10 @@ function render(){
     row('processors', navigator.hardwareConcurrency || '?', '', 'm');
 
   document.getElementById('note').innerHTML =
-    '<b>Nobody steers it.</b> Every step it weighs 24 directions, scores ' +
+    '<b>Nobody steers it, and the lines run up and down the pitch.</b> ' +
+    'It climbs from the bottom to the top, steps across, comes back ' +
+    'down, and repeats until the field is covered. Every step it ' +
+    'weighs 24 directions, scores ' +
     'each by how far it can run that way and how far off course it would ' +
     'go, and takes the best - decided again from scratch each step, with ' +
     'no map and nothing planned ahead. When it is boxed in it reverses ' +
