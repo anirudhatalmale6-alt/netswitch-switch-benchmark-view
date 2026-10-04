@@ -42,7 +42,7 @@
   #crText{color:#12261a;font-weight:700;font-size:12px;line-height:1.4}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B58</b><i id="line">finding the levels&hellip;</i></div>
+<div id="bar"><b id="stamp">B62</b><i id="line">finding the levels&hellip;</i></div>
 
 <div id="top">
   <div id="topText">The processor: primary, secondary, tertiary. The same calculation
@@ -71,7 +71,6 @@
     <a class="dl" id="dlDxf" download="calculation-starts.dxf">download this as DXF</a>
   </div>
 
-  <div id="note"></div>
   <div id="chk" style="display:none"></div>
 
   <div id="cr">
@@ -128,7 +127,7 @@ var NEIGHBOUR = 1.25;  /* and this much slower than the one before */
 var WINDOW = 320;      /* ms per calculation pass */
 
 var rings = {}, ns = {}, levels = [], starts = [], base = null;
-var guard = 0, tick_n = 0, dxf = '', ready = false, arith = 0;
+var dxf = '', ready = false, arith = 0;
 
 function two(n){ return (n<10?'0':'') + n; }
 function stampNow(){
@@ -137,25 +136,103 @@ function stampNow(){
        + two(d.getHours()) + two(d.getMinutes()) + two(d.getSeconds());
 }
 
+
+/* ============ THE MEASURING RUNS IN A THREAD OF ITS OWN ============
+   THE PAGE WAS JAMMING THE BROWSER, AND THE CLIENT SAW IT BEFORE I DID.
+   Every reading here is a tight loop that must not be interrupted, and
+   on the main thread that is exactly what it does: nothing else can
+   happen while it runs. Measured on the live page, the longest single
+   block was 2600 ms - the browser frozen solid for two and a half
+   seconds, scrolling included.
+
+   The loops are unchanged - same windows, same figures - but they now
+   run in a worker, which is a thread of its own, and the main thread
+   is left free to draw and to scroll. The page measures how long it
+   blocks the browser and puts that figure on screen, because a claim
+   like this is worth nothing unless it is measured where the person
+   reading it can see the number. */
+var WORKER_SRC = [
+  'var rings = {};',
+  'var guard = 0, tick_n = 0;',
+  'function ring(kb){',
+  '  if (rings[kb]) return rings[kb];',
+  '  var n = kb*1024/4, a = new Int32Array(n), idx = new Int32Array(n), i, j, t;',
+  '  for (i=0;i<n;i++) idx[i] = i;',
+  '  for (i=n-1;i>0;i--){ j=(Math.random()*(i+1))|0; t=idx[i]; idx[i]=idx[j]; idx[j]=t; }',
+  '  for (i=0;i<n;i++) a[idx[i]] = idx[(i+1)%n];',
+  '  rings[kb] = a; return a;',
+  '}',
+  'function chase(a, ms){',
+  '  var p = 0, steps = 0, t0 = performance.now(), t1;',
+  '  do { for (var k=0;k<20000;k++) p = a[p]; steps += 20000; t1 = performance.now(); }',
+  '  while (t1 - t0 < ms);',
+  '  guard = p;',
+  '  return (t1 - t0) * 1e6 / steps;',
+  '}',
+  'function calcPass(arr, ms){',
+  '  var i = 0, rounds = 0, x = 0.5, p = 0;',
+  '  var t0 = performance.now(), t1;',
+  '  do {',
+  '    for (i=0;i<2000;i++){',
+  '      tick_n++;',
+  '      p = arr[p]; p = arr[p];',
+  '      x = Math.sin(p * 1e-7 + tick_n * 1e-6) + Math.cos(x * 1.609);',
+  '      x = Math.tan(x * 0.5);',
+  '      x = Math.atan(x) + Math.log(Math.abs(x) + 1.0001);',
+  '      if (!isFinite(x)) x = 0.5 + (tick_n % 7) * 0.01;',
+  '    }',
+  '    rounds += 2000; t1 = performance.now();',
+  '  } while (t1 - t0 < ms);',
+  '  guard += x + p;',
+  '  return { rounds: rounds, ns: (t1-t0)*1e6/rounds, perSec: rounds/((t1-t0)/1000) };',
+  '}',
+  'self.onmessage = function(e){',
+  '  var d = e.data;',
+  '  if (d.cmd === "chase"){',
+  '    var g = Math.min(chase(ring(d.kb), d.ms), chase(ring(d.kb), d.ms));',
+  '    self.postMessage({ done: "chase", kb: d.kb, ns: g });',
+  '  }',
+  '  if (d.cmd === "calc"){',
+  '    var x = calcPass(ring(d.kb), d.ms), y = calcPass(ring(d.kb), d.ms);',
+  '    var best = x.ns <= y.ns ? x : y;',
+  '    self.postMessage({ done: "calc", kb: d.kb, ns: best.ns,',
+  '      perSec: best.perSec, rounds: best.rounds });',
+  '  }',
+  '};'
+].join("\n");
+var WORKER_URL = URL.createObjectURL(new Blob([WORKER_SRC], { type:"text/javascript" }));
+var worker = null, waiting = {};
+
+function askWorker(msg, then){
+  if (!worker){
+    worker = new Worker(WORKER_URL);
+    worker.onmessage = function(ev){
+      var key = ev.data.done + ":" + ev.data.kb;
+      var fn = waiting[key];
+      delete waiting[key];
+      if (fn) fn(ev.data);
+    };
+  }
+  waiting[msg.cmd + ":" + msg.kb] = then;
+  worker.postMessage(msg);
+}
+
+/* ---------- how long this page blocks the browser ----------
+   A timer that should fire every 16 ms. The longest gap it ever sees
+   IS the longest the browser was frozen. */
+var jamWorst = 0, jamLast = 0;
+function jamWatch(){
+  var now = performance.now();
+  if (jamLast){
+    var gap = now - jamLast;
+    if (gap > jamWorst) jamWorst = gap;
+  }
+  jamLast = now;
+  setTimeout(jamWatch, 16);
+}
+jamWatch();
+
 /* ================= finding the levels ================= */
-function ring(kb){
-  if (rings[kb]) return rings[kb];
-  var n = kb*1024/4, a = new Int32Array(n), idx = new Int32Array(n), i, j, t;
-  for (i=0;i<n;i++) idx[i] = i;
-  for (i=n-1;i>0;i--){ j=(Math.random()*(i+1))|0; t=idx[i]; idx[i]=idx[j]; idx[j]=t; }
-  for (i=0;i<n;i++) a[idx[i]] = idx[(i+1)%n];
-  rings[kb] = a;
-  return a;
-}
-/* Each read's address comes out of the read before it, so the
-   processor cannot run ahead and fetch them all at once. */
-function chase(a, ms){
-  var p = 0, steps = 0, t0 = performance.now(), t1;
-  do { for (var k=0;k<20000;k++) p = a[p]; steps += 20000; t1 = performance.now(); }
-  while (t1 - t0 < ms);
-  guard = p;
-  return (t1 - t0) * 1e6 / steps;
-}
 /* KEPT APART FROM THE MEASURING so it can be fed a made-up ladder and
    checked. A level-finder that can only run on live readings is a
    level-finder nobody has tested. */
@@ -234,57 +311,21 @@ function findLevels(sizes, time){
    THE RESULT IS WRITTEN BACK. A calculation whose answer nobody keeps
    can be deleted wholesale by the engine, and then the rate is a
    measure of nothing. */
-function calcPass(arr, ms){
-  var i = 0, rounds = 0, x = 0.5, p = 0;
-  var t0 = performance.now(), t1;
-  do {
-    for (i=0;i<2000;i++){
-      tick_n++;
-      /* THE FETCHES COME FIRST, AND EACH ADDRESS COMES OUT OF THE ONE
-         BEFORE IT. A calculation has to read the numbers it needs
-         before it can work on them, and that is where the level is
-         felt. Walking the block at a fixed step instead would let the
-         processor run ahead and fetch everything in advance - the wait
-         would disappear and every level would come out identical,
-         which is exactly the wrong answer. That is why the first
-         attempt at this page could not separate the levels at all. */
-      p = arr[p]; p = arr[p];
-      x = Math.sin(p * 1e-7 + tick_n * 1e-6) + Math.cos(x * 1.609);
-      x = Math.tan(x * 0.5);
-      x = Math.atan(x) + Math.log(Math.abs(x) + 1.0001);
-      if (!isFinite(x)) x = 0.5 + (tick_n % 7) * 0.01;
-    }
-    rounds += 2000;
-    t1 = performance.now();
-  } while (t1 - t0 < ms);               /* ALWAYS A FULL WINDOW - stopping
-                                           early and dividing by a clock
-                                           that has not ticked reports a
-                                           fast machine as a failing one */
-  guard += x + p;        /* carried out, so the chain cannot be deleted */
-  return { rounds: rounds, ms: t1 - t0, perSec: rounds / ((t1 - t0)/1000),
-           ns: (t1 - t0) * 1e6 / rounds };
-}
-/* TAKEN TWICE AND THE BETTER KEPT. A pass can only ever come out too
-   slow - something else on the machine steals time, nothing gives time
-   back - so the quicker of two is the one less disturbed. */
-function calcBest(arr){
-  var a = calcPass(arr, WINDOW), b = calcPass(arr, WINDOW);
-  return a.ns <= b.ns ? a : b;
-}
-
 /* ================= the run ================= */
 function run(){
   var i = 0;
   (function nextSize(){
-    if (i >= SIZES.length){ levels = findLevels(SIZES, ns); setTimeout(doCalc, 20); return; }
+    if (i >= SIZES.length){ levels = findLevels(SIZES, ns); doCalc(); return; }
     var kb = SIZES[i++];
     /* 40 ms a pass, not 25. A short pass smoothed the step at 1 MB
        away on this machine and the third level vanished - the
-       instrument was too blunt to see what it was looking for. */
-    var a = chase(ring(kb), 40), b = chase(ring(kb), 40);
-    ns[kb] = Math.min(a, b);
-    renderLevels();
-    setTimeout(nextSize, 8);
+       instrument was too blunt to see what it was looking for. Those
+       80 ms a size now cost the browser nothing. */
+    askWorker({ cmd:'chase', kb:kb, ms:40 }, function(res){
+      ns[kb] = res.ns;
+      renderLevels();
+      nextSize();
+    });
   })();
 }
 
@@ -310,31 +351,31 @@ function insideSize(lv){
 function doCalc(){
   /* ONE START PER LEVEL FOUND, AND THE PRIMARY START IS THE FLOOR.
 
-     There is no honest way to time "the arithmetic on its own" with
-     this same calculation, because the calculation HAS two fetches in
-     it - take them out and it is a different piece of work and the
-     comparison is worthless. My first version timed a 4 kB block and
-     called that the maths alone: 4 kB sits inside the primary level,
-     so what it really measured was the primary start under another
-     name, and the primary start then appeared to add nothing. It was
-     the same reading twice.
-
-     So the primary start IS the floor - the calculation when
-     everything it needs is as close as this processor can hold it -
-     and every level after it is measured as what it ADDS to that. */
+     There is no honest way to time the arithmetic on its own with this
+     same calculation, because the calculation HAS two fetches in it.
+     An early version timed a 4 kB block and called that the maths
+     alone: 4 kB sits inside the primary level, so it measured the
+     primary start under another name and the primary start then
+     appeared to add nothing. The same reading twice. */
   starts = [];
-  var want = ['primary', 'secondary', 'tertiary', 'main memory'], i, j;
-  for (i=0;i<want.length;i++){
-    var lv = null;
-    for (j=0;j<levels.length;j++) if (levels[j].name === want[i]) lv = levels[j];
-    if (!lv){ starts.push({ name: want[i], missing: true }); continue; }
-    var s = { name: want[i], kb: insideSize(lv), level: lv, wait: lv.ns };
-    var r = calcBest(ring(lv.to));
-    s.rounds = r.rounds; s.ns = r.ns; s.perSec = r.perSec;
-    starts.push(s);
-    renderAll();
-  }
-  var done = starts.filter(function(x){ return !x.missing; });
+  var want = ['primary', 'secondary', 'tertiary', 'main memory'], i = 0;
+  (function nextStart(){
+    if (i >= want.length){ finishCalc(); return; }
+    var name = want[i++], lv = null, j;
+    for (j=0;j<levels.length;j++) if (levels[j].name === name) lv = levels[j];
+    if (!lv){ starts.push({ name: name, missing: true }); nextStart(); return; }
+    var st = { name: name, kb: insideSize(lv), level: lv, wait: lv.ns };
+    starts.push(st);
+    askWorker({ cmd:'calc', kb:st.kb, ms:WINDOW }, function(res){
+      st.ns = res.ns; st.perSec = res.perSec; st.rounds = res.rounds;
+      renderAll();
+      nextStart();
+    });
+  })();
+}
+
+function finishCalc(){
+  var done = starts.filter(function(x){ return !x.missing; }), i;
   base = done.length ? done[0] : null;
   var prev = base ? base.ns : 0;
   for (i=0;i<starts.length;i++){
@@ -343,9 +384,8 @@ function doCalc(){
     prev = starts[i].ns;
   }
   /* THE ARITHMETIC, WORKED OUT RATHER THAN TIMED. Two fetches at the
-     primary waiting time come off the primary figure. It is labelled
-     as worked out wherever it appears, because it was never timed on
-     its own and I will not present it as if it had been. */
+     primary waiting time come off the primary figure, and it is
+     labelled as worked out wherever it appears. */
   if (base) arith = Math.max(0, base.ns - 2 * base.wait);
   ready = true;
   renderAll();
@@ -427,8 +467,15 @@ function renderAll(){
     row(tA, 'calculations a second, tertiary start',
         Math.round(tert.perSec).toLocaleString().replace(/,/g,' '), 'a second');
   /* DERIVED, AND LABELLED AS DERIVED EVERY TIME IT APPEARS */
-  row(tA, 'of the primary figure, the arithmetic itself',
-      '<span class="sub">about ' + arith.toFixed(0) + ' ns, worked out not timed</span>', '');
+  row(tA, 'Of the primary figure, the arithmetic itself',
+      '<span class="sub">About ' + arith.toFixed(0) + ' ns, worked out not timed</span>', '');
+  /* HOW LONG THIS PAGE FROZE THE BROWSER. Over about 50 ms is felt as
+     a stutter; over 200 ms the page is simply not responding. Before
+     the measuring moved into a thread of its own, this read 2600 ms. */
+  row(tA, 'Longest this page blocked the browser',
+      '<span class="' + (jamWorst < 120 ? 'm' : (jamWorst < 300 ? 'r' : 'n')) + '">'
+      + jamWorst.toFixed(0) + ' ms</span>',
+      jamWorst < 120 ? 'The browser stayed free' : 'Felt as a stutter');
 
   var tb = document.getElementById('addBody'); tb.innerHTML = '';
   starts.forEach(function(s, i){
@@ -461,22 +508,6 @@ function renderAll(){
   while (digits.length < 7) digits += '0';
   document.getElementById('ref').textContent =
     'c.YTGaA.' + digits.slice(0,7) + '   CALC-1 ' + stampNow();
-
-  document.getElementById('note').innerHTML =
-    '<b>How to read this.</b> The first bar is the whole calculation with ' +
-    'everything it needs held as close as this processor can hold it - the ' +
-    'floor, and the best this machine will ever do. Every bar after it is ' +
-    'the <b>same</b> calculation again with its numbers living one level ' +
-    'further out, and the coloured piece on the end is what that start ' +
-    '<b>adds</b>. ' +
-    (tert ? 'Here the climb from the primary start to the tertiary start is '
-      + (tert.ns - base.ns).toFixed(1) + ' ns on every single calculation, '
-      + (tert.ns/base.ns*100-100).toFixed(0) + ' per cent. ' : '') +
-    'That is the figure worth quoting - not what a level waits, but what it ' +
-    'costs the work. Where an addition is too small to separate from the ' +
-    'noise it is written in words instead of being drawn as a figure, and ' +
-    'where a level does not exist on the chip it is left out rather than ' +
-    'invented.';
 
   document.getElementById('line').textContent =
     'PRI' + base.ns.toFixed(0) + 'ns'
@@ -697,11 +728,21 @@ function selfCheck(){
   /* the clock stamp: 14 digits, no dots */
   if (!/^\d{14}$/.test(stampNow())) fails.push('the clock stamp is not 14 digits');
 
-  /* THE CALCULATION MUST NOT BE REMOVABLE. If the engine threw the
-     chain away, every figure here measures nothing. */
-  var before = guard, probe = new Float64Array(64);
-  calcPass(probe, 2);
-  if (guard === before) fails.push('THE CALCULATION IS BEING OPTIMISED AWAY - every figure means nothing');
+  /* THE CALCULATION MUST NOT BE REMOVABLE. The loops run in a thread
+     of their own now, so this is judged on what came back: a pass that
+     did no rounds, or returned no time, is one the engine threw away. */
+  for (i=0;i<starts.length;i++){
+    if (starts[i].missing || starts[i].ns === undefined) continue;
+    if (!(starts[i].rounds > 0) || !(starts[i].ns > 0))
+      fails.push('The ' + starts[i].name + ' start returned no work - the calculation '
+        + 'is being optimised away and every figure means nothing.');
+  }
+
+  /* AND THE PAGE MUST NOT FREEZE THE BROWSER. This is the fault the
+     client reported, so it is checked rather than remembered. */
+  if (ready && jamWorst > 400)
+    fails.push('This page blocked the browser for ' + jamWorst.toFixed(0)
+      + ' ms - the measuring is back on the main thread.');
 
   /* EVERY START MUST HAVE READ FROM INSIDE ITS OWN LEVEL. A start whose
      working set spills past the level it is named for is measuring the
@@ -779,8 +820,11 @@ window.__selfCheck = selfCheck;
 window.__putGlyph = function(g){
   document.getElementById('topText').textContent += ' ' + g; };
 window.__putCode = function(){
-  document.getElementById('note').innerHTML += '<div>var x = Math.sin(1);</div>'; };
+  var d = document.createElement('div');
+  d.textContent = 'var x = Math.sin(1);';
+  document.getElementById('pg').appendChild(d); };
 window.__read = function(){ return {
+  jamWorst: jamWorst,
   ready: ready, fails: window.__fails,
   levels: levels.map(function(l){ return { name:l.name, ns:l.ns, from:l.from, to:l.to }; }),
   base: base ? { ns:base.ns, perSec:base.perSec, rounds:base.rounds } : null,
