@@ -54,7 +54,7 @@
 
   <h2>What the calculation costs, and where the cost comes from</h2>
   <table id="tAns"></table>
-  <canvas id="gStack" height="150"></canvas>
+  <canvas id="gStack" height="140"></canvas>
 
   <h2>Each start, and what it adds</h2>
   <table id="tAdd"><thead><tr>
@@ -120,6 +120,7 @@
    page reports what it measured, in words and figures.
    ================================================================== */
 
+var COL = ['#4fd1ff','#7ee787','#ffc24f','#ff6b8a'];   /* one colour per level, everywhere */
 var SIZES = [4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048,
              4096, 8192, 16384, 32768, 65536];        /* kB */
 var STEP = 1.6;        /* this much slower than the level so far */
@@ -502,26 +503,50 @@ function drawStack(){
        way round; a negative bar would be drawing a level that made the
        calculation faster, which does not happen. */
     var add = Math.max(0, s.ns - prev);
-    parts.push({ name:'+ ' + s.name, ms:add, col:['#7ee787','#ffc24f','#ff6b8a'][i%3] });
+    /* the same colour as the row in the table and the bar in the chart
+       below - a part that changes colour between two pictures of the
+       same run reads as two different things */
+    parts.push({ name:'+ ' + s.name, ms:add, col:COL[i % COL.length] });
     prev = s.ns;
   });
   var total = parts.reduce(function(a,p){ return a + p.ms; }, 0);
   if (total <= 0) return;
-  var x = L, y = T, h = 34;
-  g.font = '10px monospace';
+
+  /* THE NAME GOES INSIDE ITS OWN SLICE, AND ONLY IF IT FITS. Written
+     above each slice instead, the four names ran into one another and
+     the picture was unreadable - four labels overlapping in the same
+     half inch. A slice too narrow to hold its name is left to the key
+     underneath, which always has room. */
+  var x = L, y = T, h = 40;
   parts.forEach(function(p){
     var ww = (p.ms/total) * (W-L-R);
     g.fillStyle = p.col; g.fillRect(x, y, Math.max(1, ww), h);
-    if (ww > 42){
-      g.fillStyle = '#05080c'; g.font = 'bold 10px monospace';
-      g.fillText(p.ms.toFixed(1) + ' ns', x + 4, y + h/2 + 4);
+    g.fillStyle = '#05080c';
+    if (ww > 118){
+      g.font = 'bold 11px monospace';
+      g.fillText(p.ms.toFixed(1) + ' ns', x + 6, y + 17);
+      g.font = '10px monospace';
+      g.fillText(p.name, x + 6, y + 31);
+    } else if (ww > 46){
+      g.font = 'bold 10px monospace';
+      g.fillText(p.ms.toFixed(1), x + 4, y + h/2 + 4);
     }
-    g.fillStyle = p.col; g.font = '9px monospace';
-    g.fillText(p.name, x, y - 7);
     x += ww;
   });
-  g.fillStyle = '#9fb6c9'; g.font = '10px monospace';
-  g.fillText('one calculation, end to end: ' + total.toFixed(1) + ' ns', L, H-8);
+
+  /* the key, on its own line where there is always room */
+  var kx = L, ky = y + h + 15;
+  g.font = '9px monospace';
+  parts.forEach(function(p){
+    var label = p.name + ' ' + p.ms.toFixed(1);
+    var wid = label.length * 5.4 + 14;
+    if (kx + wid > W - R){ kx = L; ky += 12; }
+    g.fillStyle = p.col; g.fillRect(kx, ky - 7, 7, 7);
+    g.fillStyle = '#9fb6c9'; g.fillText(label, kx + 11, ky);
+    kx += wid;
+  });
+  g.fillStyle = '#4a6076';
+  g.fillText('one calculation, end to end: ' + total.toFixed(1) + ' ns', L, ky + 14);
 }
 
 /* ---------- calculations a second at each start ---------- */
@@ -538,7 +563,7 @@ function drawRate(){
   all.forEach(function(s, i){
     var hgt = (s.perSec/hi) * (H-T-B);
     var x = L + i*bw + 6;
-    g.fillStyle = ['#4fd1ff','#7ee787','#ffc24f','#ff6b8a'][i%4];
+    g.fillStyle = COL[i % COL.length];
     g.fillRect(x, H-B-hgt, bw-12, hgt);
     g.fillStyle = '#9fb6c9';
     g.fillText(s.name, x, H-B+12);
@@ -737,6 +762,16 @@ function selfCheck(){
 }
 
 run();
+
+/* THE CHARTS ARE REDRAWN WHEN THE PAGE CHANGES SIZE. A canvas keeps
+   the pixel width it was given, so one drawn on a narrow screen and
+   then widened is simply stretched - the figures go blurry and the
+   labels drift off their slices. Turning a phone sideways did exactly
+   that. */
+window.addEventListener('resize', function(){
+  if (!base) return;
+  drawStack(); drawRate(); drawLadder();
+});
 
 /* ---- hooks, for checking from outside ---- */
 window.__findLevels = findLevels;
