@@ -41,7 +41,7 @@
   #crText{color:#12261a;font-weight:700;font-size:12px;line-height:1.4}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B61</b><i id="line">Starting the threads&hellip;</i></div>
+<div id="bar"><b id="stamp">B62</b><i id="line">Starting the threads&hellip;</i></div>
 
 <div id="top">
   <div id="topText">Thread Watchdog. Every thread answers or it is killed.
@@ -55,8 +55,8 @@
 
   <h2>Every Thread</h2>
   <table id="tThr"><thead><tr>
-    <th>thread</th><th>state</th><th>last answer</th><th>answers</th>
-    <th>killed</th><th>age</th>
+    <th>thread</th><th>state</th><th>last answer</th><th>its own normal</th>
+    <th>ratio</th><th>answers</th>
   </tr></thead><tbody id="thrBody"></tbody></table>
   <canvas id="g" height="170"></canvas>
 
@@ -68,7 +68,6 @@
     <a class="dl" id="dlDxf" download="thread-watchdog.dxf">Download DXF</a>
   </div>
 
-  <div id="note"></div>
   <div id="chk" style="display:none"></div>
 
   <div id="cr">
@@ -125,6 +124,18 @@ var INSTALL_BUDGET = 2000;  /* threads running within this */
    answered once, or until this grace period runs out, before the
    limit applies to it at all. */
 var START_GRACE = 2000;
+/* A THREAD IS JUDGED AGAINST ITS OWN NORMAL, NOT AGAINST A FIXED
+   FIGURE. Every thread settles at its own answer time on the machine
+   it is running on - a fast phone and a slow one are both normal for
+   themselves. So each thread keeps the last four seconds of its own
+   answers, takes the middle one as its normal, and a thread whose
+   answers climb away from that ratio is jamming. That is caught
+   BEFORE the hard 150 ms limit, which is the point: a thread on its
+   way to being stuck is worth knowing about while it can still be
+   dealt with. */
+var NORMAL_WINDOW = 4000;   /* four seconds of a thread's own answers */
+var JAM_RATIO = 3;          /* this far off its own normal and it is jamming */
+var JAM_IN_A_ROW = 2;       /* twice running, so one slow answer is not a verdict */
 var HANG_FIRST = 1200;      /* the first deliberate hang */
 var HANG_EVERY = 11000;     /* and one every so often after that */
 var TRACE = 90;             /* answers kept for the chart */
@@ -134,7 +145,7 @@ var RECYCLE_MS = 60000 / RESTARTS_PER_MIN;
 
 var threads = [], kills = [], nextId = 1, started = 0, installedAt = 0;
 var pings = 0, answers = 0, killed = 0, restarts = 0, lastRecycle = 0;
-var neverStarted = 0, recycles = 0;
+var neverStarted = 0, recycles = 0, jamsSeen = 0;
 /* A RATE NEEDS A WINDOW LONG ENOUGH TO HOLD ONE. The recycle cadence
    is one every nineteen seconds, so a reading taken four seconds in
    is a guess multiplied by fifteen - the page said 15,3 a minute
@@ -142,6 +153,16 @@ var neverStarted = 0, recycles = 0;
    rate is printed until the clock has run long enough to mean one. */
 var RATE_AFTER_MS = 40000;
 var memBefore = 0, memAfter = 0, mainMemNs = 0, dxf = '', ready = false;
+/* how long this page blocks the browser: a timer that should fire
+   every 16 ms, and the longest gap it ever sees */
+var jamWorst = 0, jamLast = 0;
+function jamWatch(){
+  var now = performance.now();
+  if (jamLast){ var gap = now - jamLast; if (gap > jamWorst) jamWorst = gap; }
+  jamLast = now;
+  setTimeout(jamWatch, 16);
+}
+jamWatch();
 var hangAt = 0, hungId = 0;
 
 function two(n){ return (n<10?'0':'') + n; }
@@ -151,33 +172,40 @@ function stampNow(){
        + two(d.getHours()) + two(d.getMinutes()) + two(d.getSeconds());
 }
 
-/* ---------- one read of main memory, measured here ----------
-   Used for one thing only: to put the asked-for nanosecond budget
-   next to something real from this machine. */
-function mainMemoryRead(){
-  var kb = 32768, n = kb*1024/4;
-  var a = new Int32Array(n), idx = new Int32Array(n), i, j, t;
-  for (i=0;i<n;i++) idx[i] = i;
-  for (i=n-1;i>0;i--){ j=(Math.random()*(i+1))|0; t=idx[i]; idx[i]=idx[j]; idx[j]=t; }
-  for (i=0;i<n;i++) a[idx[i]] = idx[(i+1)%n];
-  var p = 0, steps = 0, t0 = performance.now(), t1;
-  do { for (var k=0;k<20000;k++) p = a[p]; steps += 20000; t1 = performance.now(); }
-  while (t1 - t0 < 40);
-  window.__guard = p;
-  return (t1 - t0) * 1e6 / steps;
-}
-
+/* ---------- one read of main memory ----------
+   Used for one thing only: to put the asked-for nanosecond budget next
+   to something real from this machine. It is measured in a worker, not
+   here - forty milliseconds of tight loop on the main thread is forty
+   milliseconds of frozen browser, which is the very fault this page is
+   about. */
 /* ---------- the thread itself ----------
    Built from text in this page, so there is no second file to ship
    and nothing is fetched from anywhere. */
 var WORKER_SRC = [
-  'var guard = 0;',
+  'var guard = 0, load = 1, delay = 0;',
   'self.onmessage = function(e){',
   '  var d = e.data;',
   '  if (d.cmd === "hang"){ for(;;){ guard++; } }',
+  '  if (d.cmd === "load"){ load = d.times; return; }',
+  '  if (d.cmd === "delay"){ delay = d.ms; return; }',
+  '  if (d.cmd === "memread"){',
+  '    var kb = 32768, n = kb*1024/4;',
+  '    var a = new Int32Array(n), idx = new Int32Array(n), i, j, t;',
+  '    for (i=0;i<n;i++) idx[i] = i;',
+  '    for (i=n-1;i>0;i--){ j=(Math.random()*(i+1))|0; t=idx[i]; idx[i]=idx[j]; idx[j]=t; }',
+  '    for (i=0;i<n;i++) a[idx[i]] = idx[(i+1)%n];',
+  '    var p = 0, steps = 0, t0 = performance.now(), t1;',
+  '    do { for (var k=0;k<20000;k++) p = a[p]; steps += 20000; t1 = performance.now(); }',
+  '    while (t1 - t0 < 40);',
+  '    guard += p;',
+  '    self.postMessage({ memread: (t1 - t0) * 1e6 / steps });',
+  '    return;',
+  '  }',
   '  if (d.cmd === "ping"){',
-  '    var x = 0.5, i;',
-  '    for (i=0;i<2000;i++){ x = Math.sin(x + i*1e-6) + Math.cos(x*1.609); }',
+  '    var x = 0.5, i, n = 2000 * load;',
+  '    for (i=0;i<n;i++){ x = Math.sin(x + i*1e-6) + Math.cos(x*1.609); }',
+  '    if (delay){ var t0 = performance.now();',
+  '      while (performance.now() - t0 < delay){ x += 0.000001; } }',
   '    guard += x;',
   '    self.postMessage({ pong: d.seq, at: d.at });',
   '  }',
@@ -190,7 +218,8 @@ function startThread(reason){
     id: nextId++, w: new Worker(WORKER_URL), born: performance.now(),
     sent: 0, got: 0, outstanding: 0, outstandingAt: 0, last: 0,
     trace: [], state: 'starting', reason: reason || 'first start', hung: false,
-    graceUntil: performance.now() + START_GRACE
+    graceUntil: performance.now() + START_GRACE,
+    window: [], normal: 0, ratio: 0, overs: 0, jamming: false, jamsSeen: 0
   };
   t.w.onmessage = function(ev){
     var now = performance.now();
@@ -200,6 +229,35 @@ function startThread(reason){
     t.state = 'answering';
     t.trace.push(t.last);
     if (t.trace.length > TRACE) t.trace.shift();
+
+    /* ITS OWN NORMAL - AND THE NORMAL MUST NOT FOLLOW THE FAULT.
+
+       The first version took the middle of the last four seconds of
+       answers. A thread that slowed down kept answering, those slow
+       answers filled the window, the middle moved up to meet them,
+       and within three seconds the thread looked perfectly normal
+       again at its new bad speed. A test written that way can never
+       catch a slowdown - only an instant one, which the hard limit
+       already catches. So the normal is learned while the thread is
+       behaving and then held: a reading far off the normal is
+       reported, never folded into it. */
+    if (!t.normal){
+      t.window.push(t.last);
+      if (t.window.length >= 10){
+        var sorted = t.window.slice().sort(function(a,b){ return a-b; });
+        t.normal = sorted[(sorted.length/2)|0];
+      }
+    } else {
+      t.ratio = t.last / t.normal;
+      if (t.ratio > JAM_RATIO){
+        t.overs++;
+        if (t.overs >= JAM_IN_A_ROW && !t.jamming){ t.jamming = true; t.jamsSeen++; jamsSeen++; }
+      } else {
+        t.overs = 0; t.jamming = false;
+        /* drifts with the machine, slowly, and only on good readings */
+        t.normal = t.normal * 0.98 + t.last * 0.02;
+      }
+    }
     if (!installedAt && everyThreadAnswered()) installedAt = now - started;
   };
   threads.push(t);
@@ -312,6 +370,13 @@ function render(){
       !memAfter ? 'Only some browsers report it'
         : (memCost > 65536 ? 'At install' : 'The browser figure is too coarse'));
   row(tA, 'Answers in', answers + ' of ' + pings, 'Pings sent');
+  row(tA, 'Threads seen jamming',
+      jamsSeen ? '<span class="r">' + jamsSeen + '</span>'
+               : '<span class="m">None</span>',
+      'Drifted ' + JAM_RATIO + ' times off their own normal, caught before the limit');
+  row(tA, 'Longest this page blocked the browser',
+      '<span class="' + (jamWorst < 120 ? 'm' : 'n') + '">' + jamWorst.toFixed(0)
+      + ' ms</span>', jamWorst < 120 ? 'The browser stayed free' : 'Felt as a stutter');
   row(tA, 'Killed while still starting',
       neverStarted ? '<span class="n">' + neverStarted + '</span>'
                    : '<span class="m">None</span>',
@@ -322,14 +387,17 @@ function render(){
     var t = threads[i];
     var tr = document.createElement('tr');
     var st = t.hung ? '<span class="n">Hung on purpose</span>'
-           : (t.got ? '<span class="m">Answering</span>'
-                    : '<span class="r">Starting</span>');
+           : (t.jamming ? '<span class="r">Jamming</span>'
+             : (t.got ? '<span class="m">Answering</span>'
+                      : '<span class="r">Starting</span>'));
     tr.innerHTML = '<td class="k">Thread ' + t.id + '</td>'
       + '<td class="u" style="text-align:left">' + st + '</td>'
       + '<td class="v">' + (t.got ? t.last.toFixed(1) + ' ms' : '-') + '</td>'
-      + '<td class="u">' + t.got + '</td>'
-      + '<td class="u">' + (t.reason === 'first start' ? '-' : 'Replaced') + '</td>'
-      + '<td class="u">' + ((now - t.born)/1000).toFixed(1) + ' s</td>';
+      + '<td class="u">' + (t.normal ? t.normal.toFixed(1) + ' ms'
+          : '<span class="sub">Settling</span>') + '</td>'
+      + '<td class="' + (t.ratio > JAM_RATIO ? 'n' : 'u') + '">'
+      + (t.ratio ? t.ratio.toFixed(2) + '&times;' : '-') + '</td>'
+      + '<td class="u">' + t.got + '</td>';
     tb.appendChild(tr);
   }
 
@@ -375,6 +443,8 @@ function renderCan(){
       'The limit this page runs on.');
   row(t, 'Tell Starting Apart From Stuck', '<span class="m">YES</span>',
       'A thread is policed only once it has answered.');
+  row(t, 'Catch A Thread Drifting Before It Sticks', '<span class="m">YES</span>',
+      'Each thread is judged against its own normal over four seconds.');
   row(t, 'Measure What The Threads Cost At Install',
       memAfter ? '<span class="m">YES</span>' : '<span class="r">SOME BROWSERS</span>',
       'Only some browsers report memory.');
@@ -506,6 +576,12 @@ function selfCheck(){
 
   if (ready && answers < 1) fails.push('No thread has answered at all.');
 
+  /* THE PAGE MUST NOT FREEZE THE BROWSER. The one read of main memory
+     it takes at the start is the only heavy thing on this page, and it
+     must stay small enough not to be felt. */
+  if (ready && jamWorst > 400)
+    fails.push('This page blocked the browser for ' + jamWorst.toFixed(0) + ' ms.');
+
   /* A HEALTHY THREAD MUST NEVER BE KILLED FOR STILL STARTING. If this
      fires, the watchdog is eating its own pool. */
   if (neverStarted)
@@ -538,33 +614,33 @@ function selfCheck(){
 /* ================= the run ================= */
 function begin(){
   try { memBefore = performance.memory ? performance.memory.usedJSHeapSize : 0; } catch(e){}
-  mainMemNs = mainMemoryRead();
   started = performance.now();
   lastRecycle = started;
   hangAt = HANG_FIRST;
   for (var i=0;i<POOL;i++) startThread('first start');
+  /* THE MEMORY READING GETS A WORKER OF ITS OWN, NOT ONE OF THE POOL.
+     Handing it to a policed thread was a mistake with an obvious shape
+     in hindsight: building the block takes a second or two, during
+     which that thread cannot answer the watchdog - so the watchdog
+     killed it for being stuck, correctly, and the reading never came
+     back. A long job does not belong on a thread that is being
+     watched for not answering. This one is outside the pool, is not
+     policed, and is thrown away when it is done. */
+  var reader = new Worker(WORKER_URL);
+  reader.onmessage = function(ev){
+    if (ev.data.memread !== undefined){
+      mainMemNs = ev.data.memread;
+      renderCan();
+      reader.terminate();
+    }
+  };
+  reader.postMessage({ cmd:'memread' });
   setTimeout(function(){
     try { memAfter = performance.memory ? performance.memory.usedJSHeapSize : 0; } catch(e){}
     renderCan();
   }, 400);
   renderCan();
   tick();
-
-  document.getElementById('note').innerHTML =
-    '<b>What this is.</b> Every thread is asked a question over and over. ' +
-    'A thread that has not answered within ' + KILL_MS + ' milliseconds is ' +
-    'killed and replaced in the same instant. The chart shows how long each ' +
-    'one is taking to answer, against the line it must stay under.<br><br>' +
-    '<b>Why one thread is hung on purpose.</b> A watchdog that has never ' +
-    'fired looks exactly like a watchdog that does not work. So this page ' +
-    'hangs one of its own threads shortly after it opens, and again every ' +
-    'few seconds, and shows you the kill with the time it took to catch it. ' +
-    'The page refuses to report a clean result until it has actually killed ' +
-    'something, which is the only honest way to sell a thing like this.<br><br>' +
-    '<b>About the nanoseconds.</b> Threads are scheduled in milliseconds, ' +
-    'everywhere, on every machine. The table above puts a 17 ns budget next ' +
-    'to one read of main memory measured on this device, so the scale is a ' +
-    'measured fact and not an opinion.';
 
   /* the page has had time to prove itself before it judges itself */
   setTimeout(function(){ ready = true; selfCheck(); }, HANG_FIRST + KILL_MS * 6);
@@ -576,6 +652,15 @@ begin();
 window.__selfCheck = selfCheck;
 window.__putGlyph = function(g){
   document.getElementById('topText').textContent += ' ' + g; };
+/* A THREAD THAT SLOWS WITHOUT STOPPING. It keeps answering, so the
+   hard limit never fires - only the ratio test can catch it, which is
+   exactly the case the ratio test exists for. */
+window.__slowOne = function(ms){
+  if (!threads.length) return 0;
+  var t = threads[threads.length-1];
+  try { t.w.postMessage({ cmd:'delay', ms: ms || 40 }); } catch(e){}
+  return t.id;
+};
 window.__hangOne = function(){
   if (!threads.length) return 0;
   var t = threads[0]; t.hung = true;
@@ -590,6 +675,8 @@ window.__read = function(){ return {
   installedAt: installedAt, installBudget: INSTALL_BUDGET,
   mainMemNs: mainMemNs,
   memCost: memAfter ? memAfter - memBefore : 0,
+  jamsSeen: jamsSeen, jamWorst: jamWorst,
+  ratios: threads.map(function(t){ return { id:t.id, normal:t.normal, ratio:t.ratio, jamming:t.jamming }; }),
   neverStarted: neverStarted, startGrace: START_GRACE,
   kills: kills.map(function(k){ return { id:k.id, waited:k.waited, why:k.why,
     hung:k.hung, stamp:k.stamp }; }),
