@@ -380,7 +380,7 @@ body{padding-top:0}
 </div>
 <div class="container">
   <div class="header">
-    <button class="ghost" id="themeBtn" onclick="toggleTheme()" style="position:absolute;right:14px;top:14px;padding:7px 14px">☀ LIGHT</button>
+    <button class="ghost" id="themeBtn" onclick="toggleTheme()" style="position:absolute;right:14px;top:14px;padding:7px 14px">LIGHT</button>
     <h1>6GGW</h1>
     <div class="tagline">5G GATEWAY ROUTER</div>
     <div class="sub">SWITCH · PERFORMANCE MONITOR · 6G GATEWAY · CPU·GPU · AREA MAP · TEST LOG TOOL</div>
@@ -1615,14 +1615,14 @@ function ctResetFinish(cancelled){
 /* ---- Consumer theme toggle (B): dark <-> light (white), same data ---- */
 function toggleTheme(){
   var light=document.body.classList.toggle('light');
-  var b=document.getElementById('themeBtn'); if(b) b.textContent=light?'☀ LIGHT':'☾ DARK';
+  var b=document.getElementById('themeBtn'); if(b) b.textContent=light?'LIGHT':'DARK';
   try{localStorage.setItem('ggw-theme',light?'light':'dark');}catch(e){}
 }
 function initTheme(){ // white background is the default; remember the user's last choice
   var t; try{t=localStorage.getItem('ggw-theme');}catch(e){}
   var light=(t!=='dark'); // default to light/white when unset
   document.body.classList.toggle('light',light);
-  var b=document.getElementById('themeBtn'); if(b) b.textContent=light?'☀ LIGHT':'☾ DARK';
+  var b=document.getElementById('themeBtn'); if(b) b.textContent=light?'LIGHT':'DARK';
 }
 
 /* ---- FAIR view (A): white, large font, latest router + throughput + ratio vs previous ---- */
@@ -1702,7 +1702,7 @@ function batRun(){
     series.push(mW); now=mW;
   }
   function show(bat){
-    var lvl=bat?Math.round(bat.level*100)+' %':'n/a', chg=bat?(bat.charging?'yes ⚡':'no'):'n/a';
+    var lvl=bat?Math.round(bat.level*100)+' %':'n/a', chg=bat?(bat.charging?'yes':'no'):'n/a';
     document.getElementById('batLvl').textContent=lvl;
     document.getElementById('batChg').textContent=chg;
     document.getElementById('batNow').innerHTML=Math.round(now)+' <small>mW</small>';
@@ -1828,7 +1828,7 @@ function runBench(){
     document.getElementById('bDram').textContent = dram.gbs>0? dram.gbs.toFixed(1)+' GB/s':'n/a';
     document.getElementById('bCpu').textContent = cpu.multiMops>0? cpu.multiMops.toFixed(0)+' MOPS':'n/a';
     document.getElementById('bScrn').textContent = hz.toFixed(0)+' Hz';
-    document.getElementById('bBatt').textContent = bat? bat.level+'%'+(bat.charging?' ⚡':''):'n/a';
+    document.getElementById('bBatt').textContent = bat? bat.level+'%'+(bat.charging?' CHG':''):'n/a';
     document.getElementById('bLoad').textContent = dl? (dl.mbps>=1? dl.mbps.toFixed(1)+' Mbps':Math.round(dl.kbps)+' kbps') : (navigator.onLine?'—':'offline');
     if(dl&&dl.kbps>0) kbTodayRecord(dl.kbps); else kbTodayShow();
     /* plain measured readout — the raw numbers this device produced, no scoring / comparison bars. */
@@ -2027,7 +2027,7 @@ function rsRoutes(){ var out=[];
   return out;
 }
 function rsRerouteOne(name){ var pri=120+(rsHash(name)%120), alt=pri-(5+(rsHash(name+'a')%40));
-  rsLog('reroute '+name+' — PRI '+pri+' → ALT '+alt+' ms  ✓ (AI best path)'); }
+  rsLog('reroute '+name+' — PRI '+pri+' → ALT '+alt+' ms  (AI best path)'); }
 function rsStart(){
   if(rs.running) return;
   rs.list=rsRoutes(); rs.idx=0; rs.left=rs.total; rs.running=true;
