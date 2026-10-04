@@ -51,7 +51,7 @@
   #crText{color:#12261a;font-weight:700;font-size:12px;line-height:1.4}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B60</b><i id="line">measuring this device&hellip;</i></div>
+<div id="bar"><b id="stamp">B62</b><i id="line">measuring this device&hellip;</i></div>
 
 <div id="top">
   <div id="topText">AI Cloud Report. Type keywords, the report writes itself from
@@ -84,7 +84,6 @@
   <h2>What Went Into The Report</h2>
   <table id="tSrc"></table>
 
-  <div id="note"></div>
   <div id="chk" style="display:none"></div>
 
   <div id="cr">
@@ -173,22 +172,95 @@ function stampNow(){
 function kbText(kb){ return kb >= 1024 ? (kb/1024) + ' MB' : kb + ' kB'; }
 function num(n){ return Math.round(n).toLocaleString().replace(/,/g,' '); }
 
-/* ================= the instruments ================= */
-function ring(kb){
-  if (rings[kb]) return rings[kb];
-  var n = kb*1024/4, a = new Int32Array(n), idx = new Int32Array(n), i, j, t;
-  for (i=0;i<n;i++) idx[i] = i;
-  for (i=n-1;i>0;i--){ j=(Math.random()*(i+1))|0; t=idx[i]; idx[i]=idx[j]; idx[j]=t; }
-  for (i=0;i<n;i++) a[idx[i]] = idx[(i+1)%n];
-  rings[kb] = a; return a;
+/* ============ THE MEASURING RUNS IN A THREAD OF ITS OWN ============
+   THE PAGE WAS JAMMING THE BROWSER AND THE CLIENT SAW IT FIRST.
+   Measured on the live page, this one blocked the browser for 1558 ms
+   and was blocked on 54 of 55 looks - frozen for almost the whole time
+   it was writing a report. The loops are unchanged; they run in a
+   worker now, and the main thread is left free to draw and to scroll.
+   How long the page blocks the browser is reported on the page, since
+   a claim like that is worth nothing unmeasured. */
+var WORKER_SRC = [
+  'var rings = {};',
+  'var guard = 0, tick_n = 0;',
+  'function ring(kb){',
+  '  if (rings[kb]) return rings[kb];',
+  '  var n = kb*1024/4, a = new Int32Array(n), idx = new Int32Array(n), i, j, t;',
+  '  for (i=0;i<n;i++) idx[i] = i;',
+  '  for (i=n-1;i>0;i--){ j=(Math.random()*(i+1))|0; t=idx[i]; idx[i]=idx[j]; idx[j]=t; }',
+  '  for (i=0;i<n;i++) a[idx[i]] = idx[(i+1)%n];',
+  '  rings[kb] = a; return a;',
+  '}',
+  'function chase(a, ms){',
+  '  var p = 0, steps = 0, t0 = performance.now(), t1;',
+  '  do { for (var k=0;k<20000;k++) p = a[p]; steps += 20000; t1 = performance.now(); }',
+  '  while (t1 - t0 < ms);',
+  '  guard = p;',
+  '  return (t1 - t0) * 1e6 / steps;',
+  '}',
+  'function calcPass(arr, ms){',
+  '  var i = 0, rounds = 0, x = 0.5, p = 0;',
+  '  var t0 = performance.now(), t1;',
+  '  do {',
+  '    for (i=0;i<2000;i++){',
+  '      tick_n++;',
+  '      p = arr[p]; p = arr[p];',
+  '      x = Math.sin(p * 1e-7 + tick_n * 1e-6) + Math.cos(x * 1.609);',
+  '      x = Math.tan(x * 0.5);',
+  '      x = Math.atan(x) + Math.log(Math.abs(x) + 1.0001);',
+  '      if (!isFinite(x)) x = 0.5 + (tick_n % 7) * 0.01;',
+  '    }',
+  '    rounds += 2000; t1 = performance.now();',
+  '  } while (t1 - t0 < ms);',
+  '  guard += x + p;',
+  '  return { rounds: rounds, ns: (t1-t0)*1e6/rounds, perSec: rounds/((t1-t0)/1000) };',
+  '}',
+  'self.onmessage = function(e){',
+  '  var d = e.data, i;',
+  '  if (d.cmd === "chase"){',
+  '    var g = Math.min(chase(ring(d.kb), d.ms), chase(ring(d.kb), d.ms));',
+  '    self.postMessage({ done: "chase", kb: d.kb, ns: g });',
+  '  }',
+  '  if (d.cmd === "calc"){',
+  '    var x = calcPass(ring(d.kb), d.ms), y = calcPass(ring(d.kb), d.ms);',
+  '    var best = x.ns <= y.ns ? x : y;',
+  '    self.postMessage({ done: "calc", kb: d.kb, ns: best.ns,',
+  '      perSec: best.perSec, rounds: best.rounds });',
+  '  }',
+  '  if (d.cmd === "sweep"){',
+  '    var out = [];',
+  '    for (i=0;i<d.sizes.length;i++)',
+  '      out.push({ kb: d.sizes[i], ns: chase(ring(d.sizes[i]), d.ms) });',
+  '    self.postMessage({ done: "sweep", kb: 0, readings: out });',
+  '  }',
+  '};'
+].join("\n");
+var WORKER_URL = URL.createObjectURL(new Blob([WORKER_SRC], { type:"text/javascript" }));
+var worker = null, waiting = {};
+function askWorker(msg, then){
+  if (!worker){
+    worker = new Worker(WORKER_URL);
+    worker.onmessage = function(ev){
+      var key = ev.data.done + ":" + ev.data.kb;
+      var fn = waiting[key]; delete waiting[key];
+      if (fn) fn(ev.data);
+    };
+  }
+  waiting[msg.cmd + ":" + (msg.kb === undefined ? 0 : msg.kb)] = then;
+  worker.postMessage(msg);
 }
-function chase(a, ms){
-  var p = 0, steps = 0, t0 = performance.now(), t1;
-  do { for (var k=0;k<20000;k++) p = a[p]; steps += 20000; t1 = performance.now(); }
-  while (t1 - t0 < ms);
-  guard = p;
-  return (t1 - t0) * 1e6 / steps;
+
+var jamWorst = 0, jamLast = 0;
+function jamWatch(){
+  var now = performance.now();
+  if (jamLast){ var gap = now - jamLast; if (gap > jamWorst) jamWorst = gap; }
+  jamLast = now;
+  setTimeout(jamWatch, 16);
 }
+jamWatch();
+
+/* These two are pure - no measuring in them - so they stay on the
+   main thread where the rest of the page can reach them. */
 function findLevels(sizes, time){
   var NAMES = ['primary', 'secondary', 'tertiary'];
   var out = [], cur = null, prev = 0, i;
@@ -227,29 +299,6 @@ function findLevels(sizes, time){
                 : (NAMES[i] || ('level ' + (i+1)));
   }
   return out;
-}
-/* the addresses chain, so nothing can be fetched in advance and the
-   level is actually felt */
-function calcPass(arr, ms){
-  var i = 0, rounds = 0, x = 0.5, p = 0;
-  var t0 = performance.now(), t1;
-  do {
-    for (i=0;i<2000;i++){
-      tick_n++;
-      p = arr[p]; p = arr[p];
-      x = Math.sin(p * 1e-7 + tick_n * 1e-6) + Math.cos(x * 1.609);
-      x = Math.tan(x * 0.5);
-      x = Math.atan(x) + Math.log(Math.abs(x) + 1.0001);
-      if (!isFinite(x)) x = 0.5 + (tick_n % 7) * 0.01;
-    }
-    rounds += 2000; t1 = performance.now();
-  } while (t1 - t0 < ms);
-  guard += x + p;
-  return { rounds:rounds, ns:(t1-t0)*1e6/rounds, perSec:rounds/((t1-t0)/1000) };
-}
-function calcBest(a){
-  var x = calcPass(a, CALC_MS), y = calcPass(a, CALC_MS);
-  return x.ns <= y.ns ? x : y;
 }
 function insideSize(lv){
   var best = lv.from, i;
@@ -636,23 +685,20 @@ function buildPDF(title, lines){
 }
 
 
-/* one sweep of the whole ladder, stamped - the stability record */
-function sweepOnce(){
-  var out = [], i;
+/* One sweep of the whole ladder, stamped - the stability record. It
+   runs in the worker, so filling thirty pages with readings no longer
+   freezes the browser for the fifteen seconds it takes. */
+function sweepOnce(done){
   var st = stampNow();
-  for (i=0;i<SIZES.length;i++){
-    var kb = SIZES[i];
-    out.push({ stamp: st, what: 'A read at ' + kbText(kb),
-               ns: chase(ring(kb), SAMPLE_MS) });
-  }
-  return out;
+  askWorker({ cmd:'sweep', sizes:SIZES, ms:SAMPLE_MS }, function(res){
+    var out = [], i;
+    for (i=0;i<res.readings.length;i++)
+      out.push({ stamp: st, what: 'A read at ' + kbText(res.readings[i].kb),
+                 ns: res.readings[i].ns });
+    done(out);
+  });
 }
 
-/* Keep sweeping until the report would make the wanted number of
-   pages, or until the time cap - whichever comes first. The cap is
-   there so a slow device does not measure for ever; when it bites,
-   the page says how many pages it actually reached rather than
-   claiming the target. */
 function fillToPages(done){
   sampling = true;
   var t0 = performance.now();
@@ -666,8 +712,7 @@ function fillToPages(done){
     document.getElementById('line').textContent =
       'MEASURING ' + pages + '/' + PAGES_WANTED + ' PAGES  '
       + samples.length + ' READINGS  ' + (spent/1000).toFixed(0) + 's';
-    samples = samples.concat(sweepOnce());
-    setTimeout(step, 0);
+    sweepOnce(function(batch){ samples = samples.concat(batch); step(); });
   })();
 }
 
@@ -741,6 +786,7 @@ function update(){
     w.push('Report too long for any mail link. Gmail opens with the short form. Attach the PDF.');
   else if (mPick.trimmed)
     w.push('Gmail carries the whole report. The mail app link carries the short form.');
+  w.push('Longest block of the browser: ' + jamWorst.toFixed(0) + ' ms.');
   w.push('PDF: ' + pdfPages + ' pages'
     + (sampleMs ? ', ' + (sampleMs/1000).toFixed(0) + 's of readings' : '')
     + (pdfPages < PAGES_WANTED ? '. Short of ' + PAGES_WANTED + '.' : '.'));
@@ -792,6 +838,8 @@ function renderCan(){
       'It needs one to introduce the two ends.');
   row(t, 'Reports Every Day, Unattended', '<span class="r">SERVER VERSION AVAILABLE</span>',
       'Or a browser plug-in, which can wake itself.');
+  row(t, 'Write A Report Without Freezing The Browser', '<span class="m">YES</span>',
+      'The measuring runs in a thread of its own.');
 }
 
 /* ================= the check ================= */
@@ -888,6 +936,12 @@ function selfCheck(){
   /* the report must not be empty, and must carry the mark of where it
      came from */
   if (reportText.length < 80) fails.push('The report is empty.');
+
+  /* THE PAGE MUST NOT FREEZE THE BROWSER WHILE IT WRITES. This is the
+     fault the client reported, so it is checked, not remembered. */
+  if (ready && !sampling && jamWorst > 400)
+    fails.push('This page blocked the browser for ' + jamWorst.toFixed(0)
+      + ' ms - the measuring is back on the main thread.');
   if (reportText.indexOf('AI2Orbit') < 0) fails.push('The report is not marked AI2Orbit.');
   if (reportText.indexOf('measured on the device') < 0)
     fails.push('The report does not say where its figures came from.');
@@ -925,25 +979,32 @@ function selfCheck(){
 function measure(){
   var i = 0;
   (function nextSize(){
-    if (i >= SIZES.length){ levels = findLevels(SIZES, ns); setTimeout(doCalc, 10); return; }
+    if (i >= SIZES.length){ levels = findLevels(SIZES, ns); doCalc(); return; }
     var kb = SIZES[i++];
-    ns[kb] = Math.min(chase(ring(kb), LADDER_MS), chase(ring(kb), LADDER_MS));
-    setTimeout(nextSize, 4);
+    askWorker({ cmd:'chase', kb:kb, ms:LADDER_MS }, function(res){
+      ns[kb] = res.ns; nextSize();
+    });
   })();
 }
 function doCalc(){
   starts = [];
-  var want = ['primary','secondary','tertiary','main memory'], i, j;
-  for (i=0;i<want.length;i++){
-    var lv = null;
-    for (j=0;j<levels.length;j++) if (levels[j].name === want[i]) lv = levels[j];
-    if (!lv){ starts.push({ name:want[i], missing:true }); continue; }
-    var s = { name:want[i], kb:insideSize(lv), level:lv, wait:lv.ns };
-    var r = calcBest(ring(s.kb));
-    s.ns = r.ns; s.perSec = r.perSec; s.rounds = r.rounds;
-    starts.push(s);
-  }
-  var done = starts.filter(function(x){ return !x.missing; });
+  var want = ['primary','secondary','tertiary','main memory'], i = 0;
+  (function nextStart(){
+    if (i >= want.length){ finishCalc(); return; }
+    var name = want[i++], lv = null, j;
+    for (j=0;j<levels.length;j++) if (levels[j].name === name) lv = levels[j];
+    if (!lv){ starts.push({ name:name, missing:true }); nextStart(); return; }
+    var st = { name:name, kb:insideSize(lv), level:lv, wait:lv.ns };
+    starts.push(st);
+    askWorker({ cmd:'calc', kb:st.kb, ms:CALC_MS }, function(res){
+      st.ns = res.ns; st.perSec = res.perSec; st.rounds = res.rounds;
+      nextStart();
+    });
+  })();
+}
+
+function finishCalc(){
+  var done = starts.filter(function(x){ return !x.missing; }), i;
   base = done.length ? done[0] : null;
   var prev = base ? base.ns : 0;
   for (i=0;i<starts.length;i++){
@@ -955,26 +1016,7 @@ function doCalc(){
   renderCan();
   picked = SECTIONS.map(function(x){ return x.id; });
   update();
-  /* now fill the report out to the wanted number of pages with real
-     readings, and render again when it is there */
   fillToPages(function(){ update(); });
-  document.getElementById('note').innerHTML =
-    '<b>What this is.</b> One file. Open it, type the words you want first in ' +
-    'the report, and it writes itself out of what the device measures - then ' +
-    'goes to Gmail, or to whatever mail application is set up, already ' +
-    'addressed and filled in, with the PDF to attach. No server behind it and ' +
-    'nothing to install, so a webmaster drops the one file onto a site and it ' +
-    'works from there.<br><br>' +
-    '<b>About the thirty pages.</b> They are filled with readings taken while ' +
-    'the report is written, not with padding. That is why it takes a few ' +
-    'seconds: thirty pages of real measurement costs real measuring time. ' +
-    'Blank space and repeated headings would have reached thirty pages ' +
-    'instantly and been worth nothing to whoever opened the file. Where the ' +
-    'device is too slow to reach the target inside the time allowed, the page ' +
-    'says how many pages it did reach rather than claiming the number.<br><br>' +
-    '<b>Every keyword is in every report.</b> The keywords move a subject to ' +
-    'the front; nothing is dropped, so a reader can always tell an empty ' +
-    'subject from one that was not asked for.';
 }
 
 document.getElementById('kwIn').addEventListener('input', update);
@@ -995,6 +1037,7 @@ window.__setKeywords = function(v){
   document.getElementById('kwIn').value = v; update(); };
 window.__read = function(){ return {
   ready: ready, sampling: sampling, done: ready && !sampling,
+  jamWorst: jamWorst,
   pdfPages: pdfPages, samples: samples.length, sampleMs: sampleMs,
   fails: window.__fails,
   sections: picked, report: reportText, trimmed: trimmed,
