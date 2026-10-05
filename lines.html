@@ -31,6 +31,13 @@
   #map{display:block;width:100%;height:62vh;background:#070d15;
     border:1px solid #16293a;border-radius:4px;touch-action:none;cursor:grab}
   #map.drag{cursor:grabbing}
+  /* THE CHART HAD NO WIDTH RULE AND SO DREW ITSELF AT THE CANVAS
+     DEFAULT - three hundred pixels in the corner of a wide page, with
+     the labels running off it. A canvas does not fill its parent on
+     its own, and the page it was copied from had the rule and this
+     one did not. */
+  #gTan{display:block;width:100%;background:#070d15;border:1px solid #16293a;
+    border-radius:4px;margin-top:6px}
   #hud{position:absolute;left:8px;top:8px;background:rgba(5,8,12,.8);
     border:1px solid #16293a;border-radius:3px;padding:5px 8px;font-size:10px;
     color:#9fb6c9;pointer-events:none}
