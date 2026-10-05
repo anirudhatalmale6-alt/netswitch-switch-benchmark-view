@@ -57,7 +57,7 @@
   #crText{color:#12261a;font-weight:700;font-size:12px;line-height:1.4}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B67</b><i id="line">Loading what is in view&hellip;</i></div>
+<div id="bar"><b id="stamp">B68</b><i id="line">Loading what is in view&hellip;</i></div>
 
 <div id="top">
   <div id="topText">Lines And Switches. Drag to pan anywhere. Lines, switches and
@@ -203,6 +203,49 @@ function hash(a, b){
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 var ROLE = ['Core', 'Edge', 'Access'];
+/* ============ THE NETWORK SETTINGS OF A LOCATION ============
+   "Lets allow on map nat dhcp ip mask gateway gw on any location."
+
+   Every switch carries an IP address, a subnet mask, a gateway, a DHCP
+   pool and whether it is behind NAT - worked out from the square's own
+   number, the same way everything else on this map is, so a place is
+   always the same place when you come back to it.
+
+   THESE ARE EXAMPLE SETTINGS, AND EVERY ADDRESS IS A PRIVATE ONE.
+   10.x, 172.16-31.x and 192.168.x are the ranges reserved for private
+   networks - they belong to nobody and route nowhere on the public
+   internet. Using them on purpose means nothing here can ever collide
+   with, or be mistaken for, a real machine's address somewhere in the
+   world. A made-up public address would sooner or later land on
+   somebody's actual server. */
+var PRIV = [
+  { base: [10,0,0], mask: '255.0.0.0', bits: 8 },
+  { base: [172,16,0], mask: '255.240.0.0', bits: 12 },
+  { base: [192,168,0], mask: '255.255.255.0', bits: 24 }
+];
+function netOf(node, cx, cy, i){
+  var h = hash(cx * 2654435761 + i, cy * 40503 + 17);
+  var band = PRIV[(h * PRIV.length) | 0];
+  var o2 = (hash(cx + 7, cy * 5 + i) * 254 | 0) + 1;
+  var o3 = (hash(cx * 3 + 1, cy + i * 9) * 254 | 0) + 1;
+  var o4 = (hash(cx + i, cy * 11 + 2) * 253 | 0) + 2;   /* .1 is the gateway */
+  var oct;
+  if (band.bits === 8)  oct = [10, o2, o3, o4];
+  else if (band.bits === 12) oct = [172, 16 + (o2 % 16), o3, o4];
+  else oct = [192, 168, o2, o4];
+  node.ip = oct.join('.');
+  node.mask = band.mask;
+  /* the gateway is .1 of the same block - the way out */
+  var gw = oct.slice(); gw[gw.length-1] = 1;
+  node.gateway = gw.join('.');
+  /* the DHCP pool: the usable run above the gateway */
+  var lo = gw.slice(); lo[lo.length-1] = 100;
+  var hi = gw.slice(); hi[hi.length-1] = 200;
+  node.dhcp = lo.join('.') + ' to ' + hi.join('.');
+  /* Access sits behind NAT, Core and Edge route openly */
+  node.nat = node.role === 'Access';
+}
+
 /* NAMES THAT ARE OBVIOUSLY MADE UP, ON PURPOSE. A switch wants a name
    rather than a row of digits, but a name that looks like a real place
    would have somebody reading a real network off an example map. These
@@ -224,14 +267,16 @@ function cellNodes(cx, cy){
     var h2 = hash(cx * 13 + 5, cy * 29 + i);
     var h3 = hash(cx + i * 101, cy - i * 57);
     var role = ROLE[(h3 * ROLE.length) | 0];
-    out.push({
+    var node = {
       id: cx + ':' + cy + ':' + i,
       x: cx * CELL + h1 * CELL,
       y: cy * CELL + h2 * CELL,
       role: role,
       name: nameFor(cx, cy, i, role),
       cell: cx + ',' + cy
-    });
+    };
+    netOf(node, cx, cy, i);
+    out.push(node);
   }
   return out;
 }
@@ -697,6 +742,12 @@ function render(){
     row(tS, 'Switch', selected.name, selected.role);
     row(tS, 'Position', Math.round(selected.x) + ', ' + Math.round(selected.y), 'Units');
     row(tS, 'Ways through it', ways, 'Lines meeting here, counted in view');
+    row(tS, 'IP address', selected.ip, 'A private range, example only');
+    row(tS, 'Subnet mask', selected.mask, '');
+    row(tS, 'Gateway', selected.gateway, 'The way out of this block');
+    row(tS, 'DHCP pool', selected.dhcp, 'The run it hands out');
+    row(tS, 'NAT', selected.nat ? 'Behind NAT' : 'Routes openly',
+        selected.role === 'Access' ? 'Access sits behind NAT' : 'Core and Edge route');
     row(tS, 'Measured capacity', '<span class="sub">Waiting to be filled in</span>',
         'No speed is invented here');
     row(tS, 'Measured delay', '<span class="sub">Waiting to be filled in</span>',
@@ -757,6 +808,12 @@ function renderCan(){
       'That needs a mapping service and a key.');
   row(t, 'Confirm A Service With The Company', '<span class="n">NOT AVAILABLE</span>',
       'Only their own system can answer that.');
+  row(t, 'Show NAT, DHCP, IP, Mask And Gateway At A Location',
+      '<span class="m">YES</span>',
+      'Example private-range settings, derived from the place itself.');
+  row(t, 'Show A Real Country Network - .fi, .gov, Ukraine',
+      '<span class="n">NOT AVAILABLE</span>',
+      'A browser has no feed of any real network. These are example lines.');
   row(t, 'Read A MAC Address Or The Local IP', '<span class="n">NOT AVAILABLE</span>',
       'No browser gives either to a page, on purpose.');
   row(t, 'Invent A Measured Speed Or Delay For A Line', '<span class="n">NOT DONE</span>',
@@ -843,6 +900,20 @@ function selfCheck(){
     var floor = kmOf(inView.links[i].metres) / LIGHT_KM_S * 1000;
     if (tt < floor - 1e-9)
       fails.push('A line is travelling faster than light in glass.');
+  }
+
+  /* EVERY IP MUST BE A PRIVATE ONE. A made-up PUBLIC address would
+     eventually be somebody's real server, and a map that is going on a
+     public domain must never put a real-looking public IP on screen as
+     if it were part of this network. Checked on what is actually in
+     view. */
+  for (i=0;i<inView.nodes.length;i++){
+    var ip = inView.nodes[i].ip || '';
+    var o = ip.split('.').map(Number);
+    var priv = (o[0] === 10)
+            || (o[0] === 172 && o[1] >= 16 && o[1] <= 31)
+            || (o[0] === 192 && o[1] === 168);
+    if (!priv){ fails.push('A switch has a public IP address: ' + ip); break; }
   }
 
   var cr = document.getElementById('crText').childNodes[0].textContent.trim();
@@ -1001,6 +1072,8 @@ window.__setScale = function(km, mbit){
   kmPerSquare = km; clockMbit = mbit; render();
 };
 window.__travelMs = function(u){ return travelMs(u); };
+window.__nodesInView = function(){ return inView.nodes.map(function(n){
+  return { ip:n.ip, role:n.role }; }); };
 window.__placeHere = function(n){ placeHere(n); };
 window.__setSuppliers = function(a, name){ suppliers = a; supplierFile = name || 'test'; render(); };
 window.__forgetPlaces = function(){ places = []; savePlaces(); draw(); render(); };
@@ -1010,7 +1083,9 @@ window.__read = function(){ return {
   fails: window.__fails, view: { x: view.x, y: view.y, scale: view.scale },
   nodes: inView.nodes.length, links: inView.links.length,
   held: Object.keys(built).length, built: cellsBuilt, dropped: cellsDropped,
-  selected: selected ? { id: selected.id, role: selected.role, name: selected.name } : null,
+  selected: selected ? { id: selected.id, role: selected.role, name: selected.name,
+    ip: selected.ip, mask: selected.mask, gateway: selected.gateway,
+    dhcp: selected.dhcp, nat: selected.nat } : null,
   names: inView.nodes.slice(0,8).map(function(n){ return n.name; }),
   kmPerSquare: kmPerSquare, clockMbit: clockMbit, lightKmS: LIGHT_KM_S,
   embed: EMBED, places: places.length, suppliers: suppliers ? suppliers.length : 0,
