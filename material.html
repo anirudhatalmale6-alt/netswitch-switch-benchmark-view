@@ -48,9 +48,36 @@
     gap:12px;justify-content:center;background:#d0cefd;border-radius:4px}
   #cr img{width:56px;height:auto;display:block}
   #crText{color:#12261a;font-weight:700;font-size:12px;line-height:1.4}
+  /* THE LIGHT, AND THE SLIDER THAT RAISES IT.
+     "This cannot be operated if user is a professional. It does not
+     give light, one needs a finger slider up from bottom." Both
+     halves of that are fixed here: the page can now light the subject
+     itself, and the control for it sits at the bottom of the screen
+     where a thumb reaches without letting go of the phone. */
+  #lightPanel{position:fixed;left:0;right:0;top:0;height:38vh;background:#fff;
+    opacity:0;pointer-events:none;z-index:4;transition:opacity .12s linear}
+  #slider{position:fixed;left:0;right:0;bottom:0;z-index:8;
+    background:rgba(5,8,12,.94);border-top:1px solid #16293a;padding:10px 12px 14px}
+  #slider .row{display:flex;align-items:center;gap:10px}
+  #slider label{color:#9fb6c9;font-size:11px;white-space:nowrap}
+  #slider b{color:#4fd1ff;min-width:44px;display:inline-block;text-align:right}
+  #light{-webkit-appearance:none;appearance:none;flex:1 1 auto;height:34px;
+    background:transparent}
+  #light::-webkit-slider-runnable-track{height:10px;border-radius:5px;
+    background:linear-gradient(90deg,#16293a,#4fd1ff)}
+  #light::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;
+    margin-top:-10px;border-radius:50%;background:#4fd1ff;border:2px solid #05080c}
+  #light::-moz-range-track{height:10px;border-radius:5px;
+    background:linear-gradient(90deg,#16293a,#4fd1ff)}
+  #light::-moz-range-thumb{width:30px;height:30px;border-radius:50%;
+    background:#4fd1ff;border:2px solid #05080c}
+  #lightWhat{color:#4a6076;font-size:10px;margin-top:6px}
+  #pg{padding-bottom:110px}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B63</b><i id="line">Waiting for the camera&hellip;</i></div>
+<div id="lightPanel"></div>
+
+<div id="bar"><b id="stamp">B64</b><i id="line">Waiting for the camera&hellip;</i></div>
 
 <div id="top">
   <div id="topText">Material Learning. Show the camera a material for thirty seconds,
@@ -101,6 +128,15 @@
   </div>
 </div>
 
+<div id="slider">
+  <div class="row">
+    <label>Light</label>
+    <input id="light" type="range" min="0" max="100" value="0" step="1">
+    <b id="lightVal">0 %</b>
+  </div>
+  <div id="lightWhat">&nbsp;</div>
+</div>
+
 <script>
 /* ==================================================================
    A MATERIAL IS RECOGNISED BY WHAT IT DOES TO LIGHT, NOT BY WHAT IT
@@ -143,7 +179,7 @@ var SAMPLE_MS = 100;         /* a reading ten times a second */
 var W = 260, H = 195;
 
 var video, shot, ctx, stream = null, running = false;
-var lib = [], learning = null, now = null, match = null;
+var lib = [], learning = null, now = null, match = null, mix = null;
 var frames = 0, started = 0, dxf = '', camError = '';
 
 function two(n){ return (n<10?'0':'') + n; }
@@ -289,6 +325,119 @@ function spreadUnitsOf(list, mid){
   return list.length ? s / list.length : 0;
 }
 
+
+/* ================= THE LIGHT =================
+   THE PAGE CAN LIGHT THE SUBJECT ITSELF, two ways, and it says which
+   one is actually doing the work.
+
+   The torch is the real light, and only some devices hand it to a
+   page - it belongs to the camera track, not to the page, and a
+   laptop camera has none. Where there is no torch the screen becomes
+   the lamp: a white panel across the top of the display, which is
+   what a phone is doing when you use it to find something under a
+   sofa. It is weaker than a torch and it is not pretended otherwise.
+
+   WHAT IS NOT DONE HERE: the slider never touches the exposure. A
+   page can ask a camera to brighten the picture, and that would make
+   the picture look better while measuring nothing new - worse, it
+   would move every figure on the page without any more light
+   reaching the material. More light on the subject is a measurement;
+   a brighter picture of the same light is a decoration. */
+var lightPct = 0, torchOn = false, torchable = null, lightWhat = '';
+
+function applyLight(){
+  var pct = lightPct / 100;
+  document.getElementById('lightPanel').style.opacity = String(pct * 0.98);
+  document.getElementById('lightVal').textContent = lightPct + ' %';
+
+  /* the torch, where the device gives one to a page */
+  var want = lightPct >= 50;
+  if (torchable && want !== torchOn){
+    try {
+      torchable.applyConstraints({ advanced: [{ torch: want }] })
+        .then(function(){ torchOn = want; showLight(); })
+        .catch(function(){ torchable = null; showLight(); });
+    } catch(e){ torchable = null; }
+  }
+  showLight();
+}
+function showLight(){
+  var parts = [];
+  if (lightPct === 0) parts.push('No extra light. Raise the slider with a thumb.');
+  else {
+    parts.push('Screen lamp at ' + lightPct + ' per cent');
+    if (torchable) parts.push(torchOn ? 'and the camera torch is ON'
+      : 'torch comes on past half way');
+    else parts.push('this device does not hand its torch to a page');
+  }
+  lightWhat = parts.join(', ');
+  if (lightWhat.charAt(lightWhat.length-1) !== '.') lightWhat += '.';
+  document.getElementById('lightWhat').textContent = lightWhat;
+}
+function findTorch(s){
+  try {
+    var tr = s.getVideoTracks()[0];
+    var caps = tr.getCapabilities ? tr.getCapabilities() : {};
+    torchable = ('torch' in caps) ? tr : null;
+  } catch(e){ torchable = null; }
+  showLight();
+}
+
+/* ================= MIXTURES =================
+   TWENTY MATERIALS DESCRIBING A TWENTY-FIRST. The question was
+   whether twenty learned materials can account for a twenty-second,
+   or a twenty-and-a-half. They can, within reason: a surface that is
+   part one thing and part another sits BETWEEN two signatures, and
+   the share can be worked out and reported.
+
+   It is offered only when it is genuinely better. A mixture that
+   explains the surface no better than the nearest single material is
+   not a finding, it is a longer way of saying the same thing - so the
+   mixture has to beat the best single answer by a clear margin, and
+   its own leftover error is printed beside it. Where it does not, the
+   answer stays "not in the library".
+
+   WHAT THE SHARE IS, AND WHAT IT IS NOT. It is a POSITION between two
+   known materials, not a recipe. Half a picture of carton and half of
+   plastic does NOT come back as fifty fifty, and it should not: these
+   figures are not quantities that add up. Gloss is the share of the
+   picture far brighter than the rest, and mixing two pictures halves
+   the brightness of the highlight, which drops that figure far more
+   than half. I checked this against a surface built from exactly half
+   of each and it reads as four fifths of the way towards the carton,
+   which is the honest answer to "where does it sit", and the wrong
+   answer to "how much of each is in it". The page says which question
+   it is answering. */
+var MIX_STEPS = 20;            /* shares tried between two materials */
+var MIX_MUST_BEAT = 0.6;       /* and it must explain this much more */
+
+function blendSig(a, b, w){
+  var out = {}, i, k;
+  for (i=0;i<AXES.length;i++){
+    k = AXES[i];
+    out[k] = (a[k]||0) * (1-w) + (b[k]||0) * w;
+  }
+  return out;
+}
+/* KEPT AS A PLAIN FUNCTION OF TWO SIGNATURES so it can be handed
+   made-up materials and checked without a camera. */
+function bestMixture(sig, library){
+  if (!sig || library.length < 2) return null;
+  var best = null, i, j, s;
+  for (i=0;i<library.length;i++){
+    for (j=i+1;j<library.length;j++){
+      for (s=1;s<MIX_STEPS;s++){
+        var w = s / MIX_STEPS;
+        var mix = blendSig(library[i].mid, library[j].mid, w);
+        var u = worstAxis(sig, mix).units;
+        if (!best || u < best.units)
+          best = { units: u, w: w, a: library[i].name, b: library[j].name };
+      }
+    }
+  }
+  return best;
+}
+
 /* ================= the camera ================= */
 function startCamera(){
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
@@ -299,6 +448,7 @@ function startCamera(){
     width: { ideal: 640 }, height: { ideal: 480 } } })
   .then(function(s){
     stream = s; video.srcObject = s; running = true;
+    findTorch(s);
     started = performance.now();
     tick();
   })
@@ -320,6 +470,7 @@ function tick(){
       if (performance.now() - learning.started >= LEARN_MS) finishLearning();
     }
     match = nearest(now);
+    mix = bestMixture(now, lib);
   } catch(e){ /* a frame that is not ready yet is not an error */ }
   render();
   setTimeout(tick, SAMPLE_MS);
@@ -402,6 +553,18 @@ function render(){
         'Nearest is ' + match.name + ', but its ' + match.axis + ' is off by '
         + match.units.toFixed(1) + ' steps, past the ' + match.allowed.toFixed(1)
         + ' allowed');
+    if (mix && mix.units < match.units * MIX_MUST_BEAT){
+      row(tM, 'It does sit between two of them',
+          '<span class="r">' + Math.round((1-mix.w)*100) + ' per cent of the way to '
+          + mix.a + ', ' + Math.round(mix.w*100) + ' to ' + mix.b + '</span>',
+          'Worst figure off by ' + mix.units.toFixed(1) + ' steps against '
+          + match.units.toFixed(1) + ' for the nearest single material. '
+          + 'A position between the two, not how much of each is in it.');
+    } else if (mix){
+      row(tM, 'A mixture of two does not explain it either',
+          '<span class="sub">Best was ' + mix.a + ' with ' + mix.b + ' at '
+          + mix.units.toFixed(1) + ' steps</span>', '');
+    }
   }
 
   var tb = document.getElementById('libBody'); tb.innerHTML = '';
@@ -455,6 +618,20 @@ function renderCan(){
       'Marks and faces are somebody else property.');
   row(t, 'Learn A Thousand Materials', '<span class="m">YES</span>',
       'Thirty seconds each, kept in a file you own.');
+  row(t, 'Place A New One Between Two Known Ones',
+      '<span class="m">YES</span>',
+      'Only when it explains the surface better than either alone.');
+  row(t, 'Say How Much Of Each Is In It',
+      '<span class="n">NOT AVAILABLE</span>',
+      'These figures do not add up like quantities. The share is a position.');
+  row(t, 'Light The Subject Itself',
+      torchable ? '<span class="m">TORCH AND SCREEN</span>'
+                : '<span class="r">SCREEN ONLY</span>',
+      torchable ? 'The slider at the bottom raises both.'
+                : 'This device does not hand its torch to a page.');
+  row(t, 'Brighten The Picture Instead Of The Subject',
+      '<span class="n">NOT DONE</span>',
+      'That moves every figure without more light reaching the material.');
 }
 
 function draw(){
@@ -593,6 +770,11 @@ document.getElementById('stop').onclick = function(){
 };
 document.getElementById('forget').onclick = function(){ lib = []; render(); };
 
+document.getElementById('light').addEventListener('input', function(){
+  lightPct = Number(this.value) || 0;
+  applyLight();
+});
+applyLight();
 startCamera();
 render();
 
@@ -608,6 +790,11 @@ window.__learnNow = function(name, ms){
 };
 window.__lib = function(){ return lib; };
 window.__setLib = function(a){ lib = a; render(); };
+window.__bestMixture = bestMixture;
+window.__setLight = function(p){
+  document.getElementById('light').value = String(p);
+  lightPct = p; applyLight(); render();
+};
 window.__read = function(){ return {
   camError: camError, frames: frames, fails: window.__fails,
   now: now, match: match, learning: learning ? learning.name : null,
@@ -615,8 +802,12 @@ window.__read = function(){ return {
     gloss:m.mid.gloss, rough1:m.mid.rough1, darkStructure:m.mid.darkStructure,
     level:m.mid.level }; }),
   axes: AXES,
+  mix: mix, lightPct: lightPct, lightWhat: lightWhat,
+  panelOpacity: Number(document.getElementById('lightPanel').style.opacity || 0),
+  torchable: !!torchable,
   dxfLines: (dxf||'').split(/\r\n/).filter(function(v,i,a){
     return v === 'LINE' && a[i-1] === '0'; }).length,
   stamp: stampNow(), bar: document.getElementById('line').textContent }; };
 </script>
+
 </body></html>
