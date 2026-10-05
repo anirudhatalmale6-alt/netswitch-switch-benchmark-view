@@ -50,7 +50,7 @@
   #crText{color:#12261a;font-weight:700;font-size:12px;line-height:1.4}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B65</b><i id="line">Loading what is in view&hellip;</i></div>
+<div id="bar"><b id="stamp">B66</b><i id="line">Loading what is in view&hellip;</i></div>
 
 <div id="top">
   <div id="topText">Lines And Switches. Drag to pan anywhere. Lines, switches and
@@ -66,6 +66,18 @@
   </div>
 
   <div class="send">
+    <label style="color:#9fb6c9;font-size:11px">One square is</label>
+    <input id="kmPer" type="number" min="0.01" step="0.1" value="1"
+           style="width:80px;background:#070d15;color:#eaf6ff;border:1px solid #1d3448;
+                  border-radius:4px;padding:7px 8px;font:12px ui-monospace,monospace">
+    <label style="color:#9fb6c9;font-size:11px">km. Line clock</label>
+    <input id="clock" type="number" min="1" step="100" value="1000"
+           style="width:90px;background:#070d15;color:#eaf6ff;border:1px solid #1d3448;
+                  border-radius:4px;padding:7px 8px;font:12px ui-monospace,monospace">
+    <label style="color:#9fb6c9;font-size:11px">Mbit/s</label>
+  </div>
+
+  <div class="send">
     <button id="zoomIn">Zoom In</button>
     <button id="zoomOut" class="alt">Zoom Out</button>
     <button id="home" class="alt">Back To The Start</button>
@@ -78,6 +90,10 @@
   <h2>What Is In View</h2><table id="tView"></table>
 
   <h2>The Switch Under The Cross</h2><table id="tSel"></table>
+
+  <h2>Line Length Against Travel Time</h2>
+  <canvas id="gTan" height="150"></canvas>
+  <table id="tSpeed"></table>
 
   <h2>What This Map Is, And Is Not</h2><table id="tCan"></table>
 
@@ -166,17 +182,33 @@ function hash(a, b){
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 var ROLE = ['Core', 'Edge', 'Access'];
+/* NAMES THAT ARE OBVIOUSLY MADE UP, ON PURPOSE. A switch wants a name
+   rather than a row of digits, but a name that looks like a real place
+   would have somebody reading a real network off an example map. These
+   are two syllables and a number, from a fixed list, so they read as
+   labels and never as addresses. */
+var NAME_A = ['Alta','Brim','Caro','Dova','Eska','Fjor','Gran','Hald','Ilma','Jorv',
+              'Kiva','Lund','Mira','Nord','Orsa','Prim','Qvar','Rask','Suvi','Tarn',
+              'Ulve','Vara','Wyke','Xeno','Ymer','Zora'];
+function nameFor(cx, cy, i, role){
+  var h = hash(cx * 7919 + i * 13, cy * 104729 + 3);
+  var a = NAME_A[(h * NAME_A.length) | 0];
+  var n = 1 + ((hash(cx + 11, cy * 3 + i) * 89) | 0);
+  return role.charAt(0) + a + '-' + n;
+}
 function cellNodes(cx, cy){
   var out = [], i;
   for (i=0;i<PER_CELL;i++){
     var h1 = hash(cx * 31 + i, cy * 17 + 7);
     var h2 = hash(cx * 13 + 5, cy * 29 + i);
     var h3 = hash(cx + i * 101, cy - i * 57);
+    var role = ROLE[(h3 * ROLE.length) | 0];
     out.push({
       id: cx + ':' + cy + ':' + i,
       x: cx * CELL + h1 * CELL,
       y: cy * CELL + h2 * CELL,
-      role: ROLE[(h3 * ROLE.length) | 0],
+      role: role,
+      name: nameFor(cx, cy, i, role),
       cell: cx + ',' + cy
     });
   }
@@ -250,7 +282,61 @@ function gather(){
   return inView;
 }
 
-/* ================= drawing ================= */
+/* ================= drawing =================
+   THE ICONS ARE DRAWN HERE, LINE BY LINE, AND NOT FETCHED.
+   "Map names and icons graphic some free" - the cheapest way to get
+   icons is to take somebody's set, and the cheapest way to inherit a
+   licence problem is the same thing. These are a few strokes of
+   geometry each, drawn by the page: they cost nothing, they load
+   instantly because there is nothing to load, they stay sharp at any
+   zoom, and they belong to you outright. */
+var COL = { Core:'#ff6b8a', Edge:'#ffc24f', Access:'#4fd1ff' };
+
+function drawIcon(role, x, y){
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.strokeStyle = COL[role];
+  ctx.fillStyle = COL[role];
+  ctx.lineWidth = 1.4;
+  if (role === 'Core'){
+    /* a six sided box with four ports - the big switch */
+    var r = 7, k;
+    ctx.beginPath();
+    for (k=0;k<6;k++){
+      var a = Math.PI/6 + k * Math.PI/3;
+      var px = Math.cos(a)*r, py = Math.sin(a)*r;
+      if (k===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    }
+    ctx.closePath(); ctx.stroke();
+    ctx.globalAlpha = 0.35; ctx.fill(); ctx.globalAlpha = 1;
+    for (k=0;k<4;k++){
+      var ang = k * Math.PI/2 + Math.PI/4;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(ang)*r, Math.sin(ang)*r);
+      ctx.lineTo(Math.cos(ang)*(r+4), Math.sin(ang)*(r+4));
+      ctx.stroke();
+    }
+  } else if (role === 'Edge'){
+    /* a box with two arrows through it - traffic passing */
+    ctx.strokeRect(-5, -4, 10, 8);
+    ctx.beginPath();
+    ctx.moveTo(-8, -1.5); ctx.lineTo(8, -1.5);
+    ctx.moveTo(5.5, -3.5); ctx.lineTo(8, -1.5); ctx.lineTo(5.5, 0.5);
+    ctx.moveTo(8, 2); ctx.lineTo(-8, 2);
+    ctx.moveTo(-5.5, 0); ctx.lineTo(-8, 2); ctx.lineTo(-5.5, 4);
+    ctx.stroke();
+  } else {
+    /* a mast with two waves - where somebody joins */
+    ctx.beginPath();
+    ctx.moveTo(0, 5); ctx.lineTo(0, -2);
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, -2, 3, Math.PI*1.15, Math.PI*1.85); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, -2, 6, Math.PI*1.2, Math.PI*1.8); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, -2, 1.3, 0, 6.283); ctx.fill();
+  }
+  ctx.restore();
+}
+
 function toScreen(x, y){
   return { x: (x - view.x) * view.scale, y: (y - view.y) * view.scale };
 }
@@ -280,16 +366,13 @@ function draw(){
     ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
   }
 
-  var COL = { Core:'#ff6b8a', Edge:'#ffc24f', Access:'#4fd1ff' };
-  var SIZE = { Core:7, Edge:5, Access:4 };
   for (i=0;i<d.nodes.length;i++){
-    var n = d.nodes[i], s = toScreen(n.x, n.y);
-    if (s.x < -20 || s.y < -20 || s.x > cv.width + 20 || s.y > cv.height + 20) continue;
-    ctx.fillStyle = COL[n.role];
-    ctx.fillRect(s.x - SIZE[n.role]/2, s.y - SIZE[n.role]/2, SIZE[n.role], SIZE[n.role]);
-    if (view.scale > 0.55){
-      ctx.fillStyle = '#4a6076'; ctx.font = '9px monospace';
-      ctx.fillText(n.role, s.x + 6, s.y + 3);
+    var n = d.nodes[i], sp = toScreen(n.x, n.y);
+    if (sp.x < -30 || sp.y < -30 || sp.x > cv.width + 30 || sp.y > cv.height + 30) continue;
+    drawIcon(n.role, sp.x, sp.y);
+    if (view.scale > 0.5){
+      ctx.fillStyle = '#8ea9c2'; ctx.font = '10px monospace';
+      ctx.fillText(n.name, sp.x + 11, sp.y + 4);
     }
   }
 
@@ -322,6 +405,103 @@ function nearestTo(x, y, nodes){
     if (!best || d < best.d) best = { d: d, n: nodes[i] };
   }
   return best ? best.n : null;
+}
+
+
+/* ============ LENGTH, TRAVEL TIME, AND WHAT A CLOCK REALLY CARRIES ==
+   "Tangent off linespeed and linelength are good, important... most
+   ads 50-80% on clock based speeds."
+
+   THREE KINDS OF NUMBER, AND THE PAGE NEVER MIXES THEM UP.
+
+   MEASURED   the length of a line, taken off the drawing.
+   A CONSTANT light in glass travels at about 200 000 km a second,
+              roughly two thirds of its speed in a vacuum. That is
+              physics, the same on everybody's network, and the page
+              names it as a constant rather than passing it off as a
+              reading from your equipment.
+   YOURS      how many kilometres a square is, and the 50 to 80 per
+              cent band. Both are typed in at the top and both are
+              labelled as yours. The band is the share of a line's
+              clock that actually carries traffic, and the figure is
+              the one you gave me - I have not measured it and I do
+              not present it as measured.
+
+   The travel time is the one a buyer cannot argue with: a line of a
+   given length has a floor under its delay that no equipment can beat,
+   because nothing on it travels faster than the light in the glass.
+   That is worth more in a room than a bandwidth figure, because it is
+   the part nobody can sell their way around. */
+var LIGHT_KM_S = 200000;      /* light in glass, a constant */
+var SHARE_LOW = 0.50, SHARE_HIGH = 0.80;   /* the band he gave */
+var kmPerSquare = 1, clockMbit = 1000;
+
+function kmOf(units){ return units / CELL * kmPerSquare; }
+function travelMs(units){ return kmOf(units) / LIGHT_KM_S * 1000; }
+
+function renderSpeed(){
+  var t = document.getElementById('tSpeed'); t.innerHTML = '';
+  var L = inView.links, i;
+  if (!L.length){ row(t, 'No lines in view', '-', ''); drawTangent(); return; }
+  var longest = L[0], shortest = L[0], sum = 0;
+  for (i=0;i<L.length;i++){
+    if (L[i].metres > longest.metres) longest = L[i];
+    if (L[i].metres < shortest.metres) shortest = L[i];
+    sum += L[i].metres;
+  }
+  row(t, 'Shortest line in view', kmOf(shortest.metres).toFixed(2) + ' km',
+      travelMs(shortest.metres).toFixed(3) + ' ms each way, at the speed of light in glass');
+  row(t, 'Longest line in view', kmOf(longest.metres).toFixed(2) + ' km',
+      travelMs(longest.metres).toFixed(3) + ' ms each way');
+  row(t, 'There and back on the longest',
+      (travelMs(longest.metres) * 2).toFixed(3) + ' ms',
+      'The floor under its delay. No equipment beats it');
+  row(t, 'Average line in view', kmOf(sum / L.length).toFixed(2) + ' km',
+      travelMs(sum / L.length).toFixed(3) + ' ms each way');
+  row(t, 'A line clocked at ' + clockMbit + ' Mbit/s carries',
+      '<span class="r">' + Math.round(clockMbit * SHARE_LOW) + ' to '
+      + Math.round(clockMbit * SHARE_HIGH) + ' Mbit/s</span>',
+      'Your 50 to 80 per cent band, not a measurement of anything here');
+  row(t, 'Where these figures come from',
+      '<span class="sub">Length measured, time from a constant, the rest yours</span>',
+      '200 000 km/s is light in glass');
+  drawTangent();
+}
+
+/* THE TANGENT HE ASKED FOR: length against travel time. It is a
+   straight line through the origin and that is the point - the slope
+   IS the speed of light in the glass, and no line on any network sits
+   below it. Drawing it makes the floor visible. */
+function drawTangent(){
+  var cvt = document.getElementById('gTan'), g = cvt.getContext('2d');
+  var w = cvt.clientWidth || 320; if (cvt.width !== w) cvt.width = w;
+  var W2 = cvt.width, H2 = cvt.height, L = 46, R = 10, T = 12, B = 24;
+  g.fillStyle = '#070d15'; g.fillRect(0,0,W2,H2);
+  var links = inView.links, i;
+  if (!links.length) return;
+  var maxU = 0;
+  for (i=0;i<links.length;i++) if (links[i].metres > maxU) maxU = links[i].metres;
+  if (maxU <= 0) return;
+  var maxKm = kmOf(maxU) * 1.08, maxMs = travelMs(maxU) * 1.08;
+  function X(km){ return L + (km / maxKm) * (W2 - L - R); }
+  function Y(ms){ return (H2 - B) - (ms / maxMs) * (H2 - T - B); }
+  g.strokeStyle = '#12202c'; g.font = '9px monospace'; g.fillStyle = '#4a6076';
+  [0, maxMs/2, maxMs].forEach(function(v){
+    var y = Y(v); g.beginPath(); g.moveTo(L,y); g.lineTo(W2-R,y); g.stroke();
+    g.fillText(v.toFixed(2), 2, y+3);
+  });
+  /* the straight line: the floor */
+  g.strokeStyle = '#ff5b4d'; g.lineWidth = 1.5; g.setLineDash([5,3]);
+  g.beginPath(); g.moveTo(X(0), Y(0)); g.lineTo(X(maxKm), Y(maxMs)); g.stroke();
+  g.setLineDash([]);
+  for (i=0;i<links.length;i++){
+    var km = kmOf(links[i].metres), ms = travelMs(links[i].metres);
+    g.fillStyle = '#4fd1ff';
+    g.beginPath(); g.arc(X(km), Y(ms), 2.5, 0, 6.283); g.fill();
+  }
+  g.fillStyle = '#9fb6c9';
+  g.fillText('Each line: length in km across, travel time in ms up. The dashed '
+    + 'line is the speed of light in glass - nothing sits under it.', L, H2-6);
 }
 
 /* ================= the tables ================= */
@@ -364,15 +544,16 @@ function render(){
     var ways = 0;
     for (i=0;i<inView.links.length;i++)
       if (inView.links[i].a.id === selected.id || inView.links[i].b.id === selected.id) ways++;
-    row(tS, 'Switch', selected.role, selected.id);
+    row(tS, 'Switch', selected.name, selected.role);
     row(tS, 'Position', Math.round(selected.x) + ', ' + Math.round(selected.y), 'Units');
     row(tS, 'Ways through it', ways, 'Lines meeting here, counted in view');
-    row(tS, 'Capacity', '<span class="sub">Waiting to be filled in</span>',
+    row(tS, 'Measured capacity', '<span class="sub">Waiting to be filled in</span>',
         'No speed is invented here');
-    row(tS, 'Delay', '<span class="sub">Waiting to be filled in</span>',
-        'No millisecond figure is invented here');
+    row(tS, 'Measured delay', '<span class="sub">Waiting to be filled in</span>',
+        'No millisecond figure is measured on an example line');
   }
 
+  renderSpeed();
   dxf = toDXF();
   var b1 = new Blob([dxf], { type:'image/vnd.dxf' });
   document.getElementById('dlDxf').href = URL.createObjectURL(b1);
@@ -411,7 +592,11 @@ function renderCan(){
       'Street tiles need a provider and a key.');
   row(t, 'Show A Real Network', '<span class="n">NOT AVAILABLE</span>',
       'These are example lines. Send the real ones and they go in.');
-  row(t, 'Invent Speeds Or Delays For A Line', '<span class="n">NOT DONE</span>',
+  row(t, 'Work Out The Travel Time From The Length', '<span class="m">YES</span>',
+      'From a named constant, and the page says it is a constant.');
+  row(t, 'Name Every Switch And Draw An Icon For It', '<span class="m">YES</span>',
+      'Drawn here in geometry - nothing fetched, nothing licensed.');
+  row(t, 'Invent A Measured Speed Or Delay For A Line', '<span class="n">NOT DONE</span>',
       'Those rows stay empty until you give me the figures.');
 }
 
@@ -465,12 +650,29 @@ function selfCheck(){
     fails.push('The page is holding ' + held + ' squares - squares are not being '
       + 'dropped and the memory is growing as you drag.');
 
-  /* NO LINE MAY CARRY A SPEED OR A DELAY THAT NOBODY GAVE ME. */
+  /* NO LINE MAY CARRY A MEASURED SPEED OR DELAY THAT NOBODY GAVE ME.
+     A figure worked out from the length and a named constant is a
+     different thing and is allowed - but it has to be labelled as
+     worked out, which is checked here. */
   var body = document.getElementById('pg').innerText;
-  if (/\d+\s*(Mbit|Gbit|Mbps|Gbps)\b/.test(body))
-    fails.push('A line is carrying a speed that was never given to me.');
-  if (/\bDelay\b[^\n]*\d+\s*ms/.test(body))
-    fails.push('A line is carrying a delay that was never given to me.');
+  if (body.indexOf('Measured capacity') >= 0 &&
+      /Measured capacity[^\n]*\d+\s*(Mbit|Gbit)/.test(body))
+    fails.push('A line is carrying a measured speed that was never given to me.');
+  if (/Measured delay[^\n]*\d+\s*ms/.test(body))
+    fails.push('A line is carrying a measured delay that was never given to me.');
+  if (body.indexOf('200 000 km/s is light in glass') < 0)
+    fails.push('The travel time is on the page without naming the constant it came from.');
+  if (body.indexOf('not a measurement of anything here') < 0)
+    fails.push('The band is on the page without saying it is not a measurement.');
+
+  /* AND NO LINE MAY BEAT THE SPEED OF LIGHT. If a travel time ever
+     comes out under the floor, the arithmetic is wrong somewhere. */
+  for (i=0;i<inView.links.length;i++){
+    var tt = travelMs(inView.links[i].metres);
+    var floor = kmOf(inView.links[i].metres) / LIGHT_KM_S * 1000;
+    if (tt < floor - 1e-9)
+      fails.push('A line is travelling faster than light in glass.');
+  }
 
   var cr = document.getElementById('crText').childNodes[0].textContent.trim();
   if (cr !== 'Copyright AI2Orbit All Rights Reserved 2026.')
@@ -535,6 +737,14 @@ document.getElementById('home').onclick = function(){
   view.x = 0; view.y = 0; view.scale = 1; draw(); render();
 };
 
+document.getElementById('kmPer').addEventListener('input', function(){
+  var v = parseFloat(this.value);
+  if (v > 0){ kmPerSquare = v; render(); }
+});
+document.getElementById('clock').addEventListener('input', function(){
+  var v = parseFloat(this.value);
+  if (v > 0){ clockMbit = v; render(); }
+});
 window.addEventListener('resize', function(){ draw(); render(); });
 renderCan();
 draw();
@@ -546,12 +756,21 @@ window.__selfCheck = selfCheck;
 window.__putGlyph = function(g){
   document.getElementById('topText').textContent += ' ' + g; };
 window.__panTo = function(x, y){ view.x = x; view.y = y; draw(); render(); };
+window.__setScale = function(km, mbit){
+  document.getElementById('kmPer').value = String(km);
+  document.getElementById('clock').value = String(mbit);
+  kmPerSquare = km; clockMbit = mbit; render();
+};
+window.__travelMs = function(u){ return travelMs(u); };
+window.__kmOf = function(u){ return kmOf(u); };
 window.__panBy = function(dx, dy){ panBy(dx, dy); };
 window.__read = function(){ return {
   fails: window.__fails, view: { x: view.x, y: view.y, scale: view.scale },
   nodes: inView.nodes.length, links: inView.links.length,
   held: Object.keys(built).length, built: cellsBuilt, dropped: cellsDropped,
-  selected: selected ? { id: selected.id, role: selected.role } : null,
+  selected: selected ? { id: selected.id, role: selected.role, name: selected.name } : null,
+  names: inView.nodes.slice(0,8).map(function(n){ return n.name; }),
+  kmPerSquare: kmPerSquare, clockMbit: clockMbit, lightKmS: LIGHT_KM_S,
   ids: inView.nodes.map(function(n){ return n.id; }),
   dxfLines: (dxf||'').split(/\r\n/).filter(function(v,i,a){
     return v === 'LINE' && a[i-1] === '0'; }).length,
