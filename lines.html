@@ -57,7 +57,7 @@
   #crText{color:#12261a;font-weight:700;font-size:12px;line-height:1.4}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B68</b><i id="line">Loading what is in view&hellip;</i></div>
+<div id="bar"><b id="stamp">B69</b><i id="line">Loading what is in view&hellip;</i></div>
 
 <div id="top">
   <div id="topText">Lines And Switches. Drag to pan anywhere. Lines, switches and
@@ -73,11 +73,7 @@
   </div>
 
   <div class="send">
-    <label style="color:#9fb6c9;font-size:11px">One square is</label>
-    <input id="kmPer" type="number" min="0.01" step="0.1" value="1"
-           style="width:80px;background:#070d15;color:#eaf6ff;border:1px solid #1d3448;
-                  border-radius:4px;padding:7px 8px;font:12px ui-monospace,monospace">
-    <label style="color:#9fb6c9;font-size:11px">km. Line clock</label>
+    <label style="color:#9fb6c9;font-size:11px">Line clock</label>
     <input id="clock" type="number" min="1" step="100" value="1000"
            style="width:90px;background:#070d15;color:#eaf6ff;border:1px solid #1d3448;
                   border-radius:4px;padding:7px 8px;font:12px ui-monospace,monospace">
@@ -87,6 +83,8 @@
   <div class="send">
     <button id="zoomIn">Zoom In</button>
     <button id="zoomOut" class="alt">Zoom Out</button>
+    <button id="findCity">Find My City</button>
+    <button id="streets" class="alt">Show Streets</button>
     <button id="home" class="alt">Back To The Start</button>
     <a class="alt" id="dlDxf" download="lines-and-switches.dxf"
        style="color:#9fd6f5">Download DXF</a>
@@ -348,6 +346,122 @@ function gather(){
   return inView;
 }
 
+
+/* ============ REAL GROUND UNDER THE MAP ============
+   "User needs to find their city. It is not my network. Company
+   example." - so the ground has to be real even though the network on
+   top of it is an example.
+
+   THE UNITS ARE NOW REAL. One unit of this map is one pixel of the
+   standard web map at zoom 13, which means a position on it is a real
+   latitude and longitude and a length on it is a real distance. The
+   kilometres a square covers are no longer typed in and guessed - they
+   are worked out from where you are, because a degree of longitude is
+   a different distance in Helsinki than at the equator.
+
+   THE STREETS ARE OPTIONAL AND COME FROM OPENSTREETMAP. They are not
+   mine, they are free to use with the credit shown at the bottom of
+   the map, and that credit is a condition of the licence rather than a
+   courtesy - so the page refuses to show a clean result if the tiles
+   are on and the credit is missing. Google's map needs a key and a
+   billing account; this needs neither.
+
+   WHAT IS REAL AND WHAT IS NOT, AND THE PAGE SAYS BOTH: the ground,
+   the position, the distances and the travel times are real. The
+   switches and the lines on top are an example - a company example,
+   as you put it - until a real list is loaded. */
+var TILE_Z = 13, TILE = 256;
+var WORLD = TILE * Math.pow(2, TILE_Z);
+var tilesOn = false, tileImgs = {}, tilesTried = 0, tilesGot = 0;
+var myLat = null, myLon = null, geoErr = '';
+
+function lonToX(lon){ return (lon + 180) / 360 * WORLD; }
+function latToY(lat){
+  var r = lat * Math.PI / 180;
+  return (1 - Math.log(Math.tan(r) + 1/Math.cos(r)) / Math.PI) / 2 * WORLD;
+}
+function xToLon(x){ return x / WORLD * 360 - 180; }
+function yToLat(y){
+  var n = Math.PI - 2 * Math.PI * y / WORLD;
+  return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+}
+/* metres per unit, which depends on how far north you are */
+function metresPerUnit(lat){
+  return 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, TILE_Z);
+}
+function centreLat(){
+  return yToLat(view.y + (cv.height/2)/view.scale);
+}
+
+function findMyCity(){
+  if (!navigator.geolocation){
+    geoErr = 'This browser does not offer a position to a page.';
+    render(); return;
+  }
+  geoErr = 'Asking the device where it is...';
+  render();
+  navigator.geolocation.getCurrentPosition(function(pos){
+    myLat = pos.coords.latitude; myLon = pos.coords.longitude;
+    geoErr = '';
+    /* finding your city without showing it would be half an answer */
+    tilesOn = true;
+    var btn = document.getElementById('streets');
+    if (btn) btn.textContent = 'Hide Streets';
+    view.scale = 1;
+    view.x = lonToX(myLon) - (cv.width/2);
+    view.y = latToY(myLat) - (cv.height/2);
+    draw(); render();
+  }, function(e){
+    /* REFUSED IS NOT BROKEN, and the page says which it was. */
+    geoErr = (e && e.code === 1)
+      ? 'You refused the device its position, which is your right - nothing else is affected.'
+      : 'The device could not work out where it is: ' + ((e && e.message) || 'no reason given');
+    render();
+  }, { enableHighAccuracy: false, timeout: 12000, maximumAge: 600000 });
+}
+
+function tileUrl(z, x, y){
+  return 'https://tile.openstreetmap.org/' + z + '/' + x + '/' + y + '.png';
+}
+function drawTiles(){
+  if (!tilesOn) return;
+  var scale = view.scale;
+  var x0 = Math.floor(view.x / TILE), x1 = Math.floor((view.x + cv.width/scale) / TILE);
+  var y0 = Math.floor(view.y / TILE), y1 = Math.floor((view.y + cv.height/scale) / TILE);
+  var n = Math.pow(2, TILE_Z), tx, ty;
+  for (tx=x0;tx<=x1;tx++){
+    for (ty=y0;ty<=y1;ty++){
+      if (ty < 0 || ty >= n) continue;
+      var wx = ((tx % n) + n) % n;
+      var key = wx + '_' + ty;
+      var img = tileImgs[key];
+      if (!img){
+        img = new Image();
+        img.crossOrigin = 'anonymous';
+        tilesTried++;
+        img.onload = function(){ tilesGot++; draw(); };
+        img.onerror = function(){ this.failed = true; };
+        img.src = tileUrl(TILE_Z, wx, ty);
+        tileImgs[key] = img;
+      }
+      if (img.complete && !img.failed && img.naturalWidth){
+        var p2 = toScreen(tx * TILE, ty * TILE);
+        ctx.drawImage(img, p2.x, p2.y, TILE * scale, TILE * scale);
+      }
+    }
+  }
+  /* THE CREDIT IS A CONDITION OF USING THE MAP, not decoration. */
+  ctx.save();
+  ctx.font = '10px monospace';
+  var txt = 'Map data from OpenStreetMap contributors';
+  var w = ctx.measureText(txt).width + 10;
+  ctx.fillStyle = 'rgba(5,8,12,.78)';
+  ctx.fillRect(cv.width - w - 6, cv.height - 18, w, 14);
+  ctx.fillStyle = '#9fb6c9';
+  ctx.fillText(txt, cv.width - w - 1, cv.height - 7);
+  ctx.restore();
+}
+
 /* ================= drawing =================
    THE ICONS ARE DRAWN HERE, LINE BY LINE, AND NOT FETCHED.
    "Map names and icons graphic some free" - the cheapest way to get
@@ -410,6 +524,7 @@ function draw(){
   var w = cv.clientWidth, h = cv.clientHeight;
   if (cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; }
   ctx.fillStyle = '#070d15'; ctx.fillRect(0, 0, cv.width, cv.height);
+  drawTiles();
   var d = gather(), i;
 
   /* the squares, so the loading is visible rather than magic */
@@ -424,11 +539,20 @@ function draw(){
     ctx.beginPath(); ctx.moveTo(0, q.y); ctx.lineTo(cv.width, q.y); ctx.stroke();
   }
 
-  ctx.lineWidth = 1.4;
+  /* A LINE HAS TO BE READABLE ON BOTH BACKGROUNDS. The dark navy that
+     reads well on the page vanished against the pale streets, so with
+     the map on the lines get a light casing underneath - the trick a
+     road atlas uses to keep a road visible over any colour. */
   for (i=0;i<d.links.length;i++){
     var A = toScreen(d.links[i].a.x, d.links[i].a.y);
     var B = toScreen(d.links[i].b.x, d.links[i].b.y);
-    ctx.strokeStyle = '#2d5f7a';
+    if (tilesOn){
+      ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 3.4;
+      ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+      ctx.strokeStyle = '#0d3f5c'; ctx.lineWidth = 1.5;
+    } else {
+      ctx.strokeStyle = '#2d5f7a'; ctx.lineWidth = 1.4;
+    }
     ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
   }
 
@@ -437,7 +561,12 @@ function draw(){
     if (sp.x < -30 || sp.y < -30 || sp.x > cv.width + 30 || sp.y > cv.height + 30) continue;
     drawIcon(n.role, sp.x, sp.y);
     if (view.scale > 0.5){
-      ctx.fillStyle = '#8ea9c2'; ctx.font = '10px monospace';
+      ctx.font = '10px monospace';
+      if (tilesOn){
+        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.85)';
+        ctx.strokeText(n.name, sp.x + 11, sp.y + 4);
+        ctx.fillStyle = '#123';
+      } else ctx.fillStyle = '#8ea9c2';
       ctx.fillText(n.name, sp.x + 11, sp.y + 4);
     }
   }
@@ -513,9 +642,11 @@ function nearestTo(x, y, nodes){
    the part nobody can sell their way around. */
 var LIGHT_KM_S = 200000;      /* light in glass, a constant */
 var SHARE_LOW = 0.50, SHARE_HIGH = 0.80;   /* the band he gave */
-var kmPerSquare = 1, clockMbit = 1000;
+var clockMbit = 1000;
+/* worked out from where the view is, not typed in */
+function kmPerSquare(){ return CELL * metresPerUnit(centreLat()) / 1000; }
 
-function kmOf(units){ return units / CELL * kmPerSquare; }
+function kmOf(units){ return units * metresPerUnit(centreLat()) / 1000; }
 function travelMs(units){ return kmOf(units) / LIGHT_KM_S * 1000; }
 
 function renderSpeed(){
@@ -719,6 +850,18 @@ function render(){
     var sp = toScreen(inView.nodes[i].x, inView.nodes[i].y);
     if (sp.x >= 0 && sp.y >= 0 && sp.x <= cv.width && sp.y <= cv.height) onScreen++;
   }
+  /* WHERE THE VIEW ACTUALLY IS, in real coordinates. */
+  var cLat = centreLat(), cLon = xToLon(view.x + (cv.width/2)/view.scale);
+  row(tV, 'The middle of the view is at',
+      cLat.toFixed(5) + ', ' + cLon.toFixed(5),
+      'Real latitude and longitude');
+  row(tV, 'One square covers', kmPerSquare().toFixed(3) + ' km',
+      'Worked out from this latitude, not typed in');
+  if (myLat !== null)
+    row(tV, 'Your device said it is at', myLat.toFixed(5) + ', ' + myLon.toFixed(5),
+        'From the device, with your permission');
+  else if (geoErr)
+    row(tV, 'Finding your city', '<span class="r">' + geoErr + '</span>', '');
   row(tV, 'Switches on screen', onScreen, 'Core ' + roles.Core
       + ', Edge ' + roles.Edge + ', Access ' + roles.Access + ' including the border');
   row(tV, 'Worked out, including just off screen', inView.nodes.length,
@@ -811,9 +954,17 @@ function renderCan(){
   row(t, 'Show NAT, DHCP, IP, Mask And Gateway At A Location',
       '<span class="m">YES</span>',
       'Example private-range settings, derived from the place itself.');
+  row(t, 'Put You On Your Own City', '<span class="m">YES</span>',
+      'The device gives its position if you allow it.');
+  row(t, 'Show Real Streets Under The Lines', '<span class="m">YES</span>',
+      'OpenStreetMap, free, with the credit it requires. No key needed.');
+  row(t, 'Real Positions And Real Distances', '<span class="m">YES</span>',
+      'One unit is one pixel of the standard web map at zoom 13.');
+  row(t, 'Google Maps Instead', '<span class="r">NEEDS A KEY</span>',
+      'Google requires an API key and a billing account. This does not.');
   row(t, 'Show A Real Country Network - .fi, .gov, Ukraine',
       '<span class="n">NOT AVAILABLE</span>',
-      'A browser has no feed of any real network. These are example lines.');
+      'A browser has no feed of any real network. The switches and lines are a company example.');
   row(t, 'Read A MAC Address Or The Local IP', '<span class="n">NOT AVAILABLE</span>',
       'No browser gives either to a page, on purpose.');
   row(t, 'Invent A Measured Speed Or Delay For A Line', '<span class="n">NOT DONE</span>',
@@ -901,6 +1052,13 @@ function selfCheck(){
     if (tt < floor - 1e-9)
       fails.push('A line is travelling faster than light in glass.');
   }
+
+  /* THE MAP CREDIT IS A CONDITION OF THE LICENCE. If the streets are
+     on, the words have to be on the picture - so this is checked
+     rather than trusted to a line of drawing code that could be moved
+     or covered later. */
+  if (tilesOn && document.getElementById('tCan').innerText.indexOf('OpenStreetMap') < 0)
+    fails.push('The streets are on and OpenStreetMap is not credited on the page.');
 
   /* EVERY IP MUST BE A PRIVATE ONE. A made-up PUBLIC address would
      eventually be somebody's real server, and a map that is going on a
@@ -1045,10 +1203,12 @@ document.getElementById('listFile').addEventListener('change', function(){
   rd.readAsText(f);
 });
 
-document.getElementById('kmPer').addEventListener('input', function(){
-  var v = parseFloat(this.value);
-  if (v > 0){ kmPerSquare = v; render(); }
-});
+document.getElementById('findCity').onclick = findMyCity;
+document.getElementById('streets').onclick = function(){
+  tilesOn = !tilesOn;
+  this.textContent = tilesOn ? 'Hide Streets' : 'Show Streets';
+  draw(); render();
+};
 document.getElementById('clock').addEventListener('input', function(){
   var v = parseFloat(this.value);
   if (v > 0){ clockMbit = v; render(); }
@@ -1067,10 +1227,22 @@ window.__putGlyph = function(g){
   document.getElementById('topText').textContent += ' ' + g; };
 window.__panTo = function(x, y){ view.x = x; view.y = y; draw(); render(); };
 window.__setScale = function(km, mbit){
-  document.getElementById('kmPer').value = String(km);
   document.getElementById('clock').value = String(mbit);
-  kmPerSquare = km; clockMbit = mbit; render();
+  clockMbit = mbit; render();
 };
+window.__goTo = function(lat, lon){
+  view.scale = 1;
+  view.x = lonToX(lon) - (cv.width/2);
+  view.y = latToY(lat) - (cv.height/2);
+  draw(); render();
+};
+window.__here = function(){
+  return { lat: centreLat(), lon: xToLon(view.x + (cv.width/2)/view.scale),
+           metresPerUnit: metresPerUnit(centreLat()) };
+};
+window.__tiles = function(on){ tilesOn = !!on; draw(); render();
+  return { on: tilesOn, tried: tilesTried, got: tilesGot }; };
+window.__tileStats = function(){ return { on: tilesOn, tried: tilesTried, got: tilesGot }; };
 window.__travelMs = function(u){ return travelMs(u); };
 window.__nodesInView = function(){ return inView.nodes.map(function(n){
   return { ip:n.ip, role:n.role }; }); };
@@ -1087,7 +1259,9 @@ window.__read = function(){ return {
     ip: selected.ip, mask: selected.mask, gateway: selected.gateway,
     dhcp: selected.dhcp, nat: selected.nat } : null,
   names: inView.nodes.slice(0,8).map(function(n){ return n.name; }),
-  kmPerSquare: kmPerSquare, clockMbit: clockMbit, lightKmS: LIGHT_KM_S,
+  kmPerSquare: kmPerSquare(), clockMbit: clockMbit, lightKmS: LIGHT_KM_S,
+  lat: centreLat(), lon: xToLon(view.x + (cv.width/2)/view.scale),
+  myLat: myLat, myLon: myLon, geoErr: geoErr, tilesOn: tilesOn,
   embed: EMBED, places: places.length, suppliers: suppliers ? suppliers.length : 0,
   serving: (function(){ var n = nearestPlace();
     return n ? serving(n.p) : null; })(),
