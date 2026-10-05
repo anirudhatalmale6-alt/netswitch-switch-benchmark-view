@@ -77,7 +77,7 @@
 
 <div id="lightPanel"></div>
 
-<div id="bar"><b id="stamp">B64</b><i id="line">Waiting for the camera&hellip;</i></div>
+<div id="bar"><b id="stamp">B65</b><i id="line">Waiting for the camera&hellip;</i></div>
 
 <div id="top">
   <div id="topText">Material Learning. Show the camera a material for thirty seconds,
@@ -175,8 +175,10 @@
    ================================================================== */
 
 var LEARN_MS = 30000;        /* the thirty seconds that were asked for */
-var SAMPLE_MS = 100;         /* a reading ten times a second */
-var W = 260, H = 195;
+var SAMPLE_MS = 200;         /* five readings a second is plenty for a hand-held phone */
+var DRAW_MS = 250;         /* the screen, four times a second */
+var W = 260, H = 195;      /* the picture shown */
+var SW = 160, SH = 120;    /* the picture measured */
 
 var video, shot, ctx, stream = null, running = false;
 var lib = [], learning = null, now = null, match = null, mix = null;
@@ -194,67 +196,50 @@ function stampNow(){
    made-up picture and checked without a camera in front of it. A
    measure that can only ever be tried on a live camera is a measure
    nobody has tested. */
-function signature(data, w, h){
-  var n = w * h, i, j, p;
-  var sum = 0, sumR = 0, sumG = 0, sumB = 0;
-  var lum = new Float32Array(n);
-  for (i=0;i<n;i++){
-    p = i * 4;
-    var r = data[p], g = data[p+1], b = data[p+2];
-    var L = 0.299*r + 0.587*g + 0.114*b;
-    lum[i] = L; sum += L; sumR += r; sumG += g; sumB += b;
-  }
-  var mean = sum / n;
-  if (mean < 1) mean = 1;            /* a black frame is not a material */
+/* ============ THE PIXEL WORK RUNS IN A THREAD OF ITS OWN ==========
+   "slow and worst for cpu too". Measured on the live page: 8,9 per
+   cent of a processor core, held for as long as the page is open,
+   because fifty thousand pixels were being walked four times over,
+   ten times a second, on the thread that also draws the screen.
 
-  /* spread, as a share of the level - not in absolute steps */
-  var varSum = 0;
-  for (i=0;i<n;i++){ var d0 = lum[i] - mean; varSum += d0*d0; }
-  var sd = Math.sqrt(varSum / n);
+   Three changes, and the measurement itself is unchanged:
+     the pixels are walked in a worker, not here
+     the buffer is HANDED OVER rather than copied - it is a
+       transferable, so nothing is duplicated and the page does not
+       grow a copy of every frame it has ever looked at
+     the picture is sampled smaller and less often. These figures are
+       statistical: twenty thousand pixels say the same thing as fifty
+       thousand about the grain of a surface, and five readings a
+       second is already more than a hand can hold a phone still for.
 
-  /* GLOSS: the share of the picture far above the rest of it. A
-     highlight is a few per cent of a glossy surface and essentially
-     none of a matte one. */
-  var hi = mean + 3 * sd, glossN = 0;
-  for (i=0;i<n;i++) if (lum[i] > hi) glossN++;
+   THE SAME CODE RUNS IN BOTH PLACES. The signature is written once
+   and handed to the worker as text, so the figures cannot drift apart
+   between what the page checks and what the worker computes. */
+var SIG_SRC = "function signature(data, w, h){\n  var n = w * h, i, j, p;\n  var sum = 0, sumR = 0, sumG = 0, sumB = 0;\n  var lum = new Float32Array(n);\n  for (i=0;i<n;i++){\n    p = i * 4;\n    var r = data[p], g = data[p+1], b = data[p+2];\n    var L = 0.299*r + 0.587*g + 0.114*b;\n    lum[i] = L; sum += L; sumR += r; sumG += g; sumB += b;\n  }\n  var mean = sum / n;\n  if (mean < 1) mean = 1;            /* a black frame is not a material */\n\n  /* spread, as a share of the level - not in absolute steps */\n  var varSum = 0;\n  for (i=0;i<n;i++){ var d0 = lum[i] - mean; varSum += d0*d0; }\n  var sd = Math.sqrt(varSum / n);\n\n  /* GLOSS: the share of the picture far above the rest of it. A\n     highlight is a few per cent of a glossy surface and essentially\n     none of a matte one. */\n  var hi = mean + 3 * sd, glossN = 0;\n  for (i=0;i<n;i++) if (lum[i] > hi) glossN++;\n\n  /* THE DARK: how much is deep shadow, and does that shadow still\n     have structure in it */\n  var darkCut = mean * 0.45, darkN = 0, darkSum = 0, darkVar = 0;\n  for (i=0;i<n;i++) if (lum[i] < darkCut){ darkN++; darkSum += lum[i]; }\n  var darkMean = darkN ? darkSum / darkN : 0;\n  if (darkN > 8){\n    for (i=0;i<n;i++) if (lum[i] < darkCut){\n      var dd = lum[i] - darkMean; darkVar += dd*dd;\n    }\n    darkVar = Math.sqrt(darkVar / darkN) / (darkMean > 1 ? darkMean : 1);\n  } else darkVar = 0;\n\n  /* ROUGHNESS at two scales: next door, and eight points away. The\n     ratio of the two says whether the surface is fine grain or coarse\n     structure - a grain and a weave are not the same thing. */\n  function roughAt(step){\n    var s = 0, c = 0, x, y;\n    for (y=0;y<h;y+=2){\n      for (x=0;x<w-step;x+=2){\n        s += Math.abs(lum[y*w+x] - lum[y*w+x+step]); c++;\n      }\n    }\n    return c ? (s / c) / mean : 0;\n  }\n  var rough1 = roughAt(1), rough8 = roughAt(8);\n\n  return {\n    gloss: glossN / n,\n    rough1: rough1,\n    rough8: rough8,\n    grain: rough8 > 0 ? rough1 / rough8 : 0,\n    dark: darkN / n,\n    darkStructure: darkVar,\n    contrast: sd / mean,\n    red: sumR / (sumR + sumG + sumB + 1),\n    green: sumG / (sumR + sumG + sumB + 1),\n    level: mean                       /* kept to SHOW, never compared */\n  };\n}";
+var SIG_WORKER_SRC = SIG_SRC + "\nself.onmessage = function(e){\n"
+  + "  var d = e.data;\n"
+  + "  var sig = signature(new Uint8ClampedArray(d.buf), d.w, d.h);\n"
+  + "  self.postMessage(sig);\n"
+  + "};";
+var sigWorker = null, sigBusy = false;
+/* the same text, made live here as well, so a check can hand it a
+   made-up picture without a camera or a worker */
+eval(SIG_SRC);
 
-  /* THE DARK: how much is deep shadow, and does that shadow still
-     have structure in it */
-  var darkCut = mean * 0.45, darkN = 0, darkSum = 0, darkVar = 0;
-  for (i=0;i<n;i++) if (lum[i] < darkCut){ darkN++; darkSum += lum[i]; }
-  var darkMean = darkN ? darkSum / darkN : 0;
-  if (darkN > 8){
-    for (i=0;i<n;i++) if (lum[i] < darkCut){
-      var dd = lum[i] - darkMean; darkVar += dd*dd;
+function sigWorkerStart(){
+  if (sigWorker) return;
+  sigWorker = new Worker(URL.createObjectURL(
+    new Blob([SIG_WORKER_SRC], { type:'text/javascript' })));
+  sigWorker.onmessage = function(ev){
+    sigBusy = false;
+    now = ev.data;
+    frames++;
+    if (learning){
+      learning.list.push(now);
+      if (performance.now() - learning.started >= LEARN_MS) finishLearning();
     }
-    darkVar = Math.sqrt(darkVar / darkN) / (darkMean > 1 ? darkMean : 1);
-  } else darkVar = 0;
-
-  /* ROUGHNESS at two scales: next door, and eight points away. The
-     ratio of the two says whether the surface is fine grain or coarse
-     structure - a grain and a weave are not the same thing. */
-  function roughAt(step){
-    var s = 0, c = 0, x, y;
-    for (y=0;y<h;y+=2){
-      for (x=0;x<w-step;x+=2){
-        s += Math.abs(lum[y*w+x] - lum[y*w+x+step]); c++;
-      }
-    }
-    return c ? (s / c) / mean : 0;
-  }
-  var rough1 = roughAt(1), rough8 = roughAt(8);
-
-  return {
-    gloss: glossN / n,
-    rough1: rough1,
-    rough8: rough8,
-    grain: rough8 > 0 ? rough1 / rough8 : 0,
-    dark: darkN / n,
-    darkStructure: darkVar,
-    contrast: sd / mean,
-    red: sumR / (sumR + sumG + sumB + 1),
-    green: sumG / (sumR + sumG + sumB + 1),
-    level: mean                       /* kept to SHOW, never compared */
+    match = nearest(now);
+    mix = bestMixture(now, lib);
   };
 }
 
@@ -461,19 +446,23 @@ function startCamera(){
 function tick(){
   if (!running){ return; }
   try {
-    ctx.drawImage(video, 0, 0, W, H);
-    var d = ctx.getImageData(0, 0, W, H).data;
-    now = signature(d, W, H);
-    frames++;
-    if (learning){
-      learning.list.push(now);
-      if (performance.now() - learning.started >= LEARN_MS) finishLearning();
+    ctx.drawImage(video, 0, 0, W, H);          /* the picture on screen */
+    if (!sigBusy){
+      /* and a smaller copy for measuring, handed to the worker */
+      sctx.drawImage(video, 0, 0, SW, SH);
+      var img = sctx.getImageData(0, 0, SW, SH);
+      sigBusy = true;
+      sigWorker.postMessage({ buf: img.data.buffer, w: SW, h: SH },
+                            [img.data.buffer]);
     }
-    match = nearest(now);
-    mix = bestMixture(now, lib);
   } catch(e){ /* a frame that is not ready yet is not an error */ }
-  render();
   setTimeout(tick, SAMPLE_MS);
+}
+
+/* THE SCREEN IS DRAWN ON ITS OWN CLOCK, not once per reading. */
+function drawLoop(){
+  render();
+  setTimeout(drawLoop, DRAW_MS);
 }
 
 var ALLOWED_UNITS = 3;     /* three steps off on any one figure, and it is not the same material */
@@ -754,7 +743,12 @@ function selfCheck(){
 /* ================= wiring ================= */
 video = document.getElementById('v');
 shot = document.getElementById('shot');
-ctx = shot.getContext('2d', { willReadFrequently: true });
+ctx = shot.getContext('2d');
+/* the small canvas the measuring reads from - never shown */
+var small = document.createElement('canvas');
+small.width = SW; small.height = SH;
+var sctx = small.getContext('2d', { willReadFrequently: true });
+sigWorkerStart();
 
 document.getElementById('learn').onclick = function(){
   var nm = document.getElementById('name').value.trim();
@@ -777,6 +771,7 @@ document.getElementById('light').addEventListener('input', function(){
 applyLight();
 startCamera();
 render();
+drawLoop();
 
 /* ---- hooks, for checking from outside ---- */
 window.__signature = signature;
@@ -801,7 +796,7 @@ window.__read = function(){ return {
   lib: lib.map(function(m){ return { name:m.name, spread:m.spread, seen:m.seen,
     gloss:m.mid.gloss, rough1:m.mid.rough1, darkStructure:m.mid.darkStructure,
     level:m.mid.level }; }),
-  axes: AXES,
+  axes: AXES, sampleMs: SAMPLE_MS, sw: SW, sh: SH,
   mix: mix, lightPct: lightPct, lightWhat: lightWhat,
   panelOpacity: Number(document.getElementById('lightPanel').style.opacity || 0),
   torchable: !!torchable,
