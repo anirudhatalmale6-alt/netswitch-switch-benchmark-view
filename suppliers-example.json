@@ -1,0 +1,9 @@
+[
+  { "name": "Example Electricity Oy", "service": "Electricity", "x": 200,  "y": 150,  "reach": 900 },
+  { "name": "Another Power Ab",       "service": "Electricity", "x": 2600, "y": 1800, "reach": 600 },
+  { "name": "Example Broadband Oy",   "service": "Broadband",   "x": 350,  "y": 400,  "reach": 700 },
+  { "name": "Fibre Of The North",     "service": "Broadband",   "x": 3400, "y": 900,  "reach": 500 },
+  { "name": "Example Cleaning",       "service": "Cleaning",    "x": 500,  "y": 100,  "reach": 1200 },
+  { "name": "Example Sports Club",    "service": "Sport",       "x": 900,  "y": 900,  "reach": 1500 },
+  { "name": "Example Travel",         "service": "Travel",      "x": 100,  "y": 800,  "reach": 2000 }
+]
