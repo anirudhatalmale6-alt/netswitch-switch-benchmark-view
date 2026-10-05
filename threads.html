@@ -41,7 +41,7 @@
   #crText{color:#12261a;font-weight:700;font-size:12px;line-height:1.4}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B62</b><i id="line">Starting the threads&hellip;</i></div>
+<div id="bar"><b id="stamp">B65</b><i id="line">Starting the threads&hellip;</i></div>
 
 <div id="top">
   <div id="topText">Thread Watchdog. Every thread answers or it is killed.
@@ -139,6 +139,30 @@ var JAM_IN_A_ROW = 2;       /* twice running, so one slow answer is not a verdic
 var HANG_FIRST = 1200;      /* the first deliberate hang */
 var HANG_EVERY = 11000;     /* and one every so often after that */
 var TRACE = 90;             /* answers kept for the chart */
+/* THREE THINGS THAT WERE COSTING A QUARTER OF A PROCESSOR CORE.
+
+   Measured on the live page: 25 per cent of a core, continuously,
+   which on a phone is heat and battery and is exactly what the client
+   reported as "slow and worst for cpu too".
+
+   1. THE PAGE WAS REDRAWN FORTY TIMES A SECOND. The watchdog has to
+      LOOK every 25 ms - that is what a 150 ms limit needs - but
+      rebuilding every table and redrawing the chart at that rate is
+      work nobody can see. Looking and drawing are now separate: the
+      watchdog still looks 40 times a second, the screen is redrawn 4
+      times a second.
+   2. EACH PING DID TWO THOUSAND TRIGONOMETRY STEPS. A ping exists to
+      prove a thread can answer, not to give it work. Eight threads
+      doing that 28 times a second is half a million operations a
+      second spent on nothing.
+   3. THE DELIBERATE HANG RAN FOR EVER. On the client's phone the page
+      had started 61 threads and killed 53 - and creating a thread is
+      expensive. The hang has to happen, or the watchdog is unproven;
+      it does not have to happen all day. It now proves itself three
+      times and then leaves the pool alone. */
+var DRAW_MS = 250;          /* the screen, four times a second */
+var PING_WORK = 200;        /* enough to be real work, not enough to matter */
+var HANG_TIMES = 3;         /* prove it, then stop churning threads */
 
 var POOL = Math.min(navigator.hardwareConcurrency || 4, 8);
 var RECYCLE_MS = 60000 / RESTARTS_PER_MIN;
@@ -163,7 +187,7 @@ function jamWatch(){
   setTimeout(jamWatch, 16);
 }
 jamWatch();
-var hangAt = 0, hungId = 0;
+var hangAt = 0, hungId = 0, hangsDone = 0, lastDraw = 0;
 
 function two(n){ return (n<10?'0':'') + n; }
 function stampNow(){
@@ -182,6 +206,7 @@ function stampNow(){
    Built from text in this page, so there is no second file to ship
    and nothing is fetched from anywhere. */
 var WORKER_SRC = [
+  'var PING_WORK_N = ' + PING_WORK + ';',
   'var guard = 0, load = 1, delay = 0;',
   'self.onmessage = function(e){',
   '  var d = e.data;',
@@ -202,7 +227,7 @@ var WORKER_SRC = [
   '    return;',
   '  }',
   '  if (d.cmd === "ping"){',
-  '    var x = 0.5, i, n = 2000 * load;',
+  '    var x = 0.5, i, n = PING_WORK_N * load;',
   '    for (i=0;i<n;i++){ x = Math.sin(x + i*1e-6) + Math.cos(x*1.609); }',
   '    if (delay){ var t0 = performance.now();',
   '      while (performance.now() - t0 < delay){ x += 0.000001; } }',
@@ -285,8 +310,10 @@ function killThread(t, why){
 function tick(){
   var now = performance.now(), i, t;
 
-  /* the deliberate hang - the proof, at a known moment */
-  if (now - started > hangAt && threads.length){
+  /* the deliberate hang - the proof, at a known moment, and only
+     until it has been proved */
+  if (hangsDone < HANG_TIMES && now - started > hangAt && threads.length){
+    hangsDone++;
     t = threads[0];
     t.hung = true; hungId = t.id;
     try { t.w.postMessage({ cmd:'hang' }); } catch(e){}
@@ -322,7 +349,8 @@ function tick(){
       try { t.w.postMessage({ cmd:'ping', seq:t.sent, at: now }); } catch(e){}
     }
   }
-  render();
+  /* LOOKING AND DRAWING ARE NOT THE SAME JOB. */
+  if (now - lastDraw >= DRAW_MS){ lastDraw = now; render(); }
   setTimeout(tick, TICK_MS);
 }
 
@@ -340,7 +368,6 @@ function render(){
   row(tA, 'Threads running', threads.length + ' of ' + POOL, 'One per processor');
   row(tA, 'Answer or be killed', KILL_MS + ' ms', 'The limit that was asked for');
   row(tA, 'Threads killed so far', killed, killed ? 'Every one replaced' : 'None yet');
-  row(tA, 'Threads started', nextId - 1, '');
   /* THE CADENCE IS COUNTED ON ITS OWN. Kills caused by a stuck thread
      are not recycles, and mixing the two made the cadence read five
      times its real value. */
@@ -370,6 +397,10 @@ function render(){
       !memAfter ? 'Only some browsers report it'
         : (memCost > 65536 ? 'At install' : 'The browser figure is too coarse'));
   row(tA, 'Answers in', answers + ' of ' + pings, 'Pings sent');
+  row(tA, 'Threads started so far', nextId - 1,
+      hangsDone >= HANG_TIMES
+        ? 'The deliberate hang has proved itself and stopped'
+        : 'Proving the watchdog, ' + (HANG_TIMES - hangsDone) + ' to go');
   row(tA, 'Threads seen jamming',
       jamsSeen ? '<span class="r">' + jamsSeen + '</span>'
                : '<span class="m">None</span>',
@@ -675,7 +706,8 @@ window.__read = function(){ return {
   installedAt: installedAt, installBudget: INSTALL_BUDGET,
   mainMemNs: mainMemNs,
   memCost: memAfter ? memAfter - memBefore : 0,
-  jamsSeen: jamsSeen, jamWorst: jamWorst,
+  jamsSeen: jamsSeen, jamWorst: jamWorst, hangsDone: hangsDone,
+  drawMs: DRAW_MS, pingWork: PING_WORK,
   ratios: threads.map(function(t){ return { id:t.id, normal:t.normal, ratio:t.ratio, jamming:t.jamming }; }),
   neverStarted: neverStarted, startGrace: START_GRACE,
   kills: kills.map(function(k){ return { id:k.id, waited:k.waited, why:k.why,
