@@ -63,7 +63,7 @@
   #crText{color:#12261a;font-weight:700;font-size:12px;line-height:1.4}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B71</b><i id="line">Loading what is in view&hellip;</i></div>
+<div id="bar"><b id="stamp">B72</b><i id="line">Loading what is in view&hellip;</i></div>
 
 <div id="top">
   <div id="topText">Lines And Switches. Drag to pan anywhere. Lines, switches and
@@ -90,6 +90,10 @@
   <div class="send">
     <button id="zoomIn">Zoom In</button>
     <button id="zoomOut" class="alt">Zoom Out</button>
+    <label style="color:#9fb6c9;font-size:11px">Go to</label>
+    <select id="placePick" style="background:#070d15;color:#eaf6ff;
+            border:1px solid #1d3448;border-radius:4px;padding:7px 8px;
+            font:12px ui-monospace,monospace"></select>
     <button id="findCity">Find My City</button>
     <button id="streets" class="alt">Show Streets</button>
     <button id="googleBtn" class="alt">Use Google Maps</button>
@@ -131,6 +135,8 @@
   <h2>Line Length Against Travel Time</h2>
   <canvas id="gTan" height="150"></canvas>
   <table id="tSpeed"></table>
+
+  <h2>Kinds Of Cable</h2><table id="tCable"></table>
 
   <h2>What This Map Is, And Is Not</h2><table id="tCan"></table>
 
@@ -297,6 +303,7 @@ function cellNodes(cx, cy){
       name: nameFor(cx, cy, i, role),
       cell: cx + ',' + cy
     };
+    node.kind = kindOf(node, cx, cy, i);
     netOf(node, cx, cy, i);
     out.push(node);
   }
@@ -325,7 +332,8 @@ function linksFor(nodes){
     if (seen[key]) return;
     seen[key] = 1;
     var dx = a.x - b.x, dy = a.y - b.y;
-    out.push({ a: a, b: b, metres: Math.sqrt(dx*dx + dy*dy), id: key });
+    out.push({ a: a, b: b, metres: Math.sqrt(dx*dx + dy*dy), id: key,
+               cable: cableOf(a, b) });
   }
   for (i=0;i<nodes.length;i++){
     var a = nodes[i], near = [];
@@ -370,6 +378,91 @@ function gather(){
   return inView;
 }
 
+
+
+/* ============ NAMED PLACES, AND WHAT SITS AT THEM ============
+   "Example Levi. Ski resort." / "Example Helsinki South" / "yle.fi
+   location map cables devices..."
+
+   THE PLACES ARE REAL AND THE EQUIPMENT IS AN EXAMPLE, and those two
+   facts are kept apart everywhere they appear. Levi really is at
+   67,8047 north - that is a published coordinate, the same one a map
+   book gives. What is drawn on top of it is an example network, as it
+   has been since the start, because nobody publishes the cables and
+   cabinets of a ski resort and I will not invent a utility's plant and
+   label it with their name.
+
+   WHAT THE EXAMPLE DOES GIVE YOU is every kind of thing you asked
+   about in one picture - electricity and fibre and copper, exchanges
+   and routers and switches and servers and desk stations, and the
+   home and business connections hanging off them - behaving the way
+   they behave, so the shape of the product is visible at a real
+   address. Load your own list and the example steps aside. */
+var PLACES = [
+  { name: 'Helsinki',        lat: 60.1699, lon: 24.9384 },
+  { name: 'Helsinki South',  lat: 60.1562, lon: 24.9452 },
+  { name: 'Levi',            lat: 67.8047, lon: 24.8028 },
+  { name: 'Tampere',         lat: 61.4978, lon: 23.7610 },
+  { name: 'Oulu',            lat: 65.0121, lon: 25.4651 },
+  { name: 'Rovaniemi',       lat: 66.5039, lon: 25.7294 },
+  { name: 'Turku',           lat: 60.4518, lon: 22.2666 }
+];
+
+/* ---- the kinds of thing on the ground ---- */
+var KIND = [
+  { id:'Exchange',    col:'#ff6b8a', size:8 },
+  { id:'Router',      col:'#ffc24f', size:6 },
+  { id:'Switch',      col:'#4fd1ff', size:5 },
+  { id:'Server',      col:'#b78bff', size:6 },
+  { id:'Desk Station',col:'#7ee787', size:4 },
+  { id:'Substation',  col:'#ff9d5c', size:7 }
+];
+/* ---- and the kinds of cable between them ----
+   The rate against each one is the NOMINAL rate of that kind of
+   cable, which is a property of the medium and not a reading taken
+   off anybody's line. Every row that shows it says so. */
+var CABLE = [
+  { id:'Electricity', col:'#ff9d5c', dash:[6,3], nominal:'' },
+  { id:'Fibre',       col:'#4fd1ff', dash:[],    nominal:'1 000 to 10 000 Mbit/s' },
+  { id:'Copper ADSL', col:'#8ea9c2', dash:[2,3], nominal:'8 to 24 Mbit/s' },
+  { id:'Home Line',   col:'#7ee787', dash:[],    nominal:'100 to 1 000 Mbit/s' },
+  { id:'Business Line', col:'#b78bff', dash:[],  nominal:'1 000 Mbit/s and above' }
+];
+
+function kindOf(node, cx, cy, i){
+  var h = hash(cx * 911 + i * 7, cy * 523 + 13);
+  /* a Core is the big plant, an Edge the middle, an Access the end */
+  if (node.role === 'Core') return h < 0.45 ? 'Exchange' : (h < 0.7 ? 'Substation' : 'Server');
+  if (node.role === 'Edge') return h < 0.6 ? 'Router' : 'Switch';
+  return h < 0.75 ? 'Desk Station' : 'Switch';
+}
+function cableOf(a, b){
+  if (a.kind === 'Substation' || b.kind === 'Substation') return 'Electricity';
+  if (a.kind === 'Desk Station' || b.kind === 'Desk Station'){
+    var h = hash((a.x + b.x) | 0, (a.y + b.y) | 0);
+    return h < 0.5 ? 'Home Line' : (h < 0.8 ? 'Copper ADSL' : 'Business Line');
+  }
+  return 'Fibre';
+}
+function cableDef(id){
+  for (var i=0;i<CABLE.length;i++) if (CABLE[i].id === id) return CABLE[i];
+  return CABLE[1];
+}
+function kindDef(id){
+  for (var i=0;i<KIND.length;i++) if (KIND[i].id === id) return KIND[i];
+  return KIND[2];
+}
+/* how many connections hang off a thing, counted from the drawing */
+function usersOf(node){
+  var n = 0, i;
+  for (i=0;i<inView.links.length;i++){
+    var L = inView.links[i];
+    if (L.a.id !== node.id && L.b.id !== node.id) continue;
+    var other = L.a.id === node.id ? L.b : L.a;
+    if (other.kind === 'Desk Station') n++;
+  }
+  return n;
+}
 
 /* ============ REAL GROUND UNDER THE MAP ============
    "User needs to find their city. It is not my network. Company
@@ -595,13 +688,14 @@ function stopGoogle(){
    zoom, and they belong to you outright. */
 var COL = { Core:'#ff6b8a', Edge:'#ffc24f', Access:'#4fd1ff' };
 
-function drawIcon(role, x, y){
+function drawIcon(kind, x, y){
+  var kd = kindDef(kind);
   ctx.save();
   ctx.translate(x, y);
-  ctx.strokeStyle = COL[role];
-  ctx.fillStyle = COL[role];
+  ctx.strokeStyle = kd.col;
+  ctx.fillStyle = kd.col;
   ctx.lineWidth = 1.4;
-  if (role === 'Core'){
+  if (kind === 'Exchange' || kind === 'Substation'){
     /* a six sided box with four ports - the big switch */
     var r = 7, k;
     ctx.beginPath();
@@ -619,7 +713,7 @@ function drawIcon(role, x, y){
       ctx.lineTo(Math.cos(ang)*(r+4), Math.sin(ang)*(r+4));
       ctx.stroke();
     }
-  } else if (role === 'Edge'){
+  } else if (kind === 'Router' || kind === 'Switch'){
     /* a box with two arrows through it - traffic passing */
     ctx.strokeRect(-5, -4, 10, 8);
     ctx.beginPath();
@@ -628,6 +722,13 @@ function drawIcon(role, x, y){
     ctx.moveTo(8, 2); ctx.lineTo(-8, 2);
     ctx.moveTo(-5.5, 0); ctx.lineTo(-8, 2); ctx.lineTo(-5.5, 4);
     ctx.stroke();
+  } else if (kind === 'Server'){
+    /* three stacked shelves - a machine that serves */
+    ctx.strokeRect(-5, -6, 10, 4);
+    ctx.strokeRect(-5, -1, 10, 4);
+    ctx.strokeRect(-5, 4, 10, 4);
+    ctx.beginPath(); ctx.arc(3, -4, 0.9, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.arc(3, 1, 0.9, 0, 6.283); ctx.fill();
   } else {
     /* a mast with two waves - where somebody joins */
     ctx.beginPath();
@@ -671,20 +772,25 @@ function draw(){
   for (i=0;i<d.links.length;i++){
     var A = toScreen(d.links[i].a.x, d.links[i].a.y);
     var B = toScreen(d.links[i].b.x, d.links[i].b.y);
+    var cd = cableDef(d.links[i].cable);
     if (tilesOn || gmapOn){
-      ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 3.4;
+      ctx.setLineDash([]);
+      ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 3.6;
       ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
-      ctx.strokeStyle = '#0d3f5c'; ctx.lineWidth = 1.5;
-    } else {
-      ctx.strokeStyle = '#2d5f7a'; ctx.lineWidth = 1.4;
     }
+    /* each kind of cable has its own line, so a picture of a street
+       shows at a glance what is electricity and what is fibre */
+    ctx.setLineDash(cd.dash);
+    ctx.strokeStyle = cd.col;
+    ctx.lineWidth = (d.links[i].cable === 'Electricity') ? 2.2 : 1.6;
     ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+    ctx.setLineDash([]);
   }
 
   for (i=0;i<d.nodes.length;i++){
     var n = d.nodes[i], sp = toScreen(n.x, n.y);
     if (sp.x < -30 || sp.y < -30 || sp.x > cv.width + 30 || sp.y > cv.height + 30) continue;
-    drawIcon(n.role, sp.x, sp.y);
+    drawIcon(n.kind, sp.x, sp.y);
     if (view.scale > 0.5){
       ctx.font = '10px monospace';
       if (tilesOn || gmapOn){
@@ -998,7 +1104,20 @@ function render(){
       + ', Edge ' + roles.Edge + ', Access ' + roles.Access + ' including the border');
   row(tV, 'Worked out, including just off screen', inView.nodes.length,
       'So a line crossing the edge is still drawn');
-  row(tV, 'Lines in view', inView.links.length, 'Between those switches');
+  row(tV, 'Cables in view', inView.links.length, 'Between those pieces of equipment');
+  /* WHAT IS ACTUALLY THERE, COUNTED. Every one of these numbers comes
+     from the drawing in front of you, not from a specification. */
+  var byKind = {}, byCable = {}, k2;
+  for (i=0;i<inView.nodes.length;i++)
+    byKind[inView.nodes[i].kind] = (byKind[inView.nodes[i].kind] || 0) + 1;
+  for (i=0;i<inView.links.length;i++)
+    byCable[inView.links[i].cable] = (byCable[inView.links[i].cable] || 0) + 1;
+  var kl = [];
+  for (k2 in byKind) kl.push(byKind[k2] + ' ' + k2);
+  row(tV, 'Equipment by kind', kl.join(', ') || '-', 'Counted in view');
+  var cl = [];
+  for (k2 in byCable) cl.push(byCable[k2] + ' ' + k2);
+  row(tV, 'Cable by kind', cl.join(', ') || '-', 'Counted in view');
   var total = 0;
   for (i=0;i<inView.links.length;i++) total += inView.links[i].metres;
   row(tV, 'Line length in view', Math.round(total).toLocaleString().replace(/,/g,' '),
@@ -1014,9 +1133,21 @@ function render(){
     var ways = 0;
     for (i=0;i<inView.links.length;i++)
       if (inView.links[i].a.id === selected.id || inView.links[i].b.id === selected.id) ways++;
-    row(tS, 'Switch', selected.name, selected.role);
+    row(tS, 'Equipment', selected.name, selected.kind);
     row(tS, 'Position', Math.round(selected.x) + ', ' + Math.round(selected.y), 'Units');
-    row(tS, 'Ways through it', ways, 'Lines meeting here, counted in view');
+    row(tS, 'Cables meeting here', ways, 'Counted in view');
+    /* what kinds of cable meet here, counted rather than asserted */
+    var mix = {}, mk;
+    for (i=0;i<inView.links.length;i++){
+      var LL = inView.links[i];
+      if (LL.a.id !== selected.id && LL.b.id !== selected.id) continue;
+      mix[LL.cable] = (mix[LL.cable] || 0) + 1;
+    }
+    var mixTxt = [];
+    for (mk in mix) mixTxt.push(mk + ' ' + mix[mk]);
+    row(tS, 'Of which', mixTxt.length ? mixTxt.join(', ') : '-', 'By kind of cable');
+    row(tS, 'Desk stations served', usersOf(selected),
+        'Counted from what is drawn, in view');
     row(tS, 'IP address', selected.ip, 'A private range, example only');
     row(tS, 'Subnet mask', selected.mask, '');
     row(tS, 'Gateway', selected.gateway, 'The way out of this block');
@@ -1030,6 +1161,7 @@ function render(){
   }
 
   renderPlaces();
+  renderCable();
   renderSpeed();
   dxf = toDXF();
   var b1 = new Blob([dxf], { type:'image/vnd.dxf' });
@@ -1053,6 +1185,20 @@ function render(){
     + ' HELD' + Object.keys(built).length
     + ' ' + stampNow();
   selfCheck();
+}
+
+function renderCable(){
+  var t = document.getElementById('tCable'); t.innerHTML = '';
+  var i;
+  for (i=0;i<CABLE.length;i++){
+    row(t, CABLE[i].id,
+        CABLE[i].nominal
+          ? '<span class="sub">' + CABLE[i].nominal + '</span>'
+          : '<span class="sub">Carries power, not data</span>',
+        CABLE[i].nominal
+          ? 'Nominal for this kind of cable. Not a reading from any line here'
+          : '');
+  }
 }
 
 function renderCan(){
@@ -1086,6 +1232,14 @@ function renderCan(){
   row(t, 'Show NAT, DHCP, IP, Mask And Gateway At A Location',
       '<span class="m">YES</span>',
       'Example private-range settings, derived from the place itself.');
+  row(t, 'Go To A Named Place', '<span class="m">YES</span>',
+      'Levi, Helsinki South and the rest, at their published coordinates.');
+  row(t, 'Show Electricity, Fibre, Copper And The Connections',
+      '<span class="m">YES</span>',
+      'Each kind of cable drawn its own way, counted in view.');
+  row(t, 'Show A Real Utility Or Broadcaster Plant',
+      '<span class="n">NOT AVAILABLE</span>',
+      'Nobody publishes it. The equipment here is an example at a real place.');
   row(t, 'Put You On Your Own City', '<span class="m">YES</span>',
       'The device gives its position if you allow it.');
   row(t, 'Show Real Streets Under The Lines', '<span class="m">YES</span>',
@@ -1174,9 +1328,16 @@ function selfCheck(){
   if (body.indexOf('each way') >= 0
       && body.indexOf('200 000 km/s is light in glass') < 0)
     fails.push('A travel time is on the page without naming the constant it came from.');
-  if (/\d+\s*to\s*\d+\s*Mbit\/s/.test(body)
-      && body.indexOf('not a measurement of anything here') < 0)
-    fails.push('A band is on the page without saying it is not a measurement.');
+  /* ANY RATE ON THE PAGE MUST CARRY A QUALIFIER. There are two places
+     one can appear now - the band worked from a clock you typed, and
+     the nominal rate of a kind of cable - and they are qualified in
+     different words, so the rule accepts either rather than insisting
+     on one sentence. What it will not accept is a rate with nothing
+     saying where it came from. */
+  if (/\d+\s*(to\s*[\d\s]+)?Mbit\/s/.test(body)
+      && body.indexOf('not a measurement of anything here') < 0
+      && body.indexOf('Not a reading from any line here') < 0)
+    fails.push('A rate is on the page with nothing saying where it came from.');
 
   /* AND NO LINE MAY BEAT THE SPEED OF LIGHT. If a travel time ever
      comes out under the floor, the arithmetic is wrong somewhere. */
@@ -1262,7 +1423,7 @@ var EMBED = /[?&]embed=1/.test(location.search);
 function applyEmbed(){
   if (!EMBED) return;
   document.getElementById('top').style.display = 'none';
-  var hide = ['tView','tSel','tCan','tSpeed','gTan','tPlaces','tServe'], i, el;
+  var hide = ['tView','tSel','tCan','tSpeed','gTan','tPlaces','tServe','tCable'], i, el;
   for (i=0;i<hide.length;i++){
     el = document.getElementById(hide[i]);
     if (el){
@@ -1385,6 +1546,25 @@ document.getElementById('googleBtn').onclick = function(){
     startGoogle(); this.textContent = 'Stop Google Maps';
   }
 };
+(function(){
+  var sel = document.getElementById('placePick'), i;
+  for (i=0;i<PLACES.length;i++){
+    var o = document.createElement('option');
+    o.value = String(i); o.textContent = PLACES[i].name;
+    sel.appendChild(o);
+  }
+  sel.onchange = function(){
+    var pl = PLACES[Number(this.value)];
+    if (!pl) return;
+    view.scale = 1;
+    view.x = lonToX(pl.lon) - cv.clientWidth/2;
+    view.y = latToY(pl.lat) - cv.clientHeight/2;
+    tilesOn = true;
+    var btn = document.getElementById('streets');
+    if (btn) btn.textContent = 'Hide Streets';
+    draw(); render();
+  };
+})();
 document.getElementById('findCity').onclick = findMyCity;
 document.getElementById('streets').onclick = function(){
   tilesOn = !tilesOn;
@@ -1414,6 +1594,13 @@ window.__panTo = function(x, y){ view.x = x; view.y = y; draw(); render(); };
 window.__setScale = function(km, mbit){
   document.getElementById('clock').value = String(mbit);
   clockMbit = mbit; render();
+};
+window.__goPlace = function(name){
+  var i; for (i=0;i<PLACES.length;i++) if (PLACES[i].name === name){
+    document.getElementById('placePick').value = String(i);
+    document.getElementById('placePick').onchange.call(
+      document.getElementById('placePick')); return true; }
+  return false;
 };
 window.__goTo = function(lat, lon){
   view.scale = 1;
@@ -1445,7 +1632,11 @@ window.__read = function(){ return {
   fails: window.__fails, view: { x: view.x, y: view.y, scale: view.scale },
   nodes: inView.nodes.length, links: inView.links.length,
   held: Object.keys(built).length, built: cellsBuilt, dropped: cellsDropped,
+  placeNames: PLACES.map(function(x){ return x.name; }),
+  kinds: inView.nodes.map(function(n){ return n.kind; }),
+  cables: inView.links.map(function(l){ return l.cable; }),
   selected: selected ? { id: selected.id, role: selected.role, name: selected.name,
+    kind: selected.kind,
     ip: selected.ip, mask: selected.mask, gateway: selected.gateway,
     dhcp: selected.dhcp, nat: selected.nat } : null,
   names: inView.nodes.slice(0,8).map(function(n){ return n.name; }),
