@@ -56,11 +56,11 @@
   #crText{color:#12261a;font-weight:700;font-size:12px;line-height:1.4}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B75</b><i id="line">Ready</i></div>
+<div id="bar"><b id="stamp">B76</b><i id="line">Ready</i></div>
 
 <div id="top">
-  <div id="topText">Both Directions. The same ladder run upwards and then
-    downwards, and the coefficient between the two.</div>
+  <div id="topText">Both Directions. The same ladder run upwards and then downwards,
+    the transform run forward and back, and the coefficient between each pair.</div>
   <div id="ref">&nbsp;</div>
 </div>
 
@@ -83,6 +83,27 @@
   </tr></thead><tbody id="dirBody"></tbody></table>
   <canvas id="gDir" height="170"></canvas>
   <div id="dirSay" style="margin-top:8px;color:#9fb6c9"></div>
+
+  <h2>The Curl Out And The Curl Back In</h2>
+  <canvas id="gCurl" height="300"></canvas>
+  <div id="curlSay" style="margin-top:8px;color:#9fb6c9"></div>
+
+  <h2>The Transform, Forward And Back</h2>
+  <div class="send">
+    <button id="btnFft">Run The Transform</button>
+  </div>
+  <table id="tFft"><thead><tr>
+    <th>points</th><th>forward</th><th>back</th><th>coefficient</th>
+    <th>came back whole</th><th>passes</th>
+  </tr></thead><tbody id="fftBody"></tbody></table>
+  <div id="fftSay" style="margin-top:8px;color:#9fb6c9"></div>
+
+  <h2>Calculation Products</h2>
+  <table id="tCat"><thead><tr>
+    <th>designation</th><th>grade</th><th>number</th><th>sealing figure</th>
+    <th>halving</th>
+  </tr></thead><tbody id="catBody"></tbody></table>
+  <div id="catSay" style="margin-top:8px;color:#9fb6c9"></div>
 
   <h2>Between The Rungs</h2>
   <table id="tInt"><thead><tr>
@@ -222,8 +243,104 @@ var WSRC = [
   "           guard: acc };",
   "}",
   "",
+  "/* ================= THE TRANSFORM, BOTH WAYS =================",
+  "   A transform is the one piece of work that has a real forward and a",
+  "   real backward, not a walk that happens to be reversed. It is sized",
+  "   in powers of two because that is the only shape this method splits",
+  "   evenly.",
+  "",
+  "   AND IT CHECKS ITSELF. Forward then backward must hand back what went",
+  "   in. A transform that is timed but never checked can be fast because",
+  "   it is wrong, and nothing on a page of timings would show it. */",
+  "function fftRun(re, im, inverse){",
+  "  var n = re.length, i, j, k, len, t;",
+  "  for (i = 1, j = 0; i < n; i++){",
+  "    var bit = n >> 1;",
+  "    for (; j & bit; bit >>= 1) j ^= bit;",
+  "    j ^= bit;",
+  "    if (i < j){",
+  "      t = re[i]; re[i] = re[j]; re[j] = t;",
+  "      t = im[i]; im[i] = im[j]; im[j] = t;",
+  "    }",
+  "  }",
+  "  for (len = 2; len <= n; len <<= 1){",
+  "    var ang = 2 * Math.PI / len * (inverse ? 1 : -1);",
+  "    var wr = Math.cos(ang), wi = Math.sin(ang), half = len >> 1;",
+  "    for (i = 0; i < n; i += len){",
+  "      var cr = 1, ci = 0;",
+  "      for (j = 0; j < half; j++){",
+  "        var a = i + j, b = a + half;",
+  "        var ur = re[a], ui = im[a];",
+  "        var vr = re[b] * cr - im[b] * ci;",
+  "        var vi = re[b] * ci + im[b] * cr;",
+  "        re[a] = ur + vr; im[a] = ui + vi;",
+  "        re[b] = ur - vr; im[b] = ui - vi;",
+  "        var ncr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = ncr;",
+  "      }",
+  "    }",
+  "  }",
+  "  if (inverse) for (i = 0; i < n; i++){ re[i] /= n; im[i] /= n; }",
+  "}",
+  "",
+  "function transform(power){",
+  "  var n = 1 << power, i;",
+  "  var src = new Float64Array(n);",
+  "  for (i = 0; i < n; i++) src[i] = Math.sin(i / 35) * 35 + Math.sin(i / 37) * 37;",
+  "  var re = new Float64Array(n), im = new Float64Array(n);",
+  "",
+  "  /* ENOUGH PASSES TO CLEAR THE CLOCK. A single small transform",
+  "     finishes inside one tick, and one tick divides out to a speed",
+  "     nothing on this machine could reach. */",
+  "  var need = TICK * TICKS_NEEDED, passes = 0, fMs = 0, bMs = 0, t0;",
+  "",
+  "  /* ONE PASS BEFORE THE CLOCK STARTS. The smallest size runs first and",
+  "     would otherwise carry the cost of compiling this work for the very",
+  "     first time - which is a real cost, but it belongs to starting up,",
+  "     not to a transform of 256 points. Left in, it made the smallest",
+  "     size look six times dearer per step than the largest and the sizes",
+  "     could not be set against each other at all. */",
+  "  re.set(src); im.fill(0);",
+  "  fftRun(re, im, false); fftRun(re, im, true);",
+  "",
+  "  while ((fMs < need || bMs < need) && passes < 4096){",
+  "    re.set(src); im.fill(0);",
+  "    t0 = performance.now(); fftRun(re, im, false); fMs += performance.now() - t0;",
+  "    t0 = performance.now(); fftRun(re, im, true);  bMs += performance.now() - t0;",
+  "    passes++;",
+  "  }",
+  "  var worst = 0;",
+  "  for (i = 0; i < n; i++) worst = Math.max(worst, Math.abs(re[i] - src[i]));",
+  "  var scale = 0;",
+  "  for (i = 0; i < n; i++) scale = Math.max(scale, Math.abs(src[i]));",
+  "",
+  "  /* The work in a transform of this shape is n times log two of n, so",
+  "     the cost of ONE step is what lets two different sizes be compared",
+  "     at all. A figure per transform cannot be. */",
+  "  var steps = n * power;",
+  "  return { power: power, n: n, passes: passes,",
+  "           fMs: fMs, bMs: bMs,",
+  "           tooShort: fMs < need || bMs < need,",
+  "           fNs: fMs < need ? null : fMs * 1e6 / (passes * steps),",
+  "           bNs: bMs < need ? null : bMs * 1e6 / (passes * steps),",
+  "           worst: worst, relative: scale > 0 ? worst / scale : 0,",
+  "           cameBack: scale > 0 && worst / scale < 1e-9 };",
+  "}",
+  "",
   "self.onmessage = function(e){",
-  "  var d = e.data, out = [], i;",
+  "  if (e.data.what === 'transform'){",
+  "    var rows = [], i;",
+  "    for (i = 0; i < e.data.powers.length; i++){",
+  "      rows.push(transform(e.data.powers[i]));",
+  "      self.postMessage({ progress: i + 1, of: e.data.powers.length });",
+  "    }",
+  "    self.postMessage({ done: true, what: 'transform', rows: rows });",
+  "    return;",
+  "  }",
+  "  ladder(e.data);",
+  "};",
+  "",
+  "function ladder(d){",
+  "  var out = [], i;",
   "  /* The order arrives already arranged. The worker does not sort it -",
   "     a worker that re-sorted its own ladder would quietly undo the",
   "     backwards run and nobody would see it happen. */",
@@ -240,6 +357,26 @@ var WSRC = [
 
 var fwd = null, bwd = null, busy = false, keyRow = null, fails = [];
 var longRun = null, ownSeal = '-', wsrcUrl = null;
+var POWERS = [8, 10, 12, 14, 16, 18, 20];   /* points, as powers of two */
+var fft = null, fftBusy = false;
+
+/* HIS CATALOGUE, HIS DESIGNATIONS AND HIS NUMBERS, TYPED AS HE SENT
+   THEM. These are names for runs of this calculation, in the same way
+   a steel is named 1.4460-90 and nothing about the name is a statement
+   on the metal's behaviour. THE PAGE SAYS SO IN A LINE OF ITS OWN, so
+   nobody reading it takes a designation for a finding about an
+   illness. */
+var CATALOGUE = [
+  { tag: 'ALS', number: '70.1', seal: '.155', grade: '1.4227 AL',       halvingSec: 607025 },
+  { tag: 'HIV', number: '70.2', seal: '.667', grade: '1.4378 AL Totem', halvingSec: 579601.48 },
+  { tag: 'ALZ', number: '70.3', seal: '.900', grade: '1.4460-90 AIS',   halvingSec: 607025 }
+];
+
+/* THE SWEEP. His words: left to right, then back to the left fast,
+   then left to right again. It is tied to the pass actually running -
+   it sweeps right while the ladder is walked upwards and left while it
+   is walked downwards - so it reports state rather than decorating. */
+var sweep = { at: 0, dir: 1, on: false, last: 0 };
 
 function two(n){ return (n < 10 ? '0' : '') + n; }
 function stampNow(){
@@ -281,6 +418,27 @@ function runDirection(dir, kind, seed, then){
                   seed: SEEDS[+el('selSeed').value], capMs: CAP_MS });
 }
 
+/* ================= the transform ================= */
+function runTransform(){
+  if (fftBusy) return;
+  fftBusy = true; fft = null; draw();
+  if (!wsrcUrl) wsrcUrl = URL.createObjectURL(new Blob([WSRC], {type: 'text/javascript'}));
+  var w = new Worker(wsrcUrl);
+  w.onmessage = function(e){
+    if (e.data.progress){
+      say('Transform, size ' + e.data.progress + ' of ' + e.data.of); return;
+    }
+    w.terminate(); fft = e.data.rows; fftBusy = false;
+    say('Transform done, ' + stampNow());
+    draw(); selfCheck();
+  };
+  w.postMessage({ what: 'transform', powers: POWERS });
+}
+function fftCoefficient(r){
+  if (!r || r.fNs === null || r.bNs === null) return null;
+  return r.bNs / r.fNs;
+}
+
 function run(which){
   if (busy) return;
   busy = true; fwd = null; bwd = null; draw();
@@ -292,15 +450,45 @@ function run(which){
     draw(); selfCheck();
   };
   if (which === 'up'){
-    runDirection('up', kind, 0, function(r){ fwd = r; fin(); });
+    sweepOn(1);
+    runDirection('up', kind, 0, function(r){ fwd = r; sweepOff(); fin(); });
   } else if (which === 'down'){
-    runDirection('down', kind, 0, function(r){ bwd = r; fin(); });
+    sweepOn(-1);
+    runDirection('down', kind, 0, function(r){ bwd = r; sweepOff(); fin(); });
   } else {
+    sweepOn(1);
     runDirection('up', kind, 0, function(r){
-      fwd = r; draw();
-      runDirection('down', kind, 0, function(r2){ bwd = r2; fin(); });
+      fwd = r; draw(); sweepOn(-1);
+      runDirection('down', kind, 0, function(r2){ bwd = r2; sweepOff(); fin(); });
     });
   }
+}
+
+/* ================= the sweep ================= */
+/* THE LINE IS DRAWN ON ITS OWN CANVAS LAYER, not by redrawing the
+   chart sixty times a second. The measuring runs in workers precisely
+   so the page stays answerable, and a chart that rebuilt itself on
+   every frame would spend that freedom straight back. */
+function sweepOn(dir){
+  sweep.on = true; sweep.dir = dir;
+  sweep.at = dir > 0 ? 0 : 1;
+  sweep.last = 0;
+  requestAnimationFrame(sweepFrame);
+}
+function sweepOff(){ sweep.on = false; drawChart(); }
+function sweepFrame(t){
+  if (!sweep.on) return;
+  if (sweep.last){
+    /* Across in a second and a quarter, back in a tenth of it. The
+       return is meant to read as a snap, not as a second pass. */
+    var dt = Math.min(t - sweep.last, 100);
+    sweep.at += sweep.dir * dt / 1250;
+    if (sweep.at > 1){ sweep.at = 0; }
+    if (sweep.at < 0){ sweep.at = 1; }
+  }
+  sweep.last = t;
+  drawChart();
+  requestAnimationFrame(sweepFrame);
 }
 
 /* ================= the coefficient ================= */
@@ -570,6 +758,73 @@ function draw(){
     el('dirSay').textContent = s;
   }
 
+  var xb = el('fftBody'); xb.innerHTML = '';
+  (fft || []).forEach(function(r){
+    var tr = document.createElement('tr');
+    function td(t, cls){
+      var e = document.createElement('td');
+      e.textContent = t; if (cls) e.className = cls; tr.appendChild(e);
+    }
+    var c = fftCoefficient(r);
+    td(comma(r.n), 'k');
+    td(r.fNs === null ? 'too short to time' : fi(r.fNs, 2) + ' ns', r.fNs === null ? 'u' : 'fw');
+    td(r.bNs === null ? 'too short to time' : fi(r.bNs, 2) + ' ns', r.bNs === null ? 'u' : 'bw');
+    td(c === null ? '-' : fi(c, 3), 'v');
+    td(r.cameBack ? 'YES' : 'NO', r.cameBack ? 'm' : 'n');
+    td(comma(r.passes), 'u');
+    xb.appendChild(tr);
+  });
+  if (fftBusy) el('fftSay').textContent = 'Running.';
+  else if (fft && fft.length){
+    var broke = fft.filter(function(r){ return !r.cameBack; });
+    var timedF = fft.filter(function(r){ return r.fNs !== null && r.bNs !== null; });
+    var mean = timedF.length
+      ? timedF.reduce(function(s, r){ return s + fftCoefficient(r); }, 0) / timedF.length : 0;
+    var worstBack = fft.reduce(function(m, r){ return Math.max(m, r.relative); }, 0);
+    el('fftSay').textContent =
+      'Each size is timed per step of the work, not per transform, because a transform of a '
+      + 'million points does far more work than one of two hundred and fifty six and the two '
+      + 'cannot otherwise be set beside each other. '
+      + (timedF.length
+          ? 'Backwards costs ' + fi(mean, 3) + ' of forwards across the sizes the clock could see. '
+          : '')
+      + (timedF.length >= 4
+          ? 'The step itself gets cheaper as the transform gets bigger, from '
+            + fi(timedF[0].fNs, 2) + ' ns at ' + comma(timedF[0].n) + ' points down to '
+            + fi(timedF[timedF.length - 1].fNs, 2) + ' ns at '
+            + comma(timedF[timedF.length - 1].n) + ', and then stops falling. '
+            + 'A small transform pays the same setting up and tearing down as a large one '
+            + 'over far fewer steps, so it is dearer per step even though it is quicker '
+            + 'in total. Each size is run once untimed before the clock starts, so this '
+            + 'is not the cost of starting up. '
+          : '')
+      + (broke.length
+          ? broke.length + ' of ' + fft.length + ' sizes did NOT hand back what went in, '
+            + 'so their timings are not fit to use.'
+          : 'Every size handed back what went into it, the worst drift being '
+            + worstBack.toExponential(1).replace('.', ',')
+            + ' of the signal, so these are timings of a transform that actually works.');
+  } else el('fftSay').textContent = 'Press Run The Transform.';
+
+  var cb = el('catBody'); cb.innerHTML = '';
+  CATALOGUE.forEach(function(p){
+    var tr = document.createElement('tr');
+    function td(t, cls){
+      var e = document.createElement('td');
+      e.textContent = t; if (cls) e.className = cls; tr.appendChild(e);
+    }
+    td(p.tag + ' ' + p.number, 'k');
+    td(p.grade, 'u');
+    td(p.number, 'v');
+    td(p.seal, 'v');
+    td(fi(p.halvingSec / 86400, 3) + ' d', 'u');
+    cb.appendChild(tr);
+  });
+  el('catSay').textContent =
+    'These are designations for runs of this calculation, in the same way a steel is '
+    + 'designated 1.4460-90. A designation is a name on a run and says nothing whatever '
+    + 'about any illness, and no reading on this page is a medical one.';
+
   var ib = el('intBody'); ib.innerHTML = '';
   var pts = [];
   LADDER.forEach(function(n, i){
@@ -680,6 +935,7 @@ function draw(){
 
   refreshDownloads();
   drawChart();
+  drawCurl();
 }
 
 function drawChart(){
@@ -693,7 +949,13 @@ function drawChart(){
   }).filter(function(r){ return r.up > 0 || r.down > 0; });
   if (!rows.length){
     x.fillStyle = '#4a6076'; x.font = '12px monospace';
-    x.fillText('Press Run Both Directions', 12, h / 2); return;
+    x.fillText(sweep.on ? 'Measuring. No bar is drawn until there is a reading behind it.'
+                        : 'Press Run Both Directions', 12, h / 2);
+    /* THE SWEEP STILL DRAWS. An empty chart is precisely when a pass is
+       running, so returning here left the line invisible for the whole
+       time it had anything to say. */
+    drawSweep(x, w, h, 26);
+    return;
   }
   /* The cost spans three orders of magnitude between the shortest and
      the longest rung, so the height is on a ratio scale. On a plain
@@ -724,6 +986,108 @@ function drawChart(){
   x.fillStyle = '#4fd1ff'; x.font = '10px monospace';
   x.fillText('upwards', pad, 12);
   x.fillStyle = '#ffc24f'; x.fillText('downwards', pad + 64, 12);
+
+  drawSweep(x, w, h, pad);
+}
+
+/* HIS RED LINE: left to right, then back to the left fast, and away
+   again. It runs rightwards while the ladder is being walked upwards
+   and leftwards while it is being walked downwards, so the line is
+   telling you which pass is on rather than just moving. */
+function drawSweep(x, w, h, pad){
+  if (!sweep.on) return;
+  var sx = 2 + sweep.at * (w - 4);
+  var g = x.createLinearGradient(sx - sweep.dir * 46, 0, sx, 0);
+  g.addColorStop(0, 'rgba(255,0,0,0)'); g.addColorStop(1, 'rgba(255,0,0,0.33)');
+  x.fillStyle = g;
+  x.fillRect(Math.min(sx, sx - sweep.dir * 46), 0, 46, h - 18);
+  x.fillStyle = '#f00'; x.fillRect(sx - 1, 0, 2, h - 18);
+  x.font = '10px monospace';
+  x.fillText(sweep.dir > 0 ? 'walking upwards' : 'walking downwards', pad, h - 4);
+}
+
+/* ================= the curl out and the curl back in ================= */
+/* HIS SHAPE: the ladder curls outward on the way up and curls back in
+   on the way down, numbered at every rung. The two arms are the same
+   eight rungs, so where the arms fail to sit on top of each other is
+   exactly where the direction cost something.
+
+   THE RADIUS CARRIES THE COST, not the size of the rung. A spiral
+   whose radius only grew with the rung number would be a drawing of
+   the ladder rather than a drawing of anything measured. */
+function drawCurl(){
+  var cv = el('gCurl'), x = cv.getContext('2d');
+  var w = cv.clientWidth || 600, h = cv.height;
+  if (cv.width !== w) cv.width = w;
+  x.clearRect(0, 0, w, h);
+  var rows = LADDER.map(function(n, i){
+    return { n: n, i: i, up: fwd && fwd[i] ? fwd[i].nsEach : null,
+             down: bwd && bwd[i] ? bwd[i].nsEach : null };
+  });
+  var timed = rows.filter(function(r){ return r.up || r.down; });
+  if (!timed.length){
+    x.fillStyle = '#4a6076'; x.font = '12px monospace';
+    x.fillText('The curve appears once a run has something to draw', 12, h / 2);
+    return;
+  }
+  var lo = Infinity, hi = 0;
+  timed.forEach(function(r){
+    [r.up, r.down].forEach(function(v){
+      if (v){ lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    });
+  });
+  if (hi <= lo) hi = lo * 1.0001;
+  var cx = w / 2, cy = h / 2, rMin = 26, rMax = Math.min(w, h) / 2 - 34;
+  function rOf(v){ return rMin + (Math.log(v) - Math.log(lo))
+                   / (Math.log(hi) - Math.log(lo)) * (rMax - rMin); }
+  /* The outward arm sweeps the top half, the inward arm the bottom, so
+     the two are never drawn on top of one another. */
+  function arm(key, colour, from, to){
+    var pts = [];
+    rows.forEach(function(r, i){
+      if (!r[key]) return;
+      var f = rows.length > 1 ? i / (rows.length - 1) : 0;
+      var ang = from + (to - from) * f;
+      pts.push({ x: cx + Math.cos(ang) * rOf(r[key]), y: cy + Math.sin(ang) * rOf(r[key]),
+                 n: r.n, i: i + 1 });
+    });
+    if (!pts.length) return;
+    x.strokeStyle = colour; x.lineWidth = 2; x.beginPath();
+    pts.forEach(function(p, i){ i ? x.lineTo(p.x, p.y) : x.moveTo(p.x, p.y); });
+    x.stroke();
+    x.fillStyle = colour; x.font = '9px monospace';
+    pts.forEach(function(p){
+      x.beginPath(); x.arc(p.x, p.y, 3, 0, 7); x.fill();
+      x.fillText(String(p.i), p.x + 5, p.y - 4);
+    });
+  }
+  x.strokeStyle = '#16293a'; x.lineWidth = 1;
+  [rMin, (rMin + rMax) / 2, rMax].forEach(function(r){
+    x.beginPath(); x.arc(cx, cy, r, 0, 7); x.stroke();
+  });
+  arm('up', '#4fd1ff', Math.PI, Math.PI * 2);
+  arm('down', '#ffc24f', Math.PI * 2, Math.PI * 3);
+  x.fillStyle = '#4fd1ff'; x.font = '10px monospace';
+  x.fillText('curl out, walking upwards', 8, 14);
+  x.fillStyle = '#ffc24f'; x.fillText('curl back in, walking downwards', 8, 28);
+  x.fillStyle = '#4a6076';
+  x.fillText('near the middle is cheaper, out at the edge is dearer', 8, h - 8);
+
+  var say = [];
+  var seen = timed.filter(function(r){ return r.up && r.down; });
+  if (seen.length){
+    var apart = seen.map(function(r){ return Math.abs(rOf(r.down) - rOf(r.up)); });
+    var worst = 0, wi = 0;
+    apart.forEach(function(v, i){ if (v > worst){ worst = v; wi = i; } });
+    say.push('The two arms sit on top of each other wherever the direction cost '
+      + 'nothing. They are furthest apart at rung ' + (seen[wi].i + 1)
+      + ', which is ' + comma(seen[wi].n) + ' rounds.');
+  }
+  var unseen = rows.length - timed.length;
+  if (unseen) say.push('The shortest ' + unseen + ' rungs are not on the curve at all, '
+    + 'because the clock could not see them and a point placed from nothing would '
+    + 'still look like a reading.');
+  el('curlSay').textContent = say.join(' ');
 }
 
 /* ================= the page checks itself ================= */
@@ -796,7 +1160,8 @@ el('btnClear').onclick = function(){
   try { localStorage.removeItem('ai2orbit.longrun'); } catch (e) {}
   longRun = loadLongRun(); draw();
 };
-window.addEventListener('resize', drawChart);
+window.addEventListener('resize', function(){ drawChart(); drawCurl(); });
+el('btnFft').onclick = runTransform;
 el('ref').textContent = 'BOTH DIRECTIONS ' + stampNow();
 draw();
 measureKey();
@@ -805,7 +1170,7 @@ selfCheck();
 
 /* for the checks that run this page from outside */
 window.__read = function(){
-  return { ready: !busy, bar: el('stamp').textContent + ' ' + el('line').textContent,
+  return { ready: !busy && !fftBusy, bar: el('stamp').textContent + ' ' + el('line').textContent,
            ref: el('ref').textContent, fails: fails,
            ladder: LADDER,
            up: fwd ? fwd.map(function(r){ return { asked: r.asked, done: r.done, ns: r.nsEach,
@@ -815,9 +1180,17 @@ window.__read = function(){
                  ms: r.ms, cut: r.cut, place: r.place, tooShort: r.tooShort,
                  tick: r.tick, needed: r.needed }; }) : null,
            key: keyRow, longRun: longRun, seal: ownSeal,
+           fft: fft, fftBusy: fftBusy, catalogue: CATALOGUE,
+           sweep: { on: sweep.on, at: sweep.at, dir: sweep.dir },
+           curlSay: el('curlSay').textContent, fftSay: el('fftSay').textContent,
+           catSay: el('catSay').textContent,
            figures: figures(), say: el('dirSay').textContent };
 };
 window.__run = function(which){ run(which); };
+window.__runTransform = runTransform;
+window.__fftCoefficient = fftCoefficient;
+window.__sweepOn = sweepOn;
+window.__sweepOff = sweepOff;
 window.__coefficient = coefficient;
 window.__verdictOf = verdictOf;
 window.__between = between;
