@@ -63,7 +63,7 @@
   #crText{color:#12261a;font-weight:700;font-size:12px;line-height:1.4}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B70</b><i id="line">Loading what is in view&hellip;</i></div>
+<div id="bar"><b id="stamp">B71</b><i id="line">Loading what is in view&hellip;</i></div>
 
 <div id="top">
   <div id="topText">Lines And Switches. Drag to pan anywhere. Lines, switches and
@@ -384,11 +384,9 @@ function gather(){
    a different distance in Helsinki than at the equator.
 
    THE STREETS ARE OPTIONAL AND COME FROM OPENSTREETMAP. They are not
-   mine, they are free to use with the credit shown at the bottom of
-   the map, and that credit is a condition of the licence rather than a
-   courtesy - so the page refuses to show a clean result if the tiles
-   are on and the credit is missing. Google's map needs a key and a
-   billing account; this needs neither.
+   mine; the credit shown at the bottom of the map is a condition of
+   the licence rather than a courtesy, so the page refuses to show a
+   clean result if the tiles are on and the credit is missing.
 
    WHAT IS REAL AND WHAT IS NOT, AND THE PAGE SAYS BOTH: the ground,
    the position, the distances and the travel times are real. The
@@ -492,15 +490,12 @@ function drawTiles(){
    visible to everybody who views it - that is unavoidable with a
    browser map and Google expect it - but a key COMMITTED to a public
    code repository is worse again: it is scraped by machines within
-   minutes of being pushed, and every request they make is billed to
-   whoever owns it. So the key is typed in here, kept in this browser
-   on this device, and goes nowhere near the published file.
+   minutes of being pushed. So the key is typed in here, kept in this
+   browser on this device, and goes nowhere near the published file.
 
    AND IT HAS TO BE RESTRICTED BEFORE IT GOES ANYWHERE PUBLIC. An
-   unrestricted key works from any machine on earth, which means
-   anybody who reads it can spend your money. The page says so where
-   the key is typed, because the warning is worth nothing in a chat
-   message a month from now. */
+   unrestricted key answers from any machine on earth, which means
+   anybody who reads it can use it as though they were you. */
 var gmapOn = false, gmapObj = null, gmapLoading = false, gKey = '';
 var srcHasKey = false, srcChecked = false;
 
@@ -593,9 +588,8 @@ function stopGoogle(){
 
 /* ================= drawing =================
    THE ICONS ARE DRAWN HERE, LINE BY LINE, AND NOT FETCHED.
-   "Map names and icons graphic some free" - the cheapest way to get
-   icons is to take somebody's set, and the cheapest way to inherit a
-   licence problem is the same thing. These are a few strokes of
+   Taking somebody's icon set is the quickest way to inherit their
+   licence. These are a few strokes of
    geometry each, drawn by the page: they cost nothing, they load
    instantly because there is nothing to load, they stay sharp at any
    zoom, and they belong to you outright. */
@@ -995,7 +989,7 @@ function render(){
     row(tV, 'Finding your city', '<span class="r">' + geoErr + '</span>', '');
   row(tV, 'The ground under the lines',
       gmapOn ? '<span class="m">Google Maps, your key</span>'
-             : (tilesOn ? '<span class="m">OpenStreetMap, free</span>'
+             : (tilesOn ? '<span class="m">OpenStreetMap</span>'
                         : '<span class="sub">None - plain background</span>'),
       gKey ? 'A key is kept on this device. Restrict it before it goes public'
            : 'No Google key kept here');
@@ -1095,13 +1089,13 @@ function renderCan(){
   row(t, 'Put You On Your Own City', '<span class="m">YES</span>',
       'The device gives its position if you allow it.');
   row(t, 'Show Real Streets Under The Lines', '<span class="m">YES</span>',
-      'OpenStreetMap, free, with the credit it requires. No key needed.');
+      'OpenStreetMap, with the credit it requires.');
   row(t, 'Real Positions And Real Distances', '<span class="m">YES</span>',
       'One unit is one pixel of the standard web map at zoom 13.');
   row(t, 'Google Maps Instead', '<span class="m">YES, WITH YOUR KEY</span>',
       'Typed in here and kept on this device. Never in the published file.');
   row(t, 'Put Your Key In The Published File', '<span class="n">NOT DONE</span>',
-      'A key in a public repository is scraped within minutes and billed to you.');
+      'A key in a published file is taken by machines within minutes.');
   row(t, 'Show A Real Country Network - .fi, .gov, Ukraine',
       '<span class="n">NOT AVAILABLE</span>',
       'A browser has no feed of any real network. The switches and lines are a company example.');
@@ -1192,6 +1186,17 @@ function selfCheck(){
     if (tt < floor - 1e-9)
       fails.push('A line is travelling faster than light in glass.');
   }
+
+  /* NO PRICE, NO COST, NO "FREE" ANYWHERE ON THE PAGE.
+
+     Asked for plainly: "No prices!". Saying a thing is free is still
+     a statement about its price, and it is commentary nobody asked
+     for on a page whose job is to report what it measured. The rule
+     is checked rather than remembered, the same as the others. */
+  var money = document.getElementById('pg').innerText
+              .match(/\b(free|price|prices|cost|costs|billed|billing|cheap|expensive)\b/i);
+  if (money)
+    fails.push('There is price wording on the page: "' + money[0] + '".');
 
   /* NO GOOGLE KEY MAY BE BAKED INTO THE PUBLISHED FILE.
 
