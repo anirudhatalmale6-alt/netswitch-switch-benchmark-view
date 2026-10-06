@@ -63,7 +63,7 @@
   #crText{color:#12261a;font-weight:700;font-size:12px;line-height:1.4}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B72</b><i id="line">Loading what is in view&hellip;</i></div>
+<div id="bar"><b id="stamp">B73</b><i id="line">Loading what is in view&hellip;</i></div>
 
 <div id="top">
   <div id="topText">Lines And Switches. Drag to pan anywhere. Lines, switches and
@@ -94,6 +94,7 @@
     <select id="placePick" style="background:#070d15;color:#eaf6ff;
             border:1px solid #1d3448;border-radius:4px;padding:7px 8px;
             font:12px ui-monospace,monospace"></select>
+    <button id="whatHere">What Is Here</button>
     <button id="findCity">Find My City</button>
     <button id="streets" class="alt">Show Streets</button>
     <button id="googleBtn" class="alt">Use Google Maps</button>
@@ -135,6 +136,8 @@
   <h2>Line Length Against Travel Time</h2>
   <canvas id="gTan" height="150"></canvas>
   <table id="tSpeed"></table>
+
+  <h2>Street And Postcode Under The Cross</h2><table id="tAddr"></table>
 
   <h2>Kinds Of Cable</h2><table id="tCable"></table>
 
@@ -380,6 +383,101 @@ function gather(){
 
 
 
+
+/* ============ THE STREET AND THE POSTCODE UNDER THE CROSS ============
+   "Map Streetnames and City numbers with current code on location."
+
+   The street names you can already SEE are drawn into the map itself.
+   What was missing is the page being able to TELL you what it is
+   looking at - the road, the number, the postcode, the city - as text
+   you can read, copy and put in a report.
+
+   That is a question only a gazetteer can answer: a coordinate has no
+   street name in it. This asks OpenStreetMap's own lookup, which
+   needs no key.
+
+   IT IS ASKED SPARINGLY AND ON PURPOSE. The lookup is a shared
+   service with a published limit of one question a second, so the
+   page asks only when you press the button, never while you drag,
+   never more than once a second, and remembers what it has already
+   been told so the same spot is never asked twice. A page that
+   hammered it would be cut off, and would deserve to be. */
+var ADDR_MIN_GAP = 1100;         /* never more often than this */
+var addrCache = {}, addrLast = 0, addrBusy = false;
+var addrNow = null, addrErr = '';
+
+function addrKey(lat, lon){ return lat.toFixed(4) + ',' + lon.toFixed(4); }
+
+function askAddress(){
+  var lat = centreLat(), lon = xToLon(view.x + (cv.width/2)/view.scale);
+  var key = addrKey(lat, lon);
+  if (addrCache[key]){ addrNow = addrCache[key]; addrErr = ''; render(); return; }
+  var since = Date.now() - addrLast;
+  if (addrBusy || since < ADDR_MIN_GAP){
+    addrErr = 'Asking again in a moment - the lookup allows one question a second.';
+    render();
+    return;
+  }
+  addrBusy = true; addrLast = Date.now();
+  addrErr = 'Asking what is here...';
+  render();
+  var url = 'https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18'
+          + '&lat=' + lat.toFixed(6) + '&lon=' + lon.toFixed(6);
+  fetch(url, { headers: { 'Accept': 'application/json' } })
+    .then(function(r){
+      if (!r.ok) throw new Error('the lookup answered ' + r.status);
+      return r.json();
+    })
+    .then(function(j){
+      var a = j.address || {};
+      var got = {
+        road: a.road || a.pedestrian || a.footway || a.suburb || '',
+        number: a.house_number || '',
+        postcode: a.postcode || '',
+        city: a.city || a.town || a.village || a.municipality || '',
+        country: a.country || '',
+        label: j.display_name || ''
+      };
+      addrCache[key] = got; addrNow = got; addrErr = '';
+      addrBusy = false; render();
+    })
+    .catch(function(e){
+      /* A LOOKUP THAT DID NOT ANSWER IS SAID OUT LOUD. An empty line
+         would read as "this place has no address", which is a
+         different and wrong statement. */
+      addrNow = null;
+      addrErr = 'The lookup did not answer: ' + (e && e.message ? e.message : e);
+      addrBusy = false; render();
+    });
+}
+
+function renderAddress(){
+  var t = document.getElementById('tAddr'); t.innerHTML = '';
+  var lat = centreLat(), lon = xToLon(view.x + (cv.width/2)/view.scale);
+  row(t, 'The cross is at', lat.toFixed(5) + ', ' + lon.toFixed(5),
+      'Real latitude and longitude');
+  if (addrErr){
+    row(t, 'Street and postcode', '<span class="r">' + addrErr + '</span>', '');
+    return;
+  }
+  if (!addrNow){
+    row(t, 'Street and postcode',
+        '<span class="sub">Press What Is Here to ask</span>',
+        'Asked only when you press it');
+    return;
+  }
+  row(t, 'Street', addrNow.road
+      ? (addrNow.number ? addrNow.road + ' ' + addrNow.number : addrNow.road)
+      : '<span class="sub">No street named at this spot</span>', '');
+  row(t, 'Postcode', addrNow.postcode
+      || '<span class="sub">None given for this spot</span>', 'The city number');
+  row(t, 'City', addrNow.city || '<span class="sub">None given</span>', '');
+  row(t, 'Country', addrNow.country || '<span class="sub">None given</span>', '');
+  row(t, 'As the gazetteer writes it',
+      '<span class="sub">' + (addrNow.label || '-') + '</span>',
+      'From OpenStreetMap');
+}
+
 /* ============ NAMED PLACES, AND WHAT SITS AT THEM ============
    "Example Levi. Ski resort." / "Example Helsinki South" / "yle.fi
    location map cables devices..."
@@ -399,13 +497,18 @@ function gather(){
    they behave, so the shape of the product is visible at a real
    address. Load your own list and the example steps aside. */
 var PLACES = [
-  { name: 'Helsinki',        lat: 60.1699, lon: 24.9384 },
-  { name: 'Helsinki South',  lat: 60.1562, lon: 24.9452 },
-  { name: 'Levi',            lat: 67.8047, lon: 24.8028 },
-  { name: 'Tampere',         lat: 61.4978, lon: 23.7610 },
-  { name: 'Oulu',            lat: 65.0121, lon: 25.4651 },
-  { name: 'Rovaniemi',       lat: 66.5039, lon: 25.7294 },
-  { name: 'Turku',           lat: 60.4518, lon: 22.2666 }
+  { name: 'Helsinki',            lat: 60.1699, lon: 24.9384 },
+  { name: 'Helsingin Keskusta',  lat: 60.1708, lon: 24.9414 },
+  { name: 'Helsinki South',      lat: 60.1562, lon: 24.9452 },
+  { name: 'Helsinki-Vantaa',     lat: 60.3172, lon: 24.9633 },
+  { name: 'Levi',                lat: 67.8047, lon: 24.8028 },
+  { name: 'Tampere',             lat: 61.4978, lon: 23.7610 },
+  { name: 'Oulu',                lat: 65.0121, lon: 25.4651 },
+  { name: 'Rovaniemi',           lat: 66.5039, lon: 25.7294 },
+  { name: 'Turku',               lat: 60.4518, lon: 22.2666 },
+  { name: 'London, UK',          lat: 51.5074, lon: -0.1278 },
+  { name: 'New York, NY, US',    lat: 40.7128, lon: -74.0060 },
+  { name: 'Madrid, ES',          lat: 40.4168, lon: -3.7038 }
 ];
 
 /* ---- the kinds of thing on the ground ---- */
@@ -1161,6 +1264,7 @@ function render(){
   }
 
   renderPlaces();
+  renderAddress();
   renderCable();
   renderSpeed();
   dxf = toDXF();
@@ -1232,6 +1336,9 @@ function renderCan(){
   row(t, 'Show NAT, DHCP, IP, Mask And Gateway At A Location',
       '<span class="m">YES</span>',
       'Example private-range settings, derived from the place itself.');
+  row(t, 'Name The Street And Postcode Under The Cross',
+      '<span class="m">YES</span>',
+      'Asked of the OpenStreetMap gazetteer when you press the button.');
   row(t, 'Go To A Named Place', '<span class="m">YES</span>',
       'Levi, Helsinki South and the rest, at their published coordinates.');
   row(t, 'Show Electricity, Fibre, Copper And The Connections',
@@ -1423,7 +1530,7 @@ var EMBED = /[?&]embed=1/.test(location.search);
 function applyEmbed(){
   if (!EMBED) return;
   document.getElementById('top').style.display = 'none';
-  var hide = ['tView','tSel','tCan','tSpeed','gTan','tPlaces','tServe','tCable'], i, el;
+  var hide = ['tView','tSel','tCan','tSpeed','gTan','tPlaces','tServe','tCable','tAddr'], i, el;
   for (i=0;i<hide.length;i++){
     el = document.getElementById(hide[i]);
     if (el){
@@ -1565,6 +1672,7 @@ document.getElementById('googleBtn').onclick = function(){
     draw(); render();
   };
 })();
+document.getElementById('whatHere').onclick = askAddress;
 document.getElementById('findCity').onclick = findMyCity;
 document.getElementById('streets').onclick = function(){
   tilesOn = !tilesOn;
@@ -1595,6 +1703,9 @@ window.__setScale = function(km, mbit){
   document.getElementById('clock').value = String(mbit);
   clockMbit = mbit; render();
 };
+window.__askAddress = function(){ askAddress(); };
+window.__addrState = function(){ return { now: addrNow, err: addrErr,
+  cached: Object.keys(addrCache).length }; };
 window.__goPlace = function(name){
   var i; for (i=0;i<PLACES.length;i++) if (PLACES[i].name === name){
     document.getElementById('placePick').value = String(i);
@@ -1633,6 +1744,7 @@ window.__read = function(){ return {
   nodes: inView.nodes.length, links: inView.links.length,
   held: Object.keys(built).length, built: cellsBuilt, dropped: cellsDropped,
   placeNames: PLACES.map(function(x){ return x.name; }),
+  addr: addrNow, addrErr: addrErr,
   kinds: inView.nodes.map(function(n){ return n.kind; }),
   cables: inView.links.map(function(l){ return l.cable; }),
   selected: selected ? { id: selected.id, role: selected.role, name: selected.name,
