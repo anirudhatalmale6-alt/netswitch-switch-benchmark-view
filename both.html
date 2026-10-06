@@ -291,7 +291,7 @@ var WSRC = [
   "  /* ENOUGH PASSES TO CLEAR THE CLOCK. A single small transform",
   "     finishes inside one tick, and one tick divides out to a speed",
   "     nothing on this machine could reach. */",
-  "  var need = TICK * TICKS_NEEDED, passes = 0, fMs = 0, bMs = 0, t0;",
+  "  var need = TICK * TICKS_NEEDED, t0, k;",
   "",
   "  /* ONE PASS BEFORE THE CLOCK STARTS. The smallest size runs first and",
   "     would otherwise carry the cost of compiling this work for the very",
@@ -302,12 +302,58 @@ var WSRC = [
   "  re.set(src); im.fill(0);",
   "  fftRun(re, im, false); fftRun(re, im, true);",
   "",
-  "  while ((fMs < need || bMs < need) && passes < 4096){",
-  "    re.set(src); im.fill(0);",
-  "    t0 = performance.now(); fftRun(re, im, false); fMs += performance.now() - t0;",
-  "    t0 = performance.now(); fftRun(re, im, true);  bMs += performance.now() - t0;",
-  "    passes++;",
+  "  /* A BLOCK BIG ENOUGH FOR THE CLOCK TO SEE, then the BEST block kept",
+  "     rather than the average of them. Anything else running on the",
+  "     machine can only ever make a block slower - never faster - so an",
+  "     average is an average of this work plus whatever interrupted it.",
+  "     Averaging left one size reading three times its neighbour on one",
+  "     run and matching it on the next.",
+  "",
+  "     EVERY BLOCK RESETS THE BUFFER ON EACH TURN. Running the transform",
+  "     forward a thousand times before any backward one grows the numbers",
+  "     until they stop being numbers, and the round trip check then fails",
+  "     on arithmetic rather than on timing - which is exactly what it did.",
+  "",
+  "     The reset is not free, so it is MEASURED IN A BLOCK OF ITS OWN and",
+  "     taken off. Three blocks are run: the reset alone, the reset with",
+  "     the forward transform, and the reset with both. Each cost is the",
+  "     difference between two of them. */",
+  "  function block(stage){",
+  "    var best = Infinity, blk, kk, t1;",
+  "    for (blk = 0; blk < 5; blk++){",
+  "      t1 = performance.now();",
+  "      for (kk = 0; kk < per; kk++){",
+  "        re.set(src); im.fill(0);",
+  "        if (stage >= 1) fftRun(re, im, false);",
+  "        if (stage >= 2) fftRun(re, im, true);",
+  "      }",
+  "      var el = performance.now() - t1;",
+  "      if (el < best) best = el;",
+  "    }",
+  "    return best;",
   "  }",
+  "  /* THE BLOCK IS SIZED FOR THE DIFFERENCE, NOT FOR THE WHOLE BLOCK.",
+  "     What is wanted is the forward transform on its own, and that is",
+  "     what one block leaves behind when another is taken off it. Sizing",
+  "     the block so the BLOCK clears the clock is not enough - the part",
+  "     that survives the subtraction must clear it too, or the small",
+  "     sizes come back unmeasurable while the blocks they came from",
+  "     looked perfectly long. */",
+  "  var per = 1, pairMs = 0;",
+  "  while (per < 65536){",
+  "    t0 = performance.now();",
+  "    for (k = 0; k < per; k++){ re.set(src); im.fill(0); fftRun(re, im, false); fftRun(re, im, true); }",
+  "    pairMs = performance.now() - t0;",
+  "    if (pairMs >= need) break;",
+  "    per *= 2;",
+  "  }",
+  "  var oneFwd = pairMs / per / 2;",
+  "  if (oneFwd > 0){",
+  "    var wanted = Math.ceil(need * 3 / oneFwd);",
+  "    per = Math.max(1, Math.min(wanted, 65536));",
+  "  }",
+  "  var mReset = block(0), mFwd = block(1), mBoth = block(2);",
+  "  var fMs = mFwd - mReset, bMs = mBoth - mFwd, passes = per;",
   "  var worst = 0;",
   "  for (i = 0; i < n; i++) worst = Math.max(worst, Math.abs(re[i] - src[i]));",
   "  var scale = 0;",
@@ -317,8 +363,12 @@ var WSRC = [
   "     the cost of ONE step is what lets two different sizes be compared",
   "     at all. A figure per transform cannot be. */",
   "  var steps = n * power;",
+  "  /* A DIFFERENCE BETWEEN TWO MEASURED BLOCKS CAN COME OUT NEGATIVE OR",
+  "     TINY when the thing being isolated is small beside what it was",
+  "     measured against. That is not a fast transform, it is a figure the",
+  "     method cannot produce, and it is reported as one. */",
   "  return { power: power, n: n, passes: passes,",
-  "           fMs: fMs, bMs: bMs,",
+  "           fMs: fMs, bMs: bMs, resetMs: mReset,",
   "           tooShort: fMs < need || bMs < need,",
   "           fNs: fMs < need ? null : fMs * 1e6 / (passes * steps),",
   "           bNs: bMs < need ? null : bMs * 1e6 / (passes * steps),",
@@ -780,23 +830,28 @@ function draw(){
     var timedF = fft.filter(function(r){ return r.fNs !== null && r.bNs !== null; });
     var mean = timedF.length
       ? timedF.reduce(function(s, r){ return s + fftCoefficient(r); }, 0) / timedF.length : 0;
+    var perStep = timedF.map(function(r){ return r.fNs; });
     var worstBack = fft.reduce(function(m, r){ return Math.max(m, r.relative); }, 0);
     el('fftSay').textContent =
       'Each size is timed per step of the work, not per transform, because a transform of a '
       + 'million points does far more work than one of two hundred and fifty six and the two '
       + 'cannot otherwise be set beside each other. '
       + (timedF.length
-          ? 'Backwards costs ' + fi(mean, 3) + ' of forwards across the sizes the clock could see. '
+          ? 'Backwards takes ' + fi(mean, 3) + ' of forwards across the sizes the clock could see. '
           : '')
-      + (timedF.length >= 4
-          ? 'The step itself gets cheaper as the transform gets bigger, from '
-            + fi(timedF[0].fNs, 2) + ' ns at ' + comma(timedF[0].n) + ' points down to '
-            + fi(timedF[timedF.length - 1].fNs, 2) + ' ns at '
-            + comma(timedF[timedF.length - 1].n) + ', and then stops falling. '
-            + 'A small transform pays the same setting up and tearing down as a large one '
-            + 'over far fewer steps, so it is dearer per step even though it is quicker '
-            + 'in total. Each size is run once untimed before the clock starts, so this '
-            + 'is not the cost of starting up. '
+      + (timedF.length >= 3
+          ? 'The step costs between ' + fi(Math.min.apply(null, perStep), 2) + ' and '
+            + fi(Math.max.apply(null, perStep), 2) + ' ns whatever the size, across '
+            + comma(timedF[0].n) + ' points up to ' + comma(timedF[timedF.length - 1].n)
+            + '. A flat figure across that range is what says the work really does grow '
+            + 'as the points times the halvings of the points, and that two sizes can '
+            + 'therefore be set against each other at all. '
+          : '')
+      + (fft.length > timedF.length
+          ? 'The ' + (fft.length - timedF.length) + ' smallest sizes are left blank. '
+            + 'Each cost here is one block of work with another block taken off it, and '
+            + 'at those sizes the part left over is too small for the clock to stand '
+            + 'behind. '
           : '')
       + (broke.length
           ? broke.length + ' of ' + fft.length + ' sizes did NOT hand back what went in, '
