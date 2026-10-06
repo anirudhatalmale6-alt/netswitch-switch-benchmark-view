@@ -28,6 +28,12 @@
   td.u{color:#4a6076;font-weight:400}
   .m{color:#3fd18a}.r{color:#d8a53f}.n{color:#e0645f}.sub{color:#4a6076}
   #mapWrap{position:relative;margin-top:6px}
+  /* Google draws the ground in its own element; the network is drawn
+     on the canvas above it, which is transparent in that mode. */
+  #gmap{position:absolute;left:0;top:0;right:0;bottom:0;display:none;
+    border-radius:4px;overflow:hidden}
+  #gmap.on{display:block}
+  #map.clear{background:transparent}
   #map{display:block;width:100%;height:62vh;background:#070d15;
     border:1px solid #16293a;border-radius:4px;touch-action:none;cursor:grab}
   #map.drag{cursor:grabbing}
@@ -57,7 +63,7 @@
   #crText{color:#12261a;font-weight:700;font-size:12px;line-height:1.4}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B69</b><i id="line">Loading what is in view&hellip;</i></div>
+<div id="bar"><b id="stamp">B70</b><i id="line">Loading what is in view&hellip;</i></div>
 
 <div id="top">
   <div id="topText">Lines And Switches. Drag to pan anywhere. Lines, switches and
@@ -68,6 +74,7 @@
 <div id="pg">
 
   <div id="mapWrap">
+    <div id="gmap"></div>
     <canvas id="map"></canvas>
     <div id="hud">&nbsp;</div>
   </div>
@@ -85,6 +92,7 @@
     <button id="zoomOut" class="alt">Zoom Out</button>
     <button id="findCity">Find My City</button>
     <button id="streets" class="alt">Show Streets</button>
+    <button id="googleBtn" class="alt">Use Google Maps</button>
     <button id="home" class="alt">Back To The Start</button>
     <a class="alt" id="dlDxf" download="lines-and-switches.dxf"
        style="color:#9fd6f5">Download DXF</a>
@@ -93,6 +101,16 @@
   </div>
 
   <h2>What Is In View</h2><table id="tView"></table>
+
+  <div class="send" id="keyBar">
+    <label style="color:#9fb6c9;font-size:11px">Google key</label>
+    <input id="gkey" placeholder="Paste your own key - it stays on this device"
+           autocomplete="off" spellcheck="false"
+           style="width:300px;background:#070d15;color:#eaf6ff;border:1px solid #1d3448;
+                  border-radius:4px;padding:8px 10px;font:12px ui-monospace,monospace">
+    <button id="saveKey" class="alt">Keep Key Here</button>
+    <button id="dropKey" class="alt">Forget Key</button>
+  </div>
 
   <div class="send" id="placeBar">
     <input id="placeName" placeholder="Home, Work, The Shop&hellip;" autocomplete="off"
@@ -163,6 +181,12 @@ var CELL = 300;
 var PER_CELL = 2;          /* switches worked out per square */
 var LINK_REACH = 1.6;      /* how far a line may reach, in squares */
 
+/* WHERE THE MAP OPENS. With real coordinates, 0,0 is the top left
+   corner of the world map - latitude 85 north, on the date line, in
+   the Arctic Ocean. That is where this opened until I looked at the
+   figures rather than the picture. It opens on Helsinki now, and Back
+   To The Start returns there. */
+var START_LAT = 60.1699, START_LON = 24.9384;
 var view = { x: 0, y: 0, scale: 1 };
 var cv, ctx, hud, dragging = false, lastX = 0, lastY = 0, moved = 0;
 var cellsBuilt = 0, cellsDropped = 0, built = {}, selected = null;
@@ -462,6 +486,111 @@ function drawTiles(){
   ctx.restore();
 }
 
+
+/* ============ GOOGLE'S MAP, WITH YOUR OWN KEY ============
+   THE KEY IS NEVER PUT IN THIS FILE. A Google key in a public page is
+   visible to everybody who views it - that is unavoidable with a
+   browser map and Google expect it - but a key COMMITTED to a public
+   code repository is worse again: it is scraped by machines within
+   minutes of being pushed, and every request they make is billed to
+   whoever owns it. So the key is typed in here, kept in this browser
+   on this device, and goes nowhere near the published file.
+
+   AND IT HAS TO BE RESTRICTED BEFORE IT GOES ANYWHERE PUBLIC. An
+   unrestricted key works from any machine on earth, which means
+   anybody who reads it can spend your money. The page says so where
+   the key is typed, because the warning is worth nothing in a chat
+   message a month from now. */
+var gmapOn = false, gmapObj = null, gmapLoading = false, gKey = '';
+var srcHasKey = false, srcChecked = false;
+
+/* the bytes the server actually sends, looked at once */
+function checkOwnSource(){
+  if (srcChecked) return;
+  srcChecked = true;
+  try {
+    fetch(location.pathname, { cache: 'no-store' })
+      .then(function(r){ return r.text(); })
+      .then(function(t){
+        srcHasKey = /AIza[0-9A-Za-z_\-]{30,}/.test(t);
+        selfCheck();
+      })
+      .catch(function(){ /* opened off a disc: nothing to check */ });
+  } catch(e){}
+}
+var gmapErr = '';
+
+function loadKey(){
+  try { gKey = localStorage.getItem('ai2orbit-gkey') || ''; } catch(e){ gKey = ''; }
+}
+function saveKey(k){
+  gKey = k;
+  try { localStorage.setItem('ai2orbit-gkey', k); } catch(e){}
+}
+
+function startGoogle(){
+  if (!gKey){ gmapErr = 'Type your Google key first.'; render(); return; }
+  if (window.google && window.google.maps){ makeGoogle(); return; }
+  if (gmapLoading) return;
+  gmapLoading = true;
+  gmapErr = 'Loading Google...';
+  render();
+  window.gm_authFailure = function(){
+    /* GOOGLE REFUSING THE KEY IS A FACT, NOT A BLANK SCREEN. */
+    gmapErr = 'Google refused that key. It is usually the key being wrong, the '
+            + 'Maps JavaScript API not switched on, or the restriction not '
+            + 'allowing this address.';
+    gmapOn = false; gmapLoading = false;
+    document.getElementById('gmap').classList.remove('on');
+    document.getElementById('map').classList.remove('clear');
+    draw(); render();
+  };
+  var sc = document.createElement('script');
+  sc.async = true;
+  sc.src = 'https://maps.googleapis.com/maps/api/js?key='
+         + encodeURIComponent(gKey) + '&callback=__gmapReady&loading=async';
+  sc.onerror = function(){
+    gmapErr = 'Google could not be reached from here.';
+    gmapLoading = false; render();
+  };
+  document.head.appendChild(sc);
+}
+window.__gmapReady = function(){ gmapLoading = false; makeGoogle(); };
+
+function makeGoogle(){
+  var el = document.getElementById('gmap');
+  el.classList.add('on');
+  document.getElementById('map').classList.add('clear');
+  if (!gmapObj){
+    gmapObj = new google.maps.Map(el, {
+      center: { lat: centreLat(), lng: xToLon(view.x + (cv.width/2)/view.scale) },
+      zoom: TILE_Z,
+      disableDefaultUI: true, gestureHandling: 'none', keyboardShortcuts: false
+    });
+  }
+  gmapOn = true; gmapErr = '';
+  tilesOn = false;          /* one ground at a time */
+  syncGoogle();
+  draw(); render();
+}
+
+/* THE TWO MAPS MUST SHOW THE SAME GROUND OR THE LINES SIT ON THE WRONG
+   STREETS. Both use the same projection, so the centre is the centre
+   and the zoom is this map's zoom plus however far it has been
+   magnified. */
+function syncGoogle(){
+  if (!gmapOn || !gmapObj) return;
+  var lat = centreLat(), lon = xToLon(view.x + (cv.width/2)/view.scale);
+  gmapObj.setCenter({ lat: lat, lng: lon });
+  gmapObj.setZoom(TILE_Z + Math.log(view.scale) / Math.LN2);
+}
+function stopGoogle(){
+  gmapOn = false;
+  document.getElementById('gmap').classList.remove('on');
+  document.getElementById('map').classList.remove('clear');
+  draw(); render();
+}
+
 /* ================= drawing =================
    THE ICONS ARE DRAWN HERE, LINE BY LINE, AND NOT FETCHED.
    "Map names and icons graphic some free" - the cheapest way to get
@@ -521,9 +650,11 @@ function toScreen(x, y){
   return { x: (x - view.x) * view.scale, y: (y - view.y) * view.scale };
 }
 function draw(){
+  syncGoogle();
   var w = cv.clientWidth, h = cv.clientHeight;
   if (cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; }
-  ctx.fillStyle = '#070d15'; ctx.fillRect(0, 0, cv.width, cv.height);
+  if (gmapOn) ctx.clearRect(0, 0, cv.width, cv.height);
+  else { ctx.fillStyle = '#070d15'; ctx.fillRect(0, 0, cv.width, cv.height); }
   drawTiles();
   var d = gather(), i;
 
@@ -546,7 +677,7 @@ function draw(){
   for (i=0;i<d.links.length;i++){
     var A = toScreen(d.links[i].a.x, d.links[i].a.y);
     var B = toScreen(d.links[i].b.x, d.links[i].b.y);
-    if (tilesOn){
+    if (tilesOn || gmapOn){
       ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 3.4;
       ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
       ctx.strokeStyle = '#0d3f5c'; ctx.lineWidth = 1.5;
@@ -562,7 +693,7 @@ function draw(){
     drawIcon(n.role, sp.x, sp.y);
     if (view.scale > 0.5){
       ctx.font = '10px monospace';
-      if (tilesOn){
+      if (tilesOn || gmapOn){
         ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.85)';
         ctx.strokeText(n.name, sp.x + 11, sp.y + 4);
         ctx.fillStyle = '#123';
@@ -862,6 +993,13 @@ function render(){
         'From the device, with your permission');
   else if (geoErr)
     row(tV, 'Finding your city', '<span class="r">' + geoErr + '</span>', '');
+  row(tV, 'The ground under the lines',
+      gmapOn ? '<span class="m">Google Maps, your key</span>'
+             : (tilesOn ? '<span class="m">OpenStreetMap, free</span>'
+                        : '<span class="sub">None - plain background</span>'),
+      gKey ? 'A key is kept on this device. Restrict it before it goes public'
+           : 'No Google key kept here');
+  if (gmapErr) row(tV, 'Google', '<span class="r">' + gmapErr + '</span>', '');
   row(tV, 'Switches on screen', onScreen, 'Core ' + roles.Core
       + ', Edge ' + roles.Edge + ', Access ' + roles.Access + ' including the border');
   row(tV, 'Worked out, including just off screen', inView.nodes.length,
@@ -960,8 +1098,10 @@ function renderCan(){
       'OpenStreetMap, free, with the credit it requires. No key needed.');
   row(t, 'Real Positions And Real Distances', '<span class="m">YES</span>',
       'One unit is one pixel of the standard web map at zoom 13.');
-  row(t, 'Google Maps Instead', '<span class="r">NEEDS A KEY</span>',
-      'Google requires an API key and a billing account. This does not.');
+  row(t, 'Google Maps Instead', '<span class="m">YES, WITH YOUR KEY</span>',
+      'Typed in here and kept on this device. Never in the published file.');
+  row(t, 'Put Your Key In The Published File', '<span class="n">NOT DONE</span>',
+      'A key in a public repository is scraped within minutes and billed to you.');
   row(t, 'Show A Real Country Network - .fi, .gov, Ukraine',
       '<span class="n">NOT AVAILABLE</span>',
       'A browser has no feed of any real network. The switches and lines are a company example.');
@@ -1053,6 +1193,19 @@ function selfCheck(){
       fails.push('A line is travelling faster than light in glass.');
   }
 
+  /* NO GOOGLE KEY MAY BE BAKED INTO THE PUBLISHED FILE.
+
+     THE FIRST VERSION CHECKED THE WRONG THING. It looked at the live
+     page, which of course contains the key the owner has just typed
+     in and the script tag built from it - so the page accused itself
+     the moment Google was switched on, and a refused key looked like
+     a fault in the page. The invariant is about the bytes the SERVER
+     sends to the world, not about what is in this browser's memory,
+     so the page fetches its own source once and looks at that. */
+  if (srcHasKey)
+    fails.push('A Google key is written into the published file - a key must only '
+      + 'ever be typed in by whoever owns it.');
+
   /* THE MAP CREDIT IS A CONDITION OF THE LICENCE. If the streets are
      on, the words have to be on the picture - so this is checked
      rather than trusted to a line of drawing code that could be moved
@@ -1142,6 +1295,14 @@ function zoom(f){
 cv = document.getElementById('map');
 ctx = cv.getContext('2d');
 hud = document.getElementById('hud');
+/* the canvas has no size until it is laid out, so the opening view is
+   set after that rather than from a width of zero */
+function goStart(){
+  view.scale = 1;
+  view.x = lonToX(START_LON) - (cv.clientWidth || 800)/2;
+  view.y = latToY(START_LAT) - (cv.clientHeight || 500)/2;
+}
+goStart();
 
 cv.addEventListener('pointerdown', function(e){
   dragging = true; moved = 0; lastX = e.clientX; lastY = e.clientY;
@@ -1166,7 +1327,7 @@ cv.addEventListener('wheel', function(e){
 document.getElementById('zoomIn').onclick = function(){ zoom(1.3); };
 document.getElementById('zoomOut').onclick = function(){ zoom(1/1.3); };
 document.getElementById('home').onclick = function(){
-  view.x = 0; view.y = 0; view.scale = 1; draw(); render();
+  goStart(); draw(); render();
 };
 
 document.getElementById('keepHere').onclick = function(){
@@ -1203,6 +1364,22 @@ document.getElementById('listFile').addEventListener('change', function(){
   rd.readAsText(f);
 });
 
+document.getElementById('saveKey').onclick = function(){
+  saveKey(document.getElementById('gkey').value.trim());
+  gmapErr = gKey ? 'Key kept on this device.' : 'Key cleared.';
+  render();
+};
+document.getElementById('dropKey').onclick = function(){
+  saveKey(''); document.getElementById('gkey').value = '';
+  stopGoogle(); gmapErr = 'Key cleared.'; render();
+};
+document.getElementById('googleBtn').onclick = function(){
+  if (gmapOn){ stopGoogle(); this.textContent = 'Use Google Maps'; }
+  else {
+    if (!gKey) saveKey(document.getElementById('gkey').value.trim());
+    startGoogle(); this.textContent = 'Stop Google Maps';
+  }
+};
 document.getElementById('findCity').onclick = findMyCity;
 document.getElementById('streets').onclick = function(){
   tilesOn = !tilesOn;
@@ -1215,6 +1392,9 @@ document.getElementById('clock').addEventListener('input', function(){
 });
 window.addEventListener('resize', function(){ draw(); render(); });
 loadPlaces();
+loadKey();
+checkOwnSource();
+if (gKey) document.getElementById('gkey').value = gKey;
 applyEmbed();
 renderCan();
 draw();
@@ -1243,6 +1423,11 @@ window.__here = function(){
 window.__tiles = function(on){ tilesOn = !!on; draw(); render();
   return { on: tilesOn, tried: tilesTried, got: tilesGot }; };
 window.__tileStats = function(){ return { on: tilesOn, tried: tilesTried, got: tilesGot }; };
+window.__setKey = function(k){ saveKey(k);
+  document.getElementById('gkey').value = k; render(); };
+window.__startGoogle = function(){ startGoogle(); };
+window.__googleState = function(){ return { on: gmapOn, err: gmapErr,
+  hasObj: !!gmapObj, key: !!gKey }; };
 window.__travelMs = function(u){ return travelMs(u); };
 window.__nodesInView = function(){ return inView.nodes.map(function(n){
   return { ip:n.ip, role:n.role }; }); };
@@ -1262,6 +1447,7 @@ window.__read = function(){ return {
   kmPerSquare: kmPerSquare(), clockMbit: clockMbit, lightKmS: LIGHT_KM_S,
   lat: centreLat(), lon: xToLon(view.x + (cv.width/2)/view.scale),
   myLat: myLat, myLon: myLon, geoErr: geoErr, tilesOn: tilesOn,
+  gmapOn: gmapOn, gmapErr: gmapErr, hasKey: !!gKey,
   embed: EMBED, places: places.length, suppliers: suppliers ? suppliers.length : 0,
   serving: (function(){ var n = nearestPlace();
     return n ? serving(n.p) : null; })(),
