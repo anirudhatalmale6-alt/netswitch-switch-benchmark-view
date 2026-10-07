@@ -446,6 +446,13 @@ document.getElementById("go").onclick = runLadder;
 document.getElementById("stop").onclick = function(){ stopAsked = true; };
 render();
 
+/* IT STARTS ITSELF. HIS RULE: no page waits for a button being
+   pressed. The ladder begins as soon as the page is up, so whoever
+   opens it is looking at figures from their own machine rather than
+   at an empty table and an instruction. The button stays, for running
+   it again or after changing the calculation. */
+setTimeout(runLadder, 60);
+
 /* ---- hooks, for checking from outside ---- */
 window.__selfCheck = selfCheck;
 window.__putGlyph = function(g){
