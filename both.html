@@ -56,7 +56,7 @@
   #crText{color:#12261a;font-weight:700;font-size:12px;line-height:1.4}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B76</b><i id="line">Ready</i></div>
+<div id="bar"><b id="stamp">B77</b><i id="line">Ready</i></div>
 
 <div id="top">
   <div id="topText">Both Directions. The same ladder run upwards and then downwards,
@@ -408,7 +408,7 @@ var WSRC = [
 var fwd = null, bwd = null, busy = false, keyRow = null, fails = [];
 var longRun = null, ownSeal = '-', wsrcUrl = null;
 var POWERS = [8, 10, 12, 14, 16, 18, 20];   /* points, as powers of two */
-var fft = null, fftBusy = false;
+var fft = null, fftBusy = false, autoNext = null;
 
 /* HIS CATALOGUE, HIS DESIGNATIONS AND HIS NUMBERS, TYPED AS HE SENT
    THEM. These are names for runs of this calculation, in the same way
@@ -427,6 +427,20 @@ var CATALOGUE = [
    it sweeps right while the ladder is walked upwards and left while it
    is walked downwards - so it reports state rather than decorating. */
 var sweep = { at: 0, dir: 1, on: false, last: 0 };
+
+/* HIS POINT, AND IT IS A FAIR ONE: the moving mark crosses the very
+   part of the machine that is being measured, so the drawing could be
+   paying for itself out of the measurement.
+
+   IT IS NOT ARGUED, IT IS COUNTED. The page adds up the time it spends
+   inside its own drawing while a run is going, prints that beside the
+   time the run took, and BACKS ITS OWN FRAME RATE OFF if the drawing
+   ever climbs past a share of a core. A moving picture is not worth
+   one per cent of the thing it is a picture of. */
+var DRAW_BUDGET = 0.02;        /* share of one core the drawing may have */
+var SLOW_FRAME = 60;           /* ms between frames once it has backed off */
+var draw_ms = 0, draw_frames = 0, draw_since = 0, draw_gap = 0, drawCost = null;
+var win_ms = 0, win_start = 0;
 
 function two(n){ return (n < 10 ? '0' : '') + n; }
 function stampNow(){
@@ -498,6 +512,7 @@ function run(which){
     say('Done, ' + stampNow());
     noteLongRun();
     draw(); selfCheck();
+    if (autoNext === 'transform'){ autoNext = null; setTimeout(runTransform, 40); }
   };
   if (which === 'up'){
     sweepOn(1);
@@ -523,9 +538,20 @@ function sweepOn(dir){
   sweep.on = true; sweep.dir = dir;
   sweep.at = dir > 0 ? 0 : 1;
   sweep.last = 0;
+  if (!draw_since){ draw_since = performance.now(); draw_ms = 0; draw_frames = 0;
+                    win_start = draw_since; win_ms = 0; draw_gap = 0; }
   requestAnimationFrame(sweepFrame);
 }
-function sweepOff(){ sweep.on = false; drawChart(); }
+function sweepOff(){
+  sweep.on = false;
+  if (draw_since){
+    var ran = performance.now() - draw_since;
+    drawCost = { drawMs: draw_ms, ranMs: ran, frames: draw_frames,
+                 share: ran > 0 ? draw_ms / ran : 0, gap: draw_gap };
+    draw_since = 0;
+  }
+  drawChart();
+}
 function sweepFrame(t){
   if (!sweep.on) return;
   if (sweep.last){
@@ -536,8 +562,32 @@ function sweepFrame(t){
     if (sweep.at > 1){ sweep.at = 0; }
     if (sweep.at < 0){ sweep.at = 1; }
   }
+  /* The gap keeps the frames apart once the drawing has been found to
+     be expensive. Before that it runs at whatever the screen offers. */
+  if (draw_gap && sweep.last && t - sweep.last < draw_gap){
+    requestAnimationFrame(sweepFrame); return;
+  }
   sweep.last = t;
+  var d0 = performance.now();
   drawChart();
+  var spent = performance.now() - d0;
+  draw_ms += spent; win_ms += spent;
+  draw_frames++;
+  /* BACK OFF THE MOMENT IT COSTS TOO MUCH, not at the end when the
+     measurement it spoiled is already taken.
+
+     THE DECISION IS MADE ON THE LAST SECOND, NOT ON EVERYTHING SO FAR.
+     The first few frames build the whole chart and are dear; judged
+     against the start they put the share over budget every single
+     time, which backed the frames off on every run and left the
+     leave-it-alone case unreachable. A share measured since the start
+     only ever describes the start. */
+  var nowMs = performance.now();
+  if (nowMs - win_start >= 1000){
+    if (draw_frames > 8 && win_ms / (nowMs - win_start) > DRAW_BUDGET) draw_gap = SLOW_FRAME;
+    else if (draw_gap && win_ms / (nowMs - win_start) < DRAW_BUDGET / 2) draw_gap = 0;
+    win_start = nowMs; win_ms = 0;
+  }
   requestAnimationFrame(sweepFrame);
 }
 
@@ -981,6 +1031,14 @@ function draw(){
      'The seal is taken over the bytes this page was actually served, so a changed file shows a changed seal');
   kv(ct, 'The Line To This Page', location.protocol === 'https:' ? 'ENCRYPTED' : 'PLAIN',
      'Read from the connection in use, not from a setting');
+  kv(ct, 'What The Moving Mark Cost',
+     drawCost === null ? 'not measured yet'
+       : fi(drawCost.share * 100, 2) + ' per cent of one core',
+     drawCost === null ? 'Measured while a run is going'
+       : fi(drawCost.drawMs, 0) + ' ms of drawing across ' + comma(drawCost.frames)
+         + ' frames while the run took ' + fi(drawCost.ranMs / 1000, 1) + ' s'
+         + (drawCost.gap ? ', and the frames were slowed because it went over its share'
+                         : ', inside its share so the frames were left alone'));
   var tick = (fwd && fwd[0] && fwd[0].tick) || (bwd && bwd[0] && bwd[0].tick) || null;
   kv(ct, 'The Clock This Page Times With',
      tick === null ? 'not measured yet' : fi(tick * 1000, 1) + ' microseconds a tick',
@@ -1219,6 +1277,16 @@ window.addEventListener('resize', function(){ drawChart(); drawCurl(); });
 el('btnFft').onclick = runTransform;
 el('ref').textContent = 'BOTH DIRECTIONS ' + stampNow();
 draw();
+
+/* IT STARTS ITSELF. HIS RULE: no page waits for a button. The ladder
+   goes first because it is what the page is named after, then the
+   transform - ONE AFTER THE OTHER, never together, because two sets of
+   workers racing for the same cores would each be measuring the other.
+   The buttons stay for running it again. */
+setTimeout(function(){
+  run('both');
+  autoNext = 'transform';
+}, 60);
 measureKey();
 sealOwnSource();
 selfCheck();
@@ -1234,7 +1302,8 @@ window.__read = function(){
            down: bwd ? bwd.map(function(r){ return { asked: r.asked, done: r.done, ns: r.nsEach,
                  ms: r.ms, cut: r.cut, place: r.place, tooShort: r.tooShort,
                  tick: r.tick, needed: r.needed }; }) : null,
-           key: keyRow, longRun: longRun, seal: ownSeal,
+           key: keyRow, longRun: longRun, seal: ownSeal, drawCost: drawCost,
+           drawBudget: DRAW_BUDGET,
            fft: fft, fftBusy: fftBusy, catalogue: CATALOGUE,
            sweep: { on: sweep.on, at: sweep.at, dir: sweep.dir },
            curlSay: el('curlSay').textContent, fftSay: el('fftSay').textContent,
@@ -1245,6 +1314,8 @@ window.__run = function(which){ run(which); };
 window.__runTransform = runTransform;
 window.__fftCoefficient = fftCoefficient;
 window.__sweepOn = sweepOn;
+window.__setDrawBudget = function(b){ DRAW_BUDGET = b; };
+window.__drawGap = function(){ return draw_gap; };
 window.__sweepOff = sweepOff;
 window.__coefficient = coefficient;
 window.__verdictOf = verdictOf;
