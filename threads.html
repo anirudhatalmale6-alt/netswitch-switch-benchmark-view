@@ -41,11 +41,12 @@
   #crText{color:#12261a;font-weight:700;font-size:12px;line-height:1.4}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B65</b><i id="line">Starting the threads&hellip;</i></div>
+<div id="bar"><b id="stamp">B78</b><i id="line">Starting the threads&hellip;</i></div>
 
 <div id="top">
-  <div id="topText">Thread Watchdog. Every thread answers or it is killed.
-    The killing is shown happening, not promised.</div>
+  <div id="topText">Thread Watchdog. Work that runs too long is cut where it stands,
+    and a thread that stops answering is killed and replaced. Both are shown
+    happening, not promised.</div>
   <div id="ref">&nbsp;</div>
 </div>
 
@@ -59,6 +60,21 @@
     <th>ratio</th><th>answers</th>
   </tr></thead><tbody id="thrBody"></tbody></table>
   <canvas id="g" height="170"></canvas>
+
+  <h2>Cutting Work That Runs Too Long</h2>
+  <div style="display:flex;gap:8px;align-items:center;margin:6px 0">
+    <label style="color:#9fb6c9;font-size:11px">A Piece Of Work Gets</label>
+    <select id="selLimit" style="background:#070d15;color:#eaf6ff;border:1px solid #1d3448;border-radius:4px;padding:6px 10px;font-family:inherit;font-size:12px"></select>
+  </div>
+  <table id="tCut"></table>
+  <canvas id="gCut" height="130"></canvas>
+  <div id="cutSay" style="margin-top:8px;color:#9fb6c9"></div>
+
+  <h2>The Factorials, Nought To Nine</h2>
+  <table id="tFac"><thead><tr>
+    <th>factorial</th><th>value</th><th>one of them</th>
+    <th>how many fit inside the limit</th>
+  </tr></thead><tbody id="facBody"></tbody></table>
 
   <h2>The Kills, As They Happened</h2><div id="kills"></div>
 
@@ -136,6 +152,16 @@ var START_GRACE = 2000;
 var NORMAL_WINDOW = 4000;   /* four seconds of a thread's own answers */
 var JAM_RATIO = 3;          /* this far off its own normal and it is jamming */
 var JAM_IN_A_ROW = 2;       /* twice running, so one slow answer is not a verdict */
+/* THE CUT IS PROVED, NOT PROMISED - the same rule this page already
+   applies to the kill. Ordinary work here runs well under half a
+   millisecond, so a limit of eight would never once be reached and
+   the counter would sit at nought looking exactly like a cut that
+   does not work. So a piece of work is deliberately made to run long,
+   at known moments, and the page shows it being stopped. */
+var CUT_FIRST = 3000;       /* the first deliberate over-long piece */
+var CUT_EVERY = 7000;
+var CUT_TIMES = 4;          /* prove it, then leave the pool alone */
+var cutsAsked = 0, cutAt = CUT_FIRST;
 var HANG_FIRST = 1200;      /* the first deliberate hang */
 var HANG_EVERY = 11000;     /* and one every so often after that */
 var TRACE = 90;             /* answers kept for the chart */
@@ -162,6 +188,19 @@ var TRACE = 90;             /* answers kept for the chart */
       times and then leaves the pool alone. */
 var DRAW_MS = 250;          /* the screen, four times a second */
 var PING_WORK = 200;        /* enough to be real work, not enough to matter */
+
+/* HIS ASK: CUT TOO LONG TIMING ON THE THREADS.
+   A piece of work gets this long and no longer. Past it the work is
+   stopped where it stands and the thread reports how far it got -
+   the thread itself is left alone. That is the whole difference
+   between a CUT and a KILL, and the page counts them apart:
+     CUT    the work ran long. Stopped, thread lives, nothing replaced.
+     KILLED the thread stopped answering at all. Replaced.
+   Counting them together is what made a working pool look like it was
+   churning fifteen times a minute when it was recycling three. */
+var WORK_LIMIT_MS = 8;      /* a piece of work gets this long */
+var LIMIT_CHOICES = [2, 4, 8, 16, 40, 0];   /* 0 means do not cut */
+var cutCount = 0, cutSeen = 0, longestWork = 0, workTrace = [];
 var HANG_TIMES = 3;         /* prove it, then stop churning threads */
 
 var POOL = Math.min(navigator.hardwareConcurrency || 4, 8);
@@ -207,12 +246,16 @@ function stampNow(){
    and nothing is fetched from anywhere. */
 var WORKER_SRC = [
   'var PING_WORK_N = ' + PING_WORK + ';',
-  'var guard = 0, load = 1, delay = 0;',
+  'var LIMIT_MS = ' + WORK_LIMIT_MS + ';',
+  'var LONG_MS = 24;',
+  'var guard = 0, load = 1, delay = 0, longOnce = 0;',
   'self.onmessage = function(e){',
   '  var d = e.data;',
   '  if (d.cmd === "hang"){ for(;;){ guard++; } }',
   '  if (d.cmd === "load"){ load = d.times; return; }',
   '  if (d.cmd === "delay"){ delay = d.ms; return; }',
+  '  if (d.cmd === "longonce"){ longOnce = 1; return; }',
+  '  if (d.cmd === "limit"){ LIMIT_MS = d.ms; return; }',
   '  if (d.cmd === "memread"){',
   '    var kb = 32768, n = kb*1024/4;',
   '    var a = new Int32Array(n), idx = new Int32Array(n), i, j, t;',
@@ -226,13 +269,33 @@ var WORKER_SRC = [
   '    self.postMessage({ memread: (t1 - t0) * 1e6 / steps });',
   '    return;',
   '  }',
+  /* CUTTING IS NOT KILLING. A piece of work that runs past the limit
+     is STOPPED WHERE IT IS and the thread carries on living. Killing
+     the thread instead throws away a running worker and costs a new
+     one, and the pool churns for something that was only ever one
+     slow piece of work. The thread reports what it got through. */
   '  if (d.cmd === "ping"){',
-  '    var x = 0.5, i, n = PING_WORK_N * load;',
-  '    for (i=0;i<n;i++){ x = Math.sin(x + i*1e-6) + Math.cos(x*1.609); }',
-  '    if (delay){ var t0 = performance.now();',
-  '      while (performance.now() - t0 < delay){ x += 0.000001; } }',
+  '    var x = 0.5, i, n = PING_WORK_N * load, cut = false;',
+  '    var c0 = performance.now();',
+  '    for (i=0;i<n;i++){',
+  '      if ((i & 1023) === 0 && i > 0 && LIMIT_MS > 0',
+  '          && performance.now() - c0 > LIMIT_MS){ cut = true; break; }',
+  '      x = Math.sin(x + i*1e-6) + Math.cos(x*1.609);',
+  '    }',
+  '    var want = delay;',
+  /* A FIXED LENGTH, NOT A MULTIPLE OF THE LIMIT. Sized as three
+     times the limit it became nothing at all the moment the limit
+     was turned off, so the one case that proves the cut matters -
+     no limit, long work runs on - could never be shown. */
+  '    if (longOnce){ want = LONG_MS; longOnce = 0; }',
+  '    if (want && !cut){ var t0 = performance.now();',
+  '      while (performance.now() - t0 < want){',
+  '        if (LIMIT_MS > 0 && performance.now() - c0 > LIMIT_MS){ cut = true; break; }',
+  '        x += 0.000001; } }',
   '    guard += x;',
-  '    self.postMessage({ pong: d.seq, at: d.at });',
+  '    self.postMessage({ pong: d.seq, at: d.at, cut: cut,',
+  '      askedRounds: n, doneRounds: cut ? i : n,',
+  '      workMs: performance.now() - c0 });',
   '  }',
   '};'
 ].join('\n');
@@ -254,6 +317,22 @@ function startThread(reason){
     t.state = 'answering';
     t.trace.push(t.last);
     if (t.trace.length > TRACE) t.trace.shift();
+
+    /* THE CUT IS COUNTED WHERE IT HAPPENED, apart from the kills. A
+       cut means the WORK ran long and was stopped; the thread is
+       fine. A kill means the THREAD stopped answering and had to be
+       replaced. Adding them together describes neither. */
+    if (ev.data.workMs !== undefined){
+      cutSeen++;
+      if (ev.data.workMs > longestWork) longestWork = ev.data.workMs;
+      workTrace.push(ev.data.workMs);
+      if (workTrace.length > TRACE) workTrace.shift();
+      if (ev.data.cut){
+        cutCount++; t.cuts = (t.cuts || 0) + 1;
+        t.lastCut = { asked: ev.data.askedRounds, done: ev.data.doneRounds,
+                      ms: ev.data.workMs, at: stampNow() };
+      }
+    }
 
     /* ITS OWN NORMAL - AND THE NORMAL MUST NOT FOLLOW THE FAULT.
 
@@ -312,6 +391,11 @@ function tick(){
 
   /* the deliberate hang - the proof, at a known moment, and only
      until it has been proved */
+  if (cutsAsked < CUT_TIMES && now - started > cutAt && threads.length && WORK_LIMIT_MS){
+    var vic = threads[(cutsAsked + 1) % threads.length];
+    vic.w.postMessage({ cmd: 'longonce' });
+    cutsAsked++; cutAt += CUT_EVERY;
+  }
   if (hangsDone < HANG_TIMES && now - started > hangAt && threads.length){
     hangsDone++;
     t = threads[0];
@@ -448,6 +532,7 @@ function render(){
     kl.innerHTML = out.join('');
   }
 
+  renderCut();
   draw();
   dxf = toDXF();
   var b = new Blob([dxf], { type:'image/vnd.dxf' });
@@ -459,7 +544,14 @@ function render(){
   document.getElementById('line').textContent =
     'THREADS' + threads.length + '/' + POOL
     + ' KILLED' + killed
-    + ' CAUGHTIN' + (kills.length ? kills[kills.length-1].waited.toFixed(0) : '-') + 'ms'
+    /* THE CATCH TIME MUST COME FROM A CATCH. A planned recycle is also
+       a kill but it waited for nothing, so taking the last kill of any
+       sort printed CAUGHT IN 0 ms - a watchdog catching a hung thread
+       in no time at all, which cannot happen under a 150 ms limit. */
+    + ' CAUGHTIN' + (function(){
+        var hung = kills.filter(function(k){ return k.hung; });
+        return hung.length ? hung[hung.length-1].waited.toFixed(0) : '-';
+      })() + 'ms'
     + ' LIMIT' + KILL_MS + 'ms'
     + ' ' + stampNow();
 }
@@ -491,6 +583,166 @@ function renderCan(){
       'The driver schedules them.');
   row(t, 'Do All Of This Outside The Browser', '<span class="r">NATIVE VERSION NEEDED</span>',
       'Operating system threads need a native program.');
+}
+
+/* ================= the cut, and the factorials ================= */
+/* THE FINEST CUT THIS MACHINE CAN ACTUALLY ENFORCE IS MEASURED, not
+   claimed. His ask was to hold threads between 0,4 and 17 nanoseconds.
+   Nothing cuts at that scale, and rather than only saying so the page
+   measures the clock it would have to cut with and prints the two side
+   by side. */
+function finestCut(){
+  var best = Infinity, i, t0, t1;
+  for (i = 0; i < 12; i++){
+    t0 = performance.now();
+    do { t1 = performance.now(); } while (t1 === t0);
+    if (t1 - t0 < best) best = t1 - t0;
+  }
+  return best;
+}
+var FINEST = null;
+
+/* 0! IS 1 BY DEFINITION, NOT BY MULTIPLYING NOTHING. A loop that
+   multiplies nothing happens to return 1 here, but it returns 1 by
+   accident of the starting value rather than because the definition
+   says so, and a reader cannot tell those apart from the figure. */
+function factorials(){
+  var out = [], v = 1, n;
+  for (n = 0; n <= 9; n++){
+    if (n > 1) v = v * n;
+    out.push({ n: n, value: n <= 1 ? 1 : v });
+  }
+  return out;
+}
+/* BEST OF THREE, NOT THE AVERAGE. Anything else running on the
+   machine can only ever make a pass slower, so an average is an
+   average of this work plus whatever interrupted it. */
+function timeFactorial(n, limitMs){
+  var best = Infinity, guard = 0, pass, i, v;
+  for (pass = 0; pass < 3; pass++){
+    var t0 = performance.now(), count = 0;
+    while (performance.now() - t0 < limitMs){
+      for (var r = 0; r < 2000; r++){
+        v = 1; for (i = 2; i <= n; i++) v *= i;
+        guard += v; count++;
+      }
+    }
+    var ns = (performance.now() - t0) * 1e6 / count;
+    if (ns < best) best = ns;
+  }
+  return { nsEach: best, guard: guard };
+}
+
+/* THE SMALL ONES CANNOT BE TOLD APART AND THE PAGE SAYS SO. Nought
+   through five factorial are two or three nanoseconds each, which is
+   a handful of processor steps; the run to run spread is the same
+   size as the difference between them. Printing them as ordered
+   figures would invite a reading the measurement cannot support. */
+function separable(rows){
+  var small = rows.filter(function(r){ return r.n <= 5; }).map(function(r){ return r.nsEach; });
+  var lo = Math.min.apply(null, small), hi = Math.max.apply(null, small);
+  return hi / lo > 2;
+}
+var facRows = null, facSeparable = null;
+
+function renderCut(){
+  var t = document.getElementById('tCut'); t.innerHTML = '';
+  row(t, 'A Piece Of Work Gets',
+      WORK_LIMIT_MS ? WORK_LIMIT_MS + ' ms' : 'no limit',
+      'Past it the work stops where it is and the thread lives on');
+  row(t, 'Pieces Of Work Seen', String(cutSeen), 'Since the page opened');
+  row(t, 'Pieces Cut', String(cutCount),
+      cutSeen ? (cutCount / cutSeen * 100).toFixed(1) + ' per cent of them' : 'None yet');
+  row(t, 'Longest Piece That Got Through',
+      longestWork ? longestWork.toFixed(2) + ' ms' : '<span class="sub">Measuring</span>',
+      WORK_LIMIT_MS
+        ? (longestWork <= WORK_LIMIT_MS * 1.6
+            ? 'Inside the limit, which is the limit doing its job'
+            : '<span class="n">Over the limit - the cut is not holding</span>')
+        : 'Nothing is being cut');
+  row(t, 'Threads Killed', String(killed),
+      'A KILL is a thread that stopped answering. A CUT is work that ran '
+      + 'long. They are different things and are counted apart');
+  row(t, 'The Finest Cut This Machine Can Make',
+      FINEST === null ? '<span class="sub">Measuring</span>'
+        : (FINEST * 1000).toFixed(1) + ' microseconds',
+      FINEST === null ? '' :
+        'Measured here. The ask was 17 ns, which is '
+        + Math.round(FINEST * 1e6 / 17).toLocaleString('en').replace(/,/g, ' ')
+        + ' times finer than this machine can cut');
+
+  var fb = document.getElementById('facBody'); fb.innerHTML = '';
+  (facRows || []).forEach(function(f){
+    var tr = document.createElement('tr');
+    function td(x, cls){
+      var e = document.createElement('td');
+      e.innerHTML = x; if (cls) e.className = cls; tr.appendChild(e);
+    }
+    td(f.n + '!', 'k');
+    td(String(f.value), 'v');
+    td(f.nsEach === null ? '<span class="sub">-</span>' : f.nsEach.toFixed(1) + ' ns');
+    td(f.fit === null ? '<span class="sub">-</span>'
+       : String(f.fit).replace(/\B(?=(\d{3})+(?!\d))/g, ' '), 'u');
+    fb.appendChild(tr);
+  });
+
+  var say = [];
+  if (cutSeen > 20){
+    say.push(cutCount
+      ? cutCount + ' of ' + cutSeen + ' pieces of work ran past ' + WORK_LIMIT_MS
+        + ' ms and were stopped there. Not one thread was killed for it, and '
+        + 'nothing was replaced.'
+      : 'No piece of work has reached ' + WORK_LIMIT_MS + ' ms yet, so nothing has '
+        + 'needed cutting. The limit is in place and the longest piece so far is '
+        + longestWork.toFixed(2) + ' ms.');
+  }
+  if (facRows && facSeparable === false)
+    say.push('Nought through five factorial all come out within a nanosecond or two of '
+      + 'each other, which is the run to run spread, so they are not being told apart '
+      + 'here - only six and above are.');
+  if (facRows && facRows[9] && facRows[9].fit)
+    say.push('Nine factorial fits ' + String(facRows[9].fit).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+      + ' times inside one piece of work at this limit.');
+  document.getElementById('cutSay').textContent = say.join(' ');
+
+  drawCut();
+}
+
+/* The work times, with the limit drawn across them. A limit nobody can
+   see the shape of is a number in a table; drawn, the flat top IS the
+   cut doing its job. */
+function drawCut(){
+  var cv = document.getElementById('gCut');
+  if (!cv) return;
+  var g = cv.getContext('2d');
+  var w = cv.clientWidth || 320; if (cv.width !== w) cv.width = w;
+  var W = cv.width, H = cv.height, L = 34, R = 8, T = 10, B = 18;
+  g.fillStyle = '#070d15'; g.fillRect(0, 0, W, H);
+  if (!workTrace.length){
+    g.fillStyle = '#4a6076'; g.font = '11px monospace';
+    g.fillText('Work times appear as the threads answer', L, H / 2); return;
+  }
+  var hi = Math.max(WORK_LIMIT_MS || 0, longestWork) * 1.3 || 1;
+  function Y(v){ return H - B - (v / hi) * (H - T - B); }
+  g.strokeStyle = '#16293a'; g.lineWidth = 1;
+  g.fillStyle = '#4a6076'; g.font = '9px monospace';
+  [0, hi / 2, hi].forEach(function(v){
+    g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(W - R, Y(v)); g.stroke();
+    g.fillText(v.toFixed(1), 2, Y(v) + 3);
+  });
+  if (WORK_LIMIT_MS){
+    g.strokeStyle = '#f00'; g.setLineDash([4, 3]); g.beginPath();
+    g.moveTo(L, Y(WORK_LIMIT_MS)); g.lineTo(W - R, Y(WORK_LIMIT_MS)); g.stroke();
+    g.setLineDash([]);
+    g.fillStyle = '#f00';
+    g.fillText('cut at ' + WORK_LIMIT_MS + ' ms', L + 3, Y(WORK_LIMIT_MS) - 3);
+  }
+  g.strokeStyle = '#7ee787'; g.lineWidth = 1.5; g.beginPath();
+  workTrace.forEach(function(v, i){
+    var x = L + i / Math.max(1, TRACE - 1) * (W - L - R);
+    i ? g.lineTo(x, Y(v)) : g.moveTo(x, Y(v));
+  });
+  g.stroke();
 }
 
 function draw(){
@@ -610,7 +862,7 @@ function selfCheck(){
   /* THE PAGE MUST NOT FREEZE THE BROWSER. The one read of main memory
      it takes at the start is the only heavy thing on this page, and it
      must stay small enough not to be felt. */
-  if (ready && jamWorst > 400)
+  if (ready && jamWorst > 250)
     fails.push('This page blocked the browser for ' + jamWorst.toFixed(0) + ' ms.');
 
   /* A HEALTHY THREAD MUST NEVER BE KILLED FOR STILL STARTING. If this
@@ -698,6 +950,108 @@ window.__hangOne = function(){
   try { t.w.postMessage({ cmd:'hang' }); } catch(e){}
   return t.id;
 };
+/* Measured once, after the threads are up, so it is not competing
+   with them for the machine while it times itself. */
+(function(){
+  var sl = document.getElementById('selLimit');
+  LIMIT_CHOICES.forEach(function(ms){
+    var o = document.createElement('option');
+    o.value = ms; o.textContent = ms ? ms + ' ms' : 'no limit';
+    if (ms === WORK_LIMIT_MS) o.selected = true;
+    sl.appendChild(o);
+  });
+  sl.onchange = function(){
+    setWorkLimit(Number(this.value));
+    cutsAsked = 0; cutAt = (performance.now() - started) + 1200;   /* prove it again */
+  };
+})();
+
+/* THIS WORK GETS A THREAD OF ITS OWN, AND AN UNPOLICED ONE.
+
+   On the main thread it blocked the browser for 321 ms - on the very
+   page whose subject is work that runs too long. And it cannot go to
+   one of the pool threads either: it takes longer than the 150 ms
+   limit, so the watchdog would correctly kill the thread doing it and
+   report a fault that was my own doing. So it runs in a worker that
+   the watchdog does not police, and which is thrown away afterwards. */
+var FAC_SRC = [
+  'function finestCut(){',
+  '  var best = Infinity, i, t0, t1;',
+  '  for (i = 0; i < 12; i++){',
+  '    t0 = performance.now();',
+  '    do { t1 = performance.now(); } while (t1 === t0);',
+  '    if (t1 - t0 < best) best = t1 - t0;',
+  '  }',
+  '  return best;',
+  '}',
+  'function timeFactorial(n, limitMs){',
+  '  var best = Infinity, guard = 0, pass, i, v, r;',
+  '  for (pass = 0; pass < 3; pass++){',
+  '    var t0 = performance.now(), count = 0;',
+  '    while (performance.now() - t0 < limitMs){',
+  '      for (r = 0; r < 2000; r++){',
+  '        v = 1; for (i = 2; i <= n; i++) v *= i;',
+  '        guard += v; count++;',
+  '      }',
+  '    }',
+  '    var ns = (performance.now() - t0) * 1e6 / count;',
+  '    if (ns < best) best = ns;',
+  '  }',
+  '  return best;',
+  '}',
+  'self.onmessage = function(e){',
+  '  var out = [], n, v = 1;',
+  '  for (n = 0; n <= 9; n++){',
+  '    if (n > 1) v = v * n;',
+  '    out.push({ n: n, value: n <= 1 ? 1 : v, nsEach: timeFactorial(n, 10) });',
+  '  }',
+  '  self.postMessage({ finest: finestCut(), rows: out });',
+  '};'
+].join('\n');
+
+setTimeout(function(){
+  var fw = new Worker(URL.createObjectURL(new Blob([FAC_SRC], { type: 'text/javascript' })));
+  fw.onmessage = function(e){
+    fw.terminate();
+    FINEST = e.data.finest;
+    facRows = e.data.rows.map(function(f){
+      return { n: f.n, value: f.value, nsEach: f.nsEach,
+               fit: WORK_LIMIT_MS ? Math.round(WORK_LIMIT_MS / (f.nsEach / 1e6)) : null };
+    });
+    facSeparable = separable(facRows);
+    renderCut(); selfCheck();
+  };
+  fw.postMessage({});
+}, 2600);
+
+/* THE LIMIT IS BAKED INTO EACH THREAD WHEN IT IS BUILT, so changing
+   it on the page alone changes nothing at all for the threads already
+   running - the selector would move and the cut would carry on at the
+   old figure, silently. Every live thread is told. */
+function setWorkLimit(ms){
+  WORK_LIMIT_MS = ms;
+  threads.forEach(function(t){ t.w.postMessage({ cmd: 'limit', ms: ms }); });
+  WORKER_SRC = WORKER_SRC.replace(/var LIMIT_MS = [0-9]+;/, 'var LIMIT_MS = ' + ms + ';');
+  URL.revokeObjectURL(WORKER_URL);
+  WORKER_URL = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
+  longestWork = 0; workTrace = [];
+  renderCut();
+}
+window.__setWorkLimit = setWorkLimit;
+/* ASKED OF EVERY THREAD, NOT ONE. Sent to a single thread it can be
+   lost - that thread may be the one the page deliberately hangs a
+   moment later, and the request dies with the worker. The check
+   then reports the cut as broken when it is fine. */
+window.__askCut = function(){
+  threads.forEach(function(t){ t.w.postMessage({ cmd: 'longonce' }); });
+};
+window.__cut = function(){ return {
+  limitMs: WORK_LIMIT_MS, seen: cutSeen, cut: cutCount,
+  asked: cutsAsked,
+  separable: facSeparable,
+  longest: longestWork, finest: FINEST, killed: killed,
+  factorials: facRows }; };
+
 window.__read = function(){ return {
   ready: ready, fails: window.__fails,
   pool: POOL, alive: threads.length, killMs: KILL_MS,
