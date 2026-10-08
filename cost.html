@@ -42,10 +42,17 @@
   #always a.alt{background:#16293a;color:#9fd6f5}
   /* THE MARK SITS WITH THE PHRASE AND NOWHERE ELSE. ONE LINE OF
      COPYRIGHT, nothing beside it. */
-  #cr{margin-top:18px;padding:12px 10px;display:flex;align-items:center;
-    gap:12px;justify-content:center;background:#d0cefd;border-radius:4px}
-  #cr img{width:52px;height:auto;display:block}
-  #crText{color:#12261a;font-weight:700;font-size:11px;line-height:1.4}
+  /* THE PURPLE WAS THE MARK'S OWN BACKGROUND. The supplied jpeg is
+     that colour across four fifths of itself, and the panel was set
+     to match so the mark would not sit in a box of its own. Matching
+     it made a purple bar right across the page. The panel is now only
+     as wide as what is in it, so there is no bar - and the mark is
+     still untouched and still beside the phrase. */
+  #cr{margin-top:14px;padding:3px 7px;display:inline-flex;align-items:center;
+    gap:6px;background:#d0cefd;border-radius:3px}
+  #cr img{width:17px;height:auto;display:block}
+  #crText{color:#12261a;font-weight:700;font-size:9px;line-height:1.2;
+    white-space:nowrap}
 </style></head><body>
 
 <div id="bar"><b id="stamp">B83</b><i id="line">Measuring the data&hellip;</i></div>
@@ -124,6 +131,14 @@
 var PROBE_FILES = ['lines.html', 'both.html', 'bits.html'];
 var GB = 1000000000;            /* a gigabyte as a carrier bills it */
 
+/* A WORKED EXAMPLE, SO THERE IS A COST ON SCREEN THE MOMENT THE PAGE
+   OPENS. Every row built from it is marked as an example, and the
+   rate sits in the boxes above where it can be changed. This is not
+   a claim about anybody's tariff - it is arithmetic with a figure
+   that is shown rather than hidden, which is the opposite of
+   inventing one. */
+var EXAMPLE = { eur: 0.45, usd: 0.50, hrs: 8, fleet: 1, example: true };
+
 var res = null, probe = null, rates = null, fails = [];
 
 function two(n){ return (n < 10 ? '0' : '') + n; }
@@ -143,7 +158,13 @@ function fi(n, d){
 }
 function el(id){ return document.getElementById(id); }
 function say(s){ el('line').textContent = s; }
+var hidden = 0;
+/* HIS INSTRUCTION: DO NOT SHOW ITEMS THAT HAVE NO DATA. A row whose
+   figure is not available is left off the page entirely rather than
+   printed as a blank. How many were left off is counted and said in
+   one line at the end, so nothing goes missing quietly. */
 function row(t, k, v, u, cls){
+  if (v === 'NOT AVAILABLE' || v === null || v === undefined || v === '-'){ hidden++; return; }
   var tr = document.createElement('tr');
   var a = document.createElement('td'); a.className = 'k'; a.textContent = k;
   var b = document.createElement('td'); b.className = 'v ' + (cls || ''); b.textContent = v;
@@ -220,6 +241,7 @@ function money(v, sym){
 }
 
 function render(){
+  hidden = 0;
   var t = el('tBytes'); t.innerHTML = '';
   if (!res) row(t, 'Measuring', 'please wait', '');
   else {
@@ -245,11 +267,11 @@ function render(){
           ? 'The download finished inside the clock’s own step'
           : 'Measured here, on this connection, just now');
   }
-  var bpd = bytesPerDay();
+  var bpd = bytesPerDay(), useH = (rates || EXAMPLE).hrs;
   if (bpd !== null)
     row(t, 'At That Rate, Bytes A Day', comma(bpd),
-        rates ? fi(rates.hrs, 1) + ' hours a day at the measured speed'
-              : 'set the hours a day below');
+        fi(useH, 0) + ' hours a day at the speed measured above, flat out. '
+        + 'Change the hours below to match how the phone is really used');
   el('bytesSay').textContent = res && res.fromCache
     ? 'A file served from the cache reports nought bytes transferred, because nothing '
       + 'crossed the wire. Adding those in as nought without noticing would make a '
@@ -257,35 +279,48 @@ function render(){
     : '';
 
   var tm = el('tMoney'); tm.innerHTML = '';
-  if (!rates){
-    row(tm, 'A Rate Is Needed First', 'NOT AVAILABLE',
-        'Bytes are a measurement. A rate is a contract, and it differs by carrier, by '
-        + 'country and by month. Type yours above and every figure below fills in');
-  } else {
+  /* The rate he typed if there is one, otherwise the worked example.
+     It is never shadowed over the real one - a `var` inside a block
+     would hoist and quietly replace it for the whole function. */
+  var use = rates || EXAMPLE;
+  if (res && probe){
     var per = bytesPerDay();
-    var oneGbE = costPerDay(GB, rates.eur), oneGbD = costPerDay(GB, rates.usd);
     row(tm, 'One Gigabyte',
-        money(oneGbE, '€') + '   ' + money(oneGbD, '$'), 'The rate you gave', 'money');
-    row(tm, 'One Device, A Day', money(costPerDay(per, rates.eur), '€')
-        + '   ' + money(costPerDay(per, rates.usd), '$'),
-        comma(per) + ' bytes a day', 'money');
-    row(tm, 'One Device, A Month Of Thirty Days',
-        money(costPerDay(per * 30, rates.eur), '€') + '   '
-        + money(costPerDay(per * 30, rates.usd), '$'), '', 'money');
-    row(tm, 'The Fleet Of ' + comma(rates.fleet) + ', A Day',
-        money(costPerDay(per * rates.fleet, rates.eur), '€') + '   '
-        + money(costPerDay(per * rates.fleet, rates.usd), '$'), '', 'money');
-    row(tm, 'The Fleet Of ' + comma(rates.fleet) + ', A Year Of 365 Days',
-        money(costPerDay(per * rates.fleet * 365, rates.eur), '€') + '   '
-        + money(costPerDay(per * rates.fleet * 365, rates.usd), '$'), '', 'money');
-    row(tm, 'What One Page Load Costs',
-        money(costPerDay(res.overWire, rates.eur), '€') + '   '
-        + money(costPerDay(res.overWire, rates.usd), '$'),
+        money(costPerDay(GB, use.eur), '€') + '   ' + money(costPerDay(GB, use.usd), '$'),
+        use.example
+          ? 'An EXAMPLE rate. Put your own in the boxes above and every figure here '
+            + 'moves with it'
+          : 'The rate you gave', 'money');
+    row(tm, 'One Phone, A Day',
+        money(costPerDay(per, use.eur), '€') + '   ' + money(costPerDay(per, use.usd), '$'),
+        per === null ? '' : comma(per) + ' bytes a day, for one phone, if the link '
+          + 'ran flat out for ' + fi(use.hrs, 0) + ' hours. That is the most it could '
+          + 'spend, not what it would normally spend', 'money');
+    row(tm, 'One Phone, A Month Of Thirty Days',
+        money(costPerDay(per === null ? null : per * 30, use.eur), '€') + '   '
+        + money(costPerDay(per === null ? null : per * 30, use.usd), '$'), '', 'money');
+    if (use.fleet > 1){
+      row(tm, 'The Fleet Of ' + comma(use.fleet) + ', A Day',
+          money(costPerDay(per === null ? null : per * use.fleet, use.eur), '€') + '   '
+          + money(costPerDay(per === null ? null : per * use.fleet, use.usd), '$'), '', 'money');
+      row(tm, 'The Fleet Of ' + comma(use.fleet) + ', A Year Of 365 Days',
+          money(costPerDay(per === null ? null : per * use.fleet * 365, use.eur), '€') + '   '
+          + money(costPerDay(per === null ? null : per * use.fleet * 365, use.usd), '$'), '', 'money');
+    }
+    row(tm, 'What One Load Of This Page Cost',
+        money(costPerDay(res.overWire, use.eur), '€') + '   '
+        + money(costPerDay(res.overWire, use.usd), '$'),
         comma(res.overWire) + ' bytes, measured on this very page', 'money');
-    el('moneySay').textContent =
-      'Every figure here is your rate multiplied by bytes measured on this device. '
-      + 'Nothing is a typical figure and nothing is an industry average. Change the '
-      + 'rate and they all move; clear it and they all go back to NOT AVAILABLE.';
+    el('moneySay').textContent = (use.example
+      ? 'Worked with an EXAMPLE rate of 0,45 euro and 0,50 dollar a gigabyte over '
+        + 'eight hours a day, because a page that shows nothing until you type is no '
+        + 'use to anybody. It is not a real tariff and it is not a quote. Put yours '
+        + 'in the boxes above and every figure moves with it. '
+      : '')
+      + 'The bytes are measured on this phone. The rate is the one thing here that '
+      + 'was not measured, which is why it is shown rather than buried. The daily '
+      + 'figures assume the link runs flat out for every one of those hours, so they '
+      + 'are a ceiling - real traffic sits well under it.';
   }
 
   var tl = el('tLink'); tl.innerHTML = '';
@@ -310,12 +345,20 @@ function render(){
             : 'The link did worse than the browser claimed',
           Math.abs(probe.mbit / c.downlink - 1) < 0.3 ? 'm' : 'r');
   }
+  if (hidden){
+    var hn = document.createElement('div');
+    hn.style.cssText = 'margin-top:6px;color:#4a6076;font-size:11px';
+    hn.textContent = hidden + ' row' + (hidden === 1 ? '' : 's')
+      + ' left off this page because there is no figure behind them.';
+    el('tLink').parentNode.insertBefore(hn, el('tLink').nextSibling);
+  }
   refreshDownloads();
 }
 
 function bytesPerDay(){
-  if (!probe || probe.mbit === null || !rates) return null;
-  return probe.mbit * 1000000 / 8 * 3600 * rates.hrs;
+  var use = rates || EXAMPLE;
+  if (!probe || probe.mbit === null) return null;
+  return probe.mbit * 1000000 / 8 * 3600 * use.hrs;
 }
 
 /* ================= the page checks itself ================= */
@@ -339,8 +382,15 @@ function selfCheck(){
      was typed in. Every other page refuses money outright; this one
      refuses money that nothing stands behind, which is the same rule
      doing the same job. */
-  if (/[€$]\s?\d/.test(txt) && !rates)
-    f.push('a money figure is on the page with no rate behind it');
+  /* MONEY MAY APPEAR ONLY WITH A RATE ON SCREEN BEHIND IT - either the
+     one he typed, or the worked example, which is printed and
+     labelled. What must never happen is a money figure with no rate
+     anybody can see. */
+  if (/[€$]\s?\d/.test(txt) && !rates && !/EXAMPLE rate/.test(txt))
+    f.push('a money figure is on the page with no rate shown behind it');
+  /* AND THE EXAMPLE MUST SAY IT IS ONE. */
+  if (/[€$]\s?\d/.test(txt) && !rates && !/not a real tariff/.test(txt))
+    f.push('the example rate is on the page without saying it is an example');
   fails = f;
   var box = el('chk');
   if (f.length){
@@ -399,6 +449,13 @@ function useRates(){
 }
 
 /* ================= start, with nothing to press ================= */
+/* THE BOXES SHOW THE FIGURES THAT ARE ACTUALLY IN USE. Leaving them
+   empty with a placeholder saying 24 while the page worked on 8 would
+   have the screen disagreeing with itself. */
+el('eur').value = fi(EXAMPLE.eur, 2);
+el('usd').value = fi(EXAMPLE.usd, 2);
+el('hrs').value = String(EXAMPLE.hrs);
+el('fleet').value = String(EXAMPLE.fleet);
 el('btnUse').onclick = useRates;
 el('ref').textContent = 'COST PER DATA ' + stampNow();
 render();
