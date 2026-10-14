@@ -46,7 +46,7 @@
   #crText{color:#12261a;font-weight:700;font-size:9px;line-height:1.2;white-space:nowrap}
 </style></head><body>
 
-<div id="bar"><b id="stamp">B85</b><i id="line">Measuring&hellip;</i></div>
+<div id="bar"><b id="stamp">B87</b><i id="line">Measuring&hellip;</i></div>
 
 <div id="top">
   <div id="topText">Against The Target. The processor, the graphics, the memory,
@@ -57,6 +57,10 @@
 
 <div id="pg">
   <div id="warn"></div>
+
+  <h2>The Starting Time, Writing To The Screen</h2>
+  <table id="tStart"></table>
+  <div id="startSay" style="margin-top:6px;color:#9fb6c9"></div>
 
   <h2>Your Targets, And What This Machine Does</h2>
   <table id="tTarget"><thead><tr>
@@ -135,6 +139,18 @@ var MEM_KB = [4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096,
 var WINDOW_MS = 700;
 
 var one = null, all = null, gpu = null, mem = null, bus = null;
+
+/* THE STARTING TIME, MEASURED FROM THE MOMENT THE PAGE WAS ASKED FOR.
+   Every figure here counts from the same zero - the instant the
+   browser began loading this page - so they can be laid end to end:
+   the code starting, the first thing on the screen, the first frame
+   the code itself drew, and the graphics part's first finished frame.
+   They are read off the browser's own clock, not worked out. */
+var start = { script: performance.now(), firstFrame: null, gpuFirst: null,
+              gpuCold: null, paint: null, contentful: null };
+requestAnimationFrame(function(){
+  requestAnimationFrame(function(t){ start.firstFrame = performance.now(); });
+});
 var fails = [], hidden = 0, wurl = null;
 
 function two(n){ return (n < 10 ? '0' : '') + n; }
@@ -201,6 +217,7 @@ function spawn(n, ms, then){
 /* ================= the graphics ================= */
 function measureGpu(){
   var cv = el('gl');
+  var gCold0 = performance.now();
   var gl = cv.getContext('webgl2', { antialias: false, powerPreference: 'high-performance' })
         || cv.getContext('webgl', { antialias: false });
   if (!gl) return { available: false };
@@ -240,6 +257,13 @@ function measureGpu(){
   gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
 
   var px = new Uint8Array(4);
+  /* THE FIRST FRAME IS TIMED ON ITS OWN, before anything is warmed:
+     from asking for the graphics part to its first finished picture.
+     The pixel read back is what makes it finished rather than queued. */
+  gl.drawArrays(gl.TRIANGLES, 0, TRIS * 3);
+  gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  start.gpuCold = performance.now() - gCold0;
+  start.gpuFirst = performance.now();
   function pass(draws){
     var t0 = performance.now(), d;
     for (d = 0; d < draws; d++) gl.drawArrays(gl.TRIANGLES, 0, TRIS * 3);
@@ -338,8 +362,44 @@ function shareText(s){
   return fi(s * 100, 3) + ' per cent';
 }
 
+function renderStart(){
+  try {
+    var ps = performance.getEntriesByType('paint');
+    ps.forEach(function(e){
+      if (e.name === 'first-paint') start.paint = e.startTime;
+      if (e.name === 'first-contentful-paint') start.contentful = e.startTime;
+    });
+  } catch (e) {}
+  var t = el('tStart'); t.innerHTML = '';
+  function ms(v){ return v === null ? null : fi(v, 1) + ' ms'; }
+  row(t, 'The Code Began To Run', ms(start.script),
+      'From the moment the page was asked for');
+  row(t, 'First Anything On The Screen', ms(start.paint), 'The browser\u2019s own record');
+  row(t, 'First Words And Figures On The Screen', ms(start.contentful), 'The browser\u2019s own record');
+  row(t, 'First Frame The Code Handed To The Screen', ms(start.firstFrame),
+      'The processor writing to the screen for itself');
+  row(t, 'The Graphics Part, From Asking To Its First Picture',
+      start.gpuCold === null ? null : fi(start.gpuCold, 1) + ' ms',
+      (gpu && gpu.soft) ? 'By a SOFTWARE RENDERER on this machine - the processor again'
+                        : 'Read back, so the picture was really finished');
+  var sayS = '';
+  if (start.firstFrame !== null)
+    sayS = 'From being asked for, this machine had the code running in '
+      + fi(start.script, 0) + ' ms and handed its first own frame to the screen at '
+      + fi(start.firstFrame, 0) + ' ms.';
+  if (sayS && start.gpuCold !== null)
+  {
+    sayS += ' The graphics part took ' + fi(start.gpuCold, 1) + ' ms to wake and finish one picture.';
+    /* ONLY SAID WHEN MEASURED: one later draw, from the draws a second. */
+    if (gpu && gpu.available && gpu.perSec > 0)
+      sayS += ' Once awake, one draw took ' + fi(1000 / gpu.perSec, 4) + ' ms.';
+  }
+  el('startSay').textContent = sayS;
+}
+
 function render(){
   hidden = 0;
+  renderStart();
   var tb = el('tgtBody'); tb.innerHTML = '';
   function tgt(name, asked, got, gotTxt){
     if (got === null || got === undefined) { hidden++; return; }
@@ -470,6 +530,13 @@ function selfCheck(){
   /* AND A SOFTWARE RENDERER MUST NEVER PASS AS GRAPHICS. */
   if (gpu && gpu.available && gpu.soft && !/SOFTWARE RENDERER/.test(txt))
     f.push('a software renderer is being reported without saying so');
+  /* THE STARTING TIMES ARE ONE CLOCK FROM ONE ZERO, so they must fall
+     in order: the code cannot draw its first frame before it runs, and
+     the graphics part cannot finish before it was asked. */
+  if (start.firstFrame !== null && start.firstFrame < start.script)
+    f.push('the first frame came out earlier than the code started');
+  if (start.gpuFirst !== null && (start.gpuFirst < start.script || !(start.gpuCold > 0)))
+    f.push('the graphics starting time is out of order');
   fails = f;
   var box = el('chk');
   if (f.length){
@@ -492,6 +559,10 @@ function textOf(){
     L.push(l.name + ': ' + fi(l.ns, 2) + ' ns, ' + l.from + ' to ' + l.to + ' kB');
   });
   if (bus) L.push('Bus: ' + fi(bus.gbs, 2) + ' GB a second');
+  if (start.firstFrame !== null) L.push('Code running: ' + fi(start.script, 1) + ' ms, first own frame: '
+                                        + fi(start.firstFrame, 1) + ' ms');
+  if (start.gpuCold !== null) L.push('Graphics, asking to first picture: ' + fi(start.gpuCold, 1)
+                                     + ' ms, first picture at ' + fi(start.gpuFirst, 1) + ' ms');
   L.push('', 'Copyright AI2Orbit All Rights Reserved 2026.');
   return L.join('\n');
 }
@@ -551,7 +622,7 @@ window.__read = function(){
   return { ready: !!(one && all && mem && bus),
            bar: el('stamp').textContent + ' ' + el('line').textContent,
            fails: fails, one: one, all: all, gpu: gpu, mem: mem, bus: bus,
-           levels: mem ? findLevels(mem) : null,
+           levels: mem ? findLevels(mem) : null, start: start,
            targets: { cpu: TARGET_CPU, draws: TARGET_DRAWS },
            tgtSay: el('tgtSay').textContent, memSay: el('memSay').textContent };
 };
