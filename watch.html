@@ -56,7 +56,7 @@
   #crText{color:#12261a;font-weight:700;font-size:9px;line-height:1.2;white-space:nowrap}
   canvas#gl{position:absolute;left:-9999px;top:0;width:256px;height:256px}
 </style></head><body>
-<div id="bar"><b id="stamp">B89</b><i id="line">Watching</i></div>
+<div id="bar"><b id="stamp">B90</b><i id="line">Watching</i></div>
 <div id="pg">
   <h2>The Watch</h2>
   <div class="grid">
@@ -112,7 +112,7 @@
    for stays off the page.
    ================================================================== */
 
-var TARGET_CPU = 5455000000, TARGET_DRAWS = 579000;
+var TARGET_CPU = 5455000000, TARGET_DRAWS = 579000;   /* and 80 screen updates a second, on the screen service */
 var OK_AT = 0.85, WARN_AT = 0.60;
 var HISTORY = 60;                     /* readings kept per service */
 var X8 = Math.max(1, Math.min(20, +(/[?&]x=(\d+)/.exec(location.search) || [0, 1])[1]));
@@ -157,7 +157,7 @@ var S_CPU1 = svc({ id: 'cpu1', name: 'Processor, One Core', kind: 'best-up', eve
 var S_CPUN = svc({ id: 'cpuN', name: 'Processor, Every Core', kind: 'best-up', every: 20, target: TARGET_CPU, fmt: function(v){ return comma(v) + ' a second'; } });
 var S_GPU  = svc({ id: 'gpu',  name: 'Graphics, Draws A Second', kind: 'best-up', every: 30, target: TARGET_DRAWS, fmt: function(v){ return comma(v) + ' a second'; } });
 var S_MEM  = svc({ id: 'mem',  name: 'Memory, One Random Fetch', kind: 'best-down', every: 30, fmt: function(v){ return fi(v, 2) + ' ns'; } });
-var S_FPS  = svc({ id: 'fps',  name: 'Screen, Frames A Second', kind: 'best-up', every: 0, fmt: function(v){ return fi(v, 0) + ' a second'; } });
+var S_FPS  = svc({ id: 'fps',  name: 'Screen, Frames A Second', kind: 'best-up', every: 0, target: 80, fmt: function(v){ return fi(v, 0) + ' a second'; } });
 var S_STALL= svc({ id: 'stall',name: 'Main Thread, Longest Stall', kind: 'limit-up', every: 0, ok: 50, warn: 200, fmt: function(v){ return fi(v, 0) + ' ms'; } });
 var S_RTT  = svc({ id: 'rtt',  name: 'Network, Round Trip', kind: 'limit-up', every: 10, ok: 150, warn: 400, fmt: function(v){ return fi(v, 0) + ' ms'; } });
 var S_DOWN = svc({ id: 'down', name: 'Network, Download', kind: 'best-up', every: 60, fmt: function(v){ return fi(v, 1) + ' Mbit a second'; } });
