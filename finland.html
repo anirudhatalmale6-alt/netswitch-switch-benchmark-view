@@ -15,6 +15,9 @@
   .card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px;min-width:0}
   .card h3{margin:0 0 8px;font-size:11px;font-weight:700;color:var(--ink2);letter-spacing:.5px}
   canvas{display:block;width:100%;touch-action:none}
+  .zwrap{position:relative} .zb{position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:4px}
+  .zb button{min-width:34px;height:32px;background:#16293a;color:#d7e6f2;border:1px solid #2b3d50;border-radius:4px;font:700 15px ui-monospace,monospace;cursor:pointer;padding:0 6px}
+  .zhint{font-size:10px;color:#6d8ba3;margin-top:4px}
   #fin{height:520px} #loc{height:300px}
   .leg{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--ink2);margin-top:6px}
   .leg i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:3px}
@@ -35,12 +38,13 @@
   #cr img{width:17px;height:auto;display:block}
   #crText{color:#12261a;font-weight:400;font-size:9px;line-height:1.2;white-space:nowrap}
 </style></head><body>
-<div id="bar"><b id="stamp">B94</b><i id="line">Energising Finland</i></div>
+<div id="bar"><b id="stamp">B95</b><i id="line">Energising Finland</i></div>
 <div id="pg">
   <h2>Finland Grid</h2>
   <div class="card" style="margin-bottom:10px"><a style="color:#4fd1ff;font-weight:700" href="buildings.html#FI">Street level: the real network buildings of Finland, with street address, postcode, lat and lon</a></div>
   <div class="grid">
-    <div class="card"><h3>The Country, Modelled Lines Between Real Places</h3><canvas id="fin"></canvas>
+    <div class="card"><h3>The Country, Modelled Lines Between Real Places</h3><div class="zwrap"><canvas id="fin"></canvas><div class="zb"><button id="zIn" title="Zoom in">+</button><button id="zOut" title="Zoom out">-</button><button id="zAll" title="The whole country">ALL</button></div></div>
+      <div class="zhint" id="zHint">Zoom: wheel, pinch or the buttons, then drag to move</div>
       <div class="leg"><span><i style="background:#0ca30c"></i>Under 80 per cent</span><span><i style="background:#fab219"></i>80 to 100</span>
         <span><i style="background:#d03b3b"></i>Over or cut</span><span><i style="background:#3987e5"></i>Supply</span></div></div>
     <div class="card"><h3 id="locTitle">Local View</h3>
@@ -265,13 +269,15 @@ function prep(cv){ var dpr = Math.min(window.devicePixelRatio || 1, 2), W = cv.c
   if (cv.width !== Math.round(W * dpr)) cv.width = Math.round(W * dpr); if (cv.height !== Math.round(H * dpr)) cv.height = Math.round(H * dpr);
   var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H); return { g: g, W: W, H: H }; }
 function col(r){ return r >= 1 ? '#d03b3b' : (r >= 0.8 ? '#fab219' : '#0ca30c'); }
-var FINXY = null;
+var FINXY = null, VIEW = { z: 1, ox: 0, oy: 0 };
 function drawFin(){
   var c = prep(el('fin')), g = c.g, W = c.W, H = c.H;
   var lat0 = 59.6, lat1 = 69.2, lon0 = 20.5, lon1 = 31.8, k = Math.cos(64 * Math.PI / 180);
   var sx = (W - 30) / ((lon1 - lon0) * k), sy = (H - 30) / (lat1 - lat0), sc = Math.min(sx, sy);
-  var X = function(p){ return 15 + (p[2] - lon0) * k * sc; }, Y = function(p){ return H - 15 - (p[1] - lat0) * sc; };
-  FINXY = { X: X, Y: Y };
+  /* ZOOM: the same drawing through the view - a scale and a shift - so lines stay thin and names stay
+     readable at any zoom, instead of scaling the picture up */
+  var X = function(p){ return (15 + (p[2] - lon0) * k * sc) * VIEW.z + VIEW.ox; }, Y = function(p){ return (H - 15 - (p[1] - lat0) * sc) * VIEW.z + VIEW.oy; };
+  FINXY = { X: X, Y: Y, W: W, H: H };
   links.forEach(function(l){ var key = lkey(l[0], l[1]), f = nat.flow[key] || 0;
     g.strokeStyle = cut[key] ? '#d03b3b' : (f ? col(f / LINE_MW) : '#2b3d50'); g.lineWidth = cut[key] ? 2 : (f ? 1.5 + Math.min(4, f / 400) : 1);
     g.setLineDash(cut[key] ? [5, 4] : []); g.beginPath(); g.moveTo(X(N[l[0]]), Y(N[l[0]])); g.lineTo(X(N[l[1]]), Y(N[l[1]])); g.stroke(); });
@@ -280,7 +286,7 @@ function drawFin(){
     if (i >= NP){ g.fillStyle = '#3987e5'; g.fillRect(X(p) - 6, Y(p) - 6, 12, 12); }
     else { var r = 2.5 + Math.sqrt(p[3] / 20000); g.fillStyle = nat.feed[i] === null ? '#d03b3b' : (i === locIdx ? '#ffffff' : '#8ea9c2');
       g.beginPath(); g.arc(X(p), Y(p), r, 0, 7); g.fill(); }
-    if (i >= NP || p[3] >= 60000 || i === locIdx){ g.fillStyle = '#d7e6f2'; g.font = '10px monospace'; g.fillText(p[0], X(p) + 7, Y(p) + 3); }
+    if (i >= NP || p[3] >= 60000 || i === locIdx || VIEW.z >= 2.5){ g.fillStyle = '#d7e6f2'; g.font = '10px monospace'; g.fillText(p[0], X(p) + 7, Y(p) + 3); }
   });
 }
 function drawLoc(g0){
@@ -412,6 +418,39 @@ function tick(){
 }
 requestAnimationFrame(tick);
 addEventListener('resize', function(){ lastDraw = 0; });
+
+/* ================= zoom and move on the country map ================= */
+function zoomAt(f, mx, my){
+  var z = Math.max(1, Math.min(24, VIEW.z * f)); if (z === VIEW.z) return;
+  VIEW.ox = mx - (mx - VIEW.ox) * z / VIEW.z; VIEW.oy = my - (my - VIEW.oy) * z / VIEW.z; VIEW.z = z;
+  if (z === 1){ VIEW.ox = 0; VIEW.oy = 0; }
+  zoomed();
+}
+function zoomed(){ var cv = el('fin'); cv.style.touchAction = VIEW.z > 1 ? 'none' : 'pan-y'; cv.style.cursor = VIEW.z > 1 ? 'grab' : 'zoom-in';
+  el('zHint').textContent = VIEW.z > 1 ? 'Zoom ' + fi(VIEW.z, 1) + ' times - drag to move, ALL for the whole country' : 'Zoom: wheel, pinch or the buttons, then drag to move';
+  try { drawFin(); } catch (e){} }
+(function(){
+  var cv = el('fin'), pts = {}, last = null;
+  function rel(e){ var r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+  cv.addEventListener('wheel', function(e){ e.preventDefault(); var m = rel(e); zoomAt(e.deltaY < 0 ? 1.25 : 0.8, m[0], m[1]); }, { passive: false });
+  cv.addEventListener('dblclick', function(e){ var m = rel(e); zoomAt(2, m[0], m[1]); });
+  cv.addEventListener('pointerdown', function(e){ pts[e.pointerId] = rel(e); last = null; try { cv.setPointerCapture(e.pointerId); } catch (x){} });
+  cv.addEventListener('pointermove', function(e){
+    if (!pts[e.pointerId]) return; var p = rel(e), ids = Object.keys(pts);
+    if (ids.length >= 2){
+      var o = pts[ids[0] == e.pointerId ? ids[1] : ids[0]], d = Math.hypot(p[0] - o[0], p[1] - o[1]);
+      if (last) zoomAt(d / last, (p[0] + o[0]) / 2, (p[1] + o[1]) / 2); last = d;
+    } else if (VIEW.z > 1){ VIEW.ox += p[0] - pts[e.pointerId][0]; VIEW.oy += p[1] - pts[e.pointerId][1]; zoomed(); }
+    pts[e.pointerId] = p; });
+  function up(e){ delete pts[e.pointerId]; last = null; }
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  function mid(){ return [cv.clientWidth / 2, cv.clientHeight / 2]; }
+  el('zIn').onclick = function(){ var m = mid(); zoomAt(1.6, m[0], m[1]); };
+  el('zOut').onclick = function(){ var m = mid(); zoomAt(1 / 1.6, m[0], m[1]); };
+  el('zAll').onclick = function(){ VIEW = { z: 1, ox: 0, oy: 0 }; zoomed(); };
+  zoomed();
+})();
+window.__zoom = function(f){ zoomAt(f, el('fin').clientWidth / 2, el('fin').clientHeight / 2); return { z: VIEW.z, ox: VIEW.ox, oy: VIEW.oy }; };
 
 window.__read = function(){ return { cut: cutName, fed: nat.feed.filter(function(x){ return x !== null; }).length, given: nat.given, loc: PLACES[loc.pi][0],
   step: loc.step, links: links.length, fails: fails, bar: el('stamp').textContent + ' ' + el('line').textContent }; };
