@@ -17,6 +17,12 @@
   canvas{display:block;width:100%;touch-action:none}
   .zwrap{position:relative} .zb{position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:4px}
   .zb button{min-width:34px;height:32px;background:#16293a;color:#d7e6f2;border:1px solid #2b3d50;border-radius:4px;font:700 15px ui-monospace,monospace;cursor:pointer;padding:0 6px}
+  .big{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px}
+  .big div{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px}
+  .big b{display:block;font-size:28px;line-height:1.15;color:#fff}
+  .big span{display:block;font-size:11px;color:var(--ink2);margin-top:2px}
+  .jump{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .jump a{background:#16293a;color:#9fd6f5;text-decoration:none;font-weight:700;border-radius:4px;padding:7px 12px}
   .zhint{font-size:10px;color:#6d8ba3;margin-top:4px}
   #fin{height:520px} #loc{height:300px}
   .leg{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--ink2);margin-top:6px}
@@ -38,9 +44,11 @@
   #cr img{width:17px;height:auto;display:block}
   #crText{color:#12261a;font-weight:400;font-size:9px;line-height:1.2;white-space:nowrap}
 </style></head><body>
-<div id="bar"><b id="stamp">B96</b><i id="line">Energising Finland</i></div>
+<div id="bar"><b id="stamp">B102</b><i id="line">Energising Finland</i></div>
 <div id="pg">
   <h2>Finland Grid</h2>
+  <div class="big" id="big"></div>
+  <div class="jump"><a href="#every-place">All 308 municipalities</a><a href="#every-producer">All producers</a><a href="#finder">AI production finder</a></div>
   <div class="card" style="margin-bottom:10px"><a style="color:#4fd1ff;font-weight:700" href="buildings.html#FI">Street level: the real network buildings of Finland, with street address, postcode, lat and lon</a></div>
   <div class="grid">
     <div class="card"><h3>The Country, Modelled Lines Between Real Places</h3><div class="zwrap"><canvas id="fin"></canvas><div class="zb"><button id="zIn" title="Zoom in">+</button><button id="zOut" title="Zoom out">-</button><button id="zAll" title="The whole country">ALL</button></div></div>
@@ -54,11 +62,15 @@
   </div>
   <h2>The Country Now</h2>
   <div class="card"><table id="tNat"></table></div>
-  <h2>Supply</h2>
+  <h2 id="every-producer">Every Producer</h2>
   <div class="card"><div id="sNote" style="font-size:11px;color:#6d8ba3;margin-bottom:6px"></div><div style="max-height:420px;overflow:auto"><table id="tSup"><thead><tr><th>producer</th><th>kind</th><th>nearest municipality</th><th>can give</th><th>giving</th><th>share</th></tr></thead><tbody id="sBody"></tbody></table></div></div>
   <h2>Busiest Lines</h2>
   <div class="card"><table id="tLines"><thead><tr><th>line</th><th>flow</th><th>of rating</th></tr></thead><tbody id="liBody"></tbody></table></div>
-  <h2>Every Place, Town To Next Town To Producer</h2>
+  <h2 id="finder">AI Production Finder</h2>
+  <div class="card"><select id="fq" style="width:100%;margin:0 0 8px;background:#0e1a26;color:#d7e6f2;border:1px solid #2b3d50;border-radius:4px;padding:6px;font:inherit"></select>
+    <div id="fNote" style="font-size:11px;color:#6d8ba3;margin-bottom:6px"></div>
+    <table><thead><tr><th>solution</th><th>producers chosen</th><th>average km</th><th>lost on the way</th><th>clean share</th></tr></thead><tbody id="fBody"></tbody></table></div>
+  <h2 id="every-place">Every Place, Town To Next Town To Producer</h2>
   <div class="card"><input id="pq" placeholder="Search a place or region" autocomplete="off" style="width:100%;box-sizing:border-box;margin-bottom:8px;background:#0e1a26;color:#d7e6f2;border:1px solid #2b3d50;border-radius:4px;padding:7px;font:inherit">
     <div id="pNote" style="font-size:11px;color:#6d8ba3;margin-bottom:6px"></div>
     <div style="max-height:420px;overflow:auto"><table id="tPl"><thead><tr><th>place</th><th>region</th><th>people</th><th>use now</th><th>in 60,6 days</th><th>fed from</th><th>town to next town to producer</th><th>km</th></tr></thead><tbody id="plBody"></tbody></table></div></div>
@@ -207,6 +219,53 @@ function seasonAt(daysFromNow){ var d = new Date(Date.now() + daysFromNow * 864e
 function chainOf(i){ var k = nat.feed[i]; if (k === null) return null; var c = i, out = [i];
   while (nat.paths[k].prev[c] >= 0){ c = nat.paths[k].prev[c]; out.push(c); } return out; }
 var lastNatShown = null, lastNatSup = null;
+/* THE BIG NUMBERS: what all producers can give, what they give now, and what the country uses - the year
+   average the grid is fed with, today with the season, and 60,6 days forward */
+function renderBig(){
+  if (!nat) return; var can = SUPPLY.reduce(function(a, s){ return a + s[3]; }, 0), giv = nat.given.reduce(function(a, b){ return a + b; }, 0), use = 0;
+  PLACES.forEach(function(p, i){ use += loadMW(i); });
+  var tiles = [[fi(can, 0) + ' MW', 'Production can give, ' + SUPPLY.length + ' producers and links'], [fi(giv, 0) + ' MW', 'Production giving now'],
+    [fi(use, 0) + ' MW', 'Use, year average, all ' + NP + ' places fed'], [fi(use * seasonAt(0), 0) + ' MW', 'Use today, with the season'],
+    [fi(use * seasonAt(DAYS_AHEAD), 0) + ' MW', 'Use in 60,6 days'], [String(NP), 'Municipalities, every one'], [String(SUPPLY.length - 4 + PRODUCERS_NO_MW.length), 'Power plants listed']];
+  el('big').innerHTML = tiles.map(function(t){ return '<div><b>' + t[0] + '</b><span>' + t[1] + '</span></div>'; }).join('');
+}
+/* AI PRODUCTION FINDER. For one place, an automated search over every producer for the best way to cover
+   what the place uses: each producer is weighed by its distance along the lines plus its order of use (clean
+   first), only what it can still spare is counted, and the cheapest mix that covers the whole need wins.
+   Three ways are searched - least loss, cleanest, balanced - and the AI pick is the one with the least loss
+   plus 100 kW for every MW that is not clean. With one place and limits on what each producer spares,
+   taking the best-weighed first is the true best for each way.
+   Losses on the way are 0,8 per cent for every 100 km, modelled. */
+var LOSS_PER_KM = 0.00008;
+function findBest(i, need, how){
+  var c = SUPPLY.map(function(s, k){ var mine = 0; (nat.share[i] || []).forEach(function(t){ if (t[0] === k) mine += t[1]; });
+      var d = nat.paths[k].d[i], clean = ['nuclear', 'hydro', 'wind', 'solar'].indexOf(SUPPLY_KIND[k]) >= 0;
+      return { k: k, d: d, spare: nat.left[k] + mine, w: how === 'loss' ? d : (how === 'clean' ? (clean ? 0 : 1e6) + d : d + meritOf(k)) }; })
+    .filter(function(x){ return x.d < Infinity && x.spare > 1e-9; }).sort(function(a, b){ return a.w - b.w; });
+  var left = need, take = [];
+  c.forEach(function(x){ if (left <= 1e-9) return; var mw = Math.min(left, x.spare); take.push([x.k, mw, x.d]); left -= mw; });
+  return left > 1e-9 ? null : take;
+}
+function summary(take){ var mw = 0, km = 0, loss = 0, clean = 0, w = 0;
+  take.forEach(function(t){ var d = t[2] !== undefined ? t[2] : nat.paths[t[0]].d[FQ]; mw += t[1]; km += t[1] * d; w += t[1] * (d + meritOf(t[0])); loss += t[1] * d * LOSS_PER_KM; if (['nuclear', 'hydro', 'wind', 'solar'].indexOf(SUPPLY_KIND[t[0]]) >= 0) clean += t[1]; });
+  return { mw: mw, km: km / Math.max(1e-9, mw), loss: loss, clean: clean / Math.max(1e-9, mw), w: w / Math.max(1e-9, mw) }; }
+var FQ = 0;
+function renderFinder(){
+  if (!nat) return; var i = FQ, now = loadMW(i) * seasonAt(0), ahead = loadMW(i) * seasonAt(DAYS_AHEAD), cur = (nat.share[i] || []).map(function(t){ return [t[0], t[1] * seasonAt(0), nat.paths[t[0]].d[i]]; });
+  /* THREE WAYS SEARCHED, then the pick: least lost on the way, cleanest, and balanced (as the grid runs). The pick is the one
+     with the least loss plus 100 kW for every MW that is not clean - so clean wins unless it costs a lot more on the way. */
+  var ways = [['Least loss', findBest(i, now, 'loss')], ['Cleanest', findBest(i, now, 'clean')], ['Balanced', findBest(i, now, 'bal')]], pick = null, pv = Infinity;
+  ways.forEach(function(w){ if (!w[1]) return; var sm = summary(w[1]), v = sm.loss * 1000 + (1 - sm.clean) * sm.mw * 100; w.sm = sm; if (v < pv - 1e-9){ pv = v; pick = w; } });
+  var rows = [['Fed now', cur]].concat(ways.map(function(w){ return [w[0] + (w === pick ? ', AI pick' : ''), w[1]]; })).concat([['AI pick in 60,6 days', pick ? findBest(i, ahead, pick[0] === 'Least loss' ? 'loss' : (pick[0] === 'Cleanest' ? 'clean' : 'bal')) : null]]), tb = el('fBody'); tb.innerHTML = ''; var best = pick ? pick.sm : null;
+  rows.forEach(function(r){ var tr = document.createElement('tr'), t = r[1];
+    var cells = [r[0], t ? t.map(function(x){ return SUPPLY[x[0]][0] + ' ' + fi(x[1], x[1] < 10 ? 2 : 0) + ' MW, ' + fi(x[2], 0) + ' km'; }).join('; ') : 'Not enough spare power', '-', '-', '-'];
+    if (t){ var sm = summary(t); cells[2] = fi(sm.km, 0) + ' km'; cells[3] = fi(sm.loss * 1000, 0) + ' kW'; cells[4] = fi(sm.clean * 100, 0) + ' %'; if (r[0] === 'Fed now') r.sm = sm; }
+    cells.forEach(function(c, k){ var td = document.createElement('td'); td.className = k ? 'v' : 'k'; td.textContent = c; tr.appendChild(td); }); tb.appendChild(tr); });
+  var fed = rows[0].sm;
+  el('fNote').textContent = PLACES[i][0] + ', ' + PLACES[i][3].toLocaleString('fi-FI') + ' people, uses ' + fi(now, 2) + ' MW today and ' + fi(ahead, 2) + ' MW in 60,6 days. '
+    + 'Searched all ' + SUPPLY.length + ' producers, with what the other places leave spare. ' + (best && fed ? 'AI pick: ' + pick[0].toLowerCase() + ' - losses ' + fi(best.loss * 1000, 0) + ' kW against ' + fi(fed.loss * 1000, 0) + ' now, clean share ' + fi(best.clean * 100, 0) + ' per cent against ' + fi(fed.clean * 100, 0) + '.' : '');
+  window.__finder = { place: PLACES[i][0], now: now, ahead: ahead, best: pick ? pick[1] : null, pick: pick ? pick[0] : null, fed: fed, bestSum: best, ways: ways.map(function(w){ return [w[0], w.sm ? { loss: w.sm.loss, clean: w.sm.clean, km: w.sm.km } : null]; }) };
+}
 function cap1(x){ x = String(x); return x.charAt(0).toUpperCase() + x.slice(1); }
 function renderPlaces(){
   if (!nat) return; var q = (el('pq').value || '').trim().toLowerCase(), tb = el('plBody'), frag = document.createDocumentFragment(), sNow = seasonAt(0), sAhead = seasonAt(DAYS_AHEAD), n = 0;
@@ -377,7 +436,7 @@ function render(g0){
   el('line').textContent = 'Finland: ' + (cutName ? 'line ' + cutName + ' cut, ' : '') + (NP - unfed) + ' of ' + NP + ' places fed, busiest line '
     + fi(worst * 100, 0) + ' per cent - local view ' + PLACES[L.pi][0] + ' - real places, modelled grid';
   if (document.activeElement !== el('cities')) el('cities').value = String(L.pi);
-  if (nat !== lastNatShown){ lastNatShown = nat; renderPlaces(); }
+  if (nat !== lastNatShown){ lastNatShown = nat; renderPlaces(); renderBig(); renderFinder(); }
   selfCheck(g0); refreshDownloads();
 }
 function renderSettings(){ var t = el('tSet'); t.innerHTML = '';
@@ -391,7 +450,7 @@ function renderSettings(){ var t = el('tSet'); t.innerHTML = '';
 /* ================= the page checks itself ================= */
 var WORDS = ('All Rights Reserved Copyright Finland Grid The Country Modelled Lines Between Real Places Local View One District Of '
   + 'Now Supply Busiest Settings Under Over Line Cut None Fed Power Used Nuclear Hydro Wind State Normal Fault City Last Feeder '
-  + 'Breaker Section Rerouted Repaired Back Use Per Person Rating Feeders Tie Nothing Avainlippu Every Place Town Next Producer Producers Season Search Municipalities').split(' ')
+  + 'Breaker Section Rerouted Repaired Back Use Per Person Rating Feeders Tie Nothing Avainlippu Every Place Town Next Producer Producers Season Search Municipalities Production Finder Fed Best All Power Not Enough Searched It').split(' ')
   .concat([].concat.apply([], PLACES.concat(SUPPLY, PRODUCERS_NO_MW).map(function(p){ return p[0].split(/[\s,()-]+/); })), REGION.join(' ').split(' '),
     'Coal Gas Oil Solar Biomass Biogas Waste Other Link Bio Fossil Not Given Data OpenStreetMap'.split(' '),
     /* the pieces the check itself sees: a name like Kaukolämpö is read up to its first letter outside a to z */
@@ -415,6 +474,8 @@ function selfCheck(g0){
     Object.keys(cut).forEach(function(k){ if (nat.flow[k]) f.push('power flows through the cut line'); });
     PLACES.forEach(function(p, i){ var ch = chainOf(i); if (ch && ch[ch.length - 1] !== NP + nat.feed[i]) f.push('the way from ' + p[0] + ' does not end at its producer'); });
     if (NP !== 308) f.push('not every municipality is on the map');
+    if (window.__finder && window.__finder.best && window.__finder.fed && window.__finder.bestSum.km * 0 === 0){ var bs = window.__finder.best.reduce(function(a, t){ return a + t[1]; }, 0);
+      if (Math.abs(bs - window.__finder.now) > 1e-6) f.push('the finder does not cover the whole need'); }
     var b0 = bellman(NP, cut); PLACES.forEach(function(p, i){ if (Math.abs(b0[i] - nat.paths[0].d[i]) > 1e-6) f.push('a shortest way to ' + p[0] + ' is wrong'); });
   }
   if (g0 && loc){
@@ -458,7 +519,11 @@ function refreshDownloads(){ if (performance.now() - lastDl < 2000) return; last
 PLACES.map(function(p, i){ return i; }).sort(function(a, b){ return PLACES[a][0].localeCompare(PLACES[b][0], 'fi'); }).forEach(function(i){
   var o = document.createElement('option'); o.value = String(i); o.textContent = PLACES[i][0] + ', ' + REGION[i] + ', ' + PLACES[i][3].toLocaleString('fi-FI') + ' people'; el('cities').appendChild(o); });
 el('cities').onchange = function(){ var i = +this.value; locPinned = true; locIdx = i; loc = buildLocal(i); };
-el('pq').oninput = function(){ renderPlaces(); };
+el('pq').oninput = function(){ renderPlaces(); var q = this.value.trim().toLowerCase(); if (!q) return;
+  for (var i = 0; i < NP; i++) if (PLACES[i][0].toLowerCase().indexOf(q) === 0){ FQ = i; el('fq').value = String(i); renderFinder(); break; } };
+PLACES.map(function(p, i){ return i; }).sort(function(a, b){ return PLACES[a][0].localeCompare(PLACES[b][0], 'fi'); }).forEach(function(i){
+  var o = document.createElement('option'); o.value = String(i); o.textContent = PLACES[i][0] + ', ' + REGION[i]; el('fq').appendChild(o); });
+el('fq').value = '0'; el('fq').onchange = function(){ FQ = +this.value; renderFinder(); };
 loc = buildLocal(0); nat = solve({}); renderSettings(); lastLocSwitch = performance.now();
 var lastDraw = 0, lastG = null;
 function tick(){
