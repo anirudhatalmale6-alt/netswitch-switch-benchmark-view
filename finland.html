@@ -478,7 +478,7 @@ addEventListener('resize', function(){ lastDraw = 0; });
 
 /* ================= zoom and move on the country map ================= */
 function zoomAt(f, mx, my){
-  var z = Math.max(1, Math.min(24, VIEW.z * f)); if (z === VIEW.z) return;
+  var z = Math.max(1, Math.min(85, VIEW.z * f)); if (z === VIEW.z) return;
   VIEW.ox = mx - (mx - VIEW.ox) * z / VIEW.z; VIEW.oy = my - (my - VIEW.oy) * z / VIEW.z; VIEW.z = z;
   if (z === 1){ VIEW.ox = 0; VIEW.oy = 0; }
   zoomed();
