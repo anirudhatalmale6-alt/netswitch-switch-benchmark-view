@@ -1,6 +1,7 @@
-/* NetSwitch service worker — offline-first so a live demo never depends on venue wifi.
-   Stale-while-revalidate: serve from cache instantly, refresh in the background when online. */
-var CACHE = 'netswitch-v2.53.0';
+/* NetSwitch service worker - NETWORK FIRST, the local copy when there is no network.
+   With a network every page comes fresh from the server; without one the copy kept in this
+   browser (local.html fills it) opens instead, so a demo never depends on the venue wifi. */
+var CACHE = 'netswitch-v2.54.0';
 var ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', function (e) {
@@ -16,20 +17,19 @@ self.addEventListener('activate', function (e) {
 });
 
 self.addEventListener('fetch', function (e) {
-  if (e.request.method !== 'GET') return;
-  /* never intercept the live measurement requests — they must hit the real network,
-     otherwise a cached copy would report a fake (instant) speed / latency. */
-  if (e.request.url.indexOf('speedtest.bin') >= 0 || e.request.url.indexOf('?cb=') >= 0) return;
+  var r = e.request;
+  if (r.method !== 'GET') return;
+  /* never touch the live measurements - a stored copy would report a fake (instant) speed or echo */
+  if (r.cache === 'no-store' || r.cache === 'reload' || r.url.indexOf('speedtest.bin') >= 0 || r.url.indexOf('?cb=') >= 0) return;
   e.respondWith(
-    caches.match(e.request).then(function (cached) {
-      var net = fetch(e.request).then(function (res) {
-        if (res && res.status === 200 && res.type === 'basic') {
-          var copy = res.clone();
-          caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
-        }
-        return res;
-      }).catch(function () { return cached; });
-      return cached || net;
+    fetch(r).then(function (res) {
+      if (res && res.status === 200 && res.type === 'basic') {
+        var copy = res.clone();
+        caches.open(CACHE).then(function (c) { c.put(r, copy); });
+      }
+      return res;
+    }).catch(function () {
+      return caches.match(r, { ignoreSearch: true }).then(function (hit) { return hit || caches.match('./index.html'); });
     })
   );
 });

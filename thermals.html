@@ -35,7 +35,7 @@
   #crText{color:#12261a;font-weight:400;font-size:9px;line-height:1.2;white-space:nowrap}
   @media (max-width:600px){ #bar{font-size:11px;padding:5px 8px} #pg{padding-top:78px} h2{scroll-margin-top:80px} }
 </style></head><body>
-<div id="bar"><b id="stamp">B107</b><i id="line">Warming up</i></div>
+<div id="bar"><b id="stamp">B108</b><i id="line">Warming up</i></div>
 <div id="pg">
   <div id="jump"><a href="#s-heat">Thermals</a><a href="#s-brk">Breaker 3D</a><a href="#s-thr">Threads</a><a href="#s-mem">Memory DDR</a><a href="#s-bus">Bus</a><a href="#s-scr">Screen</a><a href="#s-gfx">Graphics</a><a href="#s-str">Screen Striper</a><a href="#s-sph">CPU Sphere</a><a href="#s-dev">Device</a><a href="#s-net">4G 5G</a><a href="#s-file">File Test 24 h</a><a href="#s-ref">Reference</a></div>
   <h2 id="s-heat">Browser Thermals</h2>
@@ -769,6 +769,17 @@ var REFS = [
    ['Cat 5e cable', '1 Gbit/s', '1 Gbit/s', '100 m, 100 MHz'], ['Cat 6A cable', '10 Gbit/s', '10 Gbit/s', '100 m, 500 MHz'], ['Cat 8 cable', '40 Gbit/s', '40 Gbit/s', '30 m, 2 000 MHz'], ['Fibre, single mode', '100 Gbit/s and more', 'Same', 'Tens of km']]],
  ['Memory', ['Kind', 'Transfers a second', 'One 64 bit channel', 'Where'], [['DDR3-1600', '1 600 million', '12,8 GB/s', 'Older desktops'], ['DDR4-3200', '3 200 million', '25,6 GB/s', 'Desktops, servers'],
    ['LPDDR4X-4266', '4 266 million', '34,1 GB/s', 'Phones, tablets'], ['DDR5-4800', '4 800 million', '38,4 GB/s', 'Desktops, servers'], ['DDR5-6400', '6 400 million', '51,2 GB/s', 'Desktops'], ['LPDDR5X-8533', '8 533 million', '68,3 GB/s', 'Phones, laptops']]],
+ ['MTU, Largest Packet By Platform', ['Platform', 'MTU, octets', 'Note', ''], [['Ethernet', '1 500', 'TCP carries 1 460 in it', ''], ['Ethernet, jumbo', '9 000', 'Data centres, storage', ''], ['PPPoE, DSL and fibre', '1 492', '8 for the PPPoE header', ''],
+   ['Wi-Fi 802.11', '2 304', '1 500 when bridged to Ethernet', ''], ['4G LTE', '1 500', 'Some operators 1 428 - 1 450', ''], ['5G NR', '1 500', 'Usual to the phone', ''], ['DOCSIS cable', '1 500', '', ''],
+   ['IPv6, smallest allowed', '1 280', 'Every IPv6 link must carry it', ''], ['IPv4, every host accepts', '576', '', ''], ['GRE tunnel', '1 476', '24 for GRE and outer IP', ''], ['IP in IP', '1 480', '', ''],
+   ['IPsec ESP, AES-GCM', '1 438', 'On a 1 500 link', ''], ['WireGuard', '1 420', 'Its default', ''], ['VXLAN', '1 450', '50 for the outer headers', ''],
+   ['ATM AAL5, IP', '9 180', '', ''], ['FDDI', '4 352', '', ''], ['Token Ring, 4 Mbit/s', '4 464', '', ''], ['InfiniBand, IPoIB', '2 044 / 65 520', 'Datagram / connected', ''],
+   ['Loopback, Linux', '65 536', 'Never leaves the machine', ''], ['Bluetooth LE, ATT', '23 - 517', '23 until both ends agree more', '']]],
+ ['Memory, Pins And Chips', ['Part', 'Pins or balls', 'Chips and width', 'Where'], [['DDR3 DIMM', '240', '64 bit data: 8 chips of x8, 9 with ECC', 'Older desktops'], ['DDR3 SO-DIMM', '204', '64 bit data', 'Older laptops'],
+   ['DDR4 DIMM', '288', '8 chips of x8, 16 of x4; ECC adds 1 or 2', 'Desktops, servers'], ['DDR4 SO-DIMM', '260', '64 bit data', 'Laptops'], ['DDR5 DIMM', '288', 'Two channels of 32 bit; ECC adds 8 bit to each', 'Desktops, servers'],
+   ['DDR5 SO-DIMM', '262', 'Two channels of 32 bit', 'Laptops'], ['LPDDR4X, LPDDR5', 'Soldered BGA', 'Channels 16 bit wide', 'Phones, thin laptops'],
+   ['NAND flash, TSOP', '48', '8 bit data bus; 1, 2, 3 or 4 bits a cell (SLC, MLC, TLC, QLC)', 'Drives, cards'], ['eMMC', '153 balls', 'NAND with its controller, 8 bit bus', 'Phones, tablets'], ['UFS', '153 balls', 'NAND with its controller, serial lanes', 'Phones'],
+   ['Boot ROM, SPI NOR flash', '8', '1 to 4 bit serial', 'BIOS, UEFI, routers'], ['Pin by pin, chip by chip', '-', 'Not visible to a browser; measured here as a whole, block size by block size', '']]],
  ['Screen Rates', ['Rate', 'One frame', 'Where', ''], [['60 Hz', '16,7 ms', 'Most screens', ''], ['70 Hz', '14,3 ms', 'Old text mode', ''], ['80 Hz', '12,5 ms', 'Some monitors', ''], ['90 Hz', '11,1 ms', 'Phones', ''],
    ['96 Hz', '10,4 ms', 'Phones, film at 4 x 24', ''], ['120 Hz', '8,3 ms', 'Phones, tablets, laptops', ''], ['144 Hz', '6,9 ms', 'Game monitors', ''], ['240 Hz', '4,2 ms', 'Game monitors', '']]]];
 el('refs').innerHTML = REFS.map(function(t){ return '<div class="card"><div style="color:#8ea9c2;font-size:11px;margin-bottom:4px">' + t[0] + '</div><table><thead><tr>' + t[1].map(function(h){ return '<td>' + h + '</td>'; }).join('') + '</tr></thead><tbody>' +
