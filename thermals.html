@@ -12,7 +12,7 @@
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px;min-width:0;overflow-x:auto}
   canvas{display:block;width:100%}
-  #heat{height:300px} #chart{height:220px} #gpu{height:90px} #brk{height:320px;touch-action:none;cursor:grab} #mem{height:230px} #ladder{height:230px} #fchart{height:150px}
+  #heat{height:300px} #chart{height:220px} #gpu{height:90px} #brk{height:320px;touch-action:none;cursor:grab} #mem{height:230px} #ladder{height:230px} #fchart{height:150px} #str{height:360px;background:#000} #str:fullscreen{height:100vh;width:100vw} #sph{height:320px;background:#000;border-radius:4px}
   .names{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--ink2);margin-top:6px}
   .names i{display:inline-block;width:16px;height:3px;border-radius:2px;margin-right:6px;vertical-align:3px}
   .scale{height:10px;border-radius:3px;background:linear-gradient(90deg,#2050ff,#20c0ff,#20e060,#ffe040,#ff8020,#ff2020);margin-top:6px}
@@ -35,9 +35,9 @@
   #crText{color:#12261a;font-weight:400;font-size:9px;line-height:1.2;white-space:nowrap}
   @media (max-width:600px){ #bar{font-size:11px;padding:5px 8px} #pg{padding-top:78px} h2{scroll-margin-top:80px} }
 </style></head><body>
-<div id="bar"><b id="stamp">B106</b><i id="line">Warming up</i></div>
+<div id="bar"><b id="stamp">B107</b><i id="line">Warming up</i></div>
 <div id="pg">
-  <div id="jump"><a href="#s-heat">Thermals</a><a href="#s-brk">Breaker 3D</a><a href="#s-thr">Threads</a><a href="#s-mem">Memory DDR</a><a href="#s-bus">Bus</a><a href="#s-scr">Screen</a><a href="#s-gfx">Graphics</a><a href="#s-dev">Device</a><a href="#s-net">4G 5G</a><a href="#s-file">File Test 24 h</a><a href="#s-ref">Reference</a></div>
+  <div id="jump"><a href="#s-heat">Thermals</a><a href="#s-brk">Breaker 3D</a><a href="#s-thr">Threads</a><a href="#s-mem">Memory DDR</a><a href="#s-bus">Bus</a><a href="#s-scr">Screen</a><a href="#s-gfx">Graphics</a><a href="#s-str">Screen Striper</a><a href="#s-sph">CPU Sphere</a><a href="#s-dev">Device</a><a href="#s-net">4G 5G</a><a href="#s-file">File Test 24 h</a><a href="#s-ref">Reference</a></div>
   <h2 id="s-heat">Browser Thermals</h2>
   <div class="grid">
     <div class="card"><canvas id="heat"></canvas><div class="scale"></div>
@@ -88,6 +88,20 @@
 
   <h2 id="s-gfx">Graphics Chip</h2>
   <div class="card"><table><tbody id="tgfx"></tbody></table></div>
+
+  <h2 id="s-str">Screen Striper</h2>
+  <div class="card"><canvas id="str"></canvas><div class="names"><span id="strStage"></span><span style="margin-left:auto"><button class="btn" id="strAgain">Run again</button> <button class="btn" id="strFull">Full screen</button></span></div></div>
+  <div class="grid" style="margin-top:10px">
+    <div class="card"><table><tbody id="tstr"></tbody></table></div>
+    <div class="card"><table><thead><tr><td>Stage</td><td>ms</td><td>log10</td><td>Square</td><td>To previous</td></tr></thead><tbody id="tstrst"></tbody></table></div>
+  </div>
+
+  <h2 id="s-sph">CPU Sphere</h2>
+  <div class="grid">
+    <div class="card"><canvas id="sph"></canvas><div class="names"><span>One band of facets per core, the cap is the graphics chip; colour = estimated heat, fire scale</span></div></div>
+    <div class="card"><table><thead><tr><td>Colour</td><td>Est. heat</td><td>Facets</td><td>Of all</td><td>Facing</td><td>Of facing</td></tr></thead><tbody id="tsph"></tbody></table>
+      <table style="margin-top:6px"><tbody id="tsph2"></tbody></table></div>
+  </div>
 
   <h2 id="s-dev">Device</h2>
   <div class="card"><table><tbody id="tdev"></tbody></table></div>
@@ -177,7 +191,7 @@ function bytesTxt(n){ return n >= 1048576 ? big(n / 1048576, n % 1048576 ? 1 : 0
 function median(a){ var s = a.slice().sort(function(x, y){ return x - y; }); return s.length ? s[s.length >> 1] : null; }
 function nowS(){ return (performance.now() - t0) / 1000; }
 function rows(id, list){ el(id).innerHTML = list.map(function(r){ return '<tr' + (r[2] ? ' class="hit"' : '') + '><td class="k">' + r[0] + '</td><td class="v">' + r[1] + '</td></tr>'; }).join(''); }
-function asked(){ if (!started) return { cpu: 0, gpu: 0, on: false };
+function asked(){ if (!started || STR.running) return { cpu: 0, gpu: 0, on: false };
   var on = !el('prog').checked || (nowS() % (PROG_ON + PROG_OFF)) < PROG_ON; return { cpu: on && !BRK.tripped ? +el('lc').value / 100 : 0, gpu: on ? +el('lg').value / 100 : 0, on: on }; }
 /* the heat model: d(heat)/dt = (load x rise at full - heat) / time constant */
 function heatStep(h, load, dt){ return h + (load * RISE_FULL - h) * Math.min(1, dt / TAU_S); }
@@ -216,7 +230,7 @@ function gpuFrame(){
   g.fillStyle = '#05080c'; g.fillRect(0, 0, W, H);
   for (var i = 0; i < n; i++){ var x = (i * 37 + t * 0.2) % W, y = (i * 53) % H; g.fillStyle = 'hsla(' + ((i * 7 + t * 0.05) % 360) + ',80%,60%,0.5)'; g.beginPath(); g.arc(x, y, 3 + (i % 5), 0, 6.283); g.fill(); }
   var spent = performance.now() - t; G.busy = Math.min(1, spent / 16.7); G.frameMs = spent;
-  drawBreaker();
+  drawBreaker(); drawSphere();
 }
 function canvasOf(id, hDefault){ var cv = el(id), dpr = Math.min(window.devicePixelRatio || 1, 2), W = cv.clientWidth || 300, H = cv.clientHeight || hDefault;
   if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
@@ -401,9 +415,133 @@ function probeDevice(){
 }
 async function probeAll(){
   try { probeDevice(); P.phase = 'Measuring the screen'; await probeScreen(); P.phase = 'Measuring memory down to one bit'; await probeMemory();
-    P.phase = 'Measuring the bus between threads'; await probeBus(); P.phase = 'Measuring the graphics chip'; await probeGfx(); P.phase = 'Measuring the disk'; await probeDisk(); }
+    P.phase = 'Measuring the bus between threads'; await probeBus(); P.phase = 'Measuring the graphics chip'; await probeGfx(); P.phase = 'Measuring the disk'; await probeDisk(); P.phase = 'Running the screen striper'; await striper(); }
   catch (e){ err = 'a measurement failed: ' + (e.message || e); }
   P.phase = null; t0 = performance.now(); lastT = t0; started = true;
+}
+
+/* ---------------- SCREEN STRIPER: the same work through memory and through the screen, every stage timed ----------------
+   Bits: one bit at a time, then every bit of a full screen picture. To the screen, back to memory, read as a loop.
+   Colours brown, black, white, yellow, orange, black. Green laterals tight at the start, sparser up, moving up; verticals.
+   A red whale on the right, FANFARE at the top. The striper: diagonals as a sideways hourglass, 10,1 % to 100 % to 10,5 %.
+   The sky photograph placed six times. A 100 x 100 piece turned a full circle; with the three signals
+   1 log + 29700 sin + 5 tan of the turn time, then the square root: the screen's value, against the same at 0,05 s.
+   Ratios, ratio to the previous run, and the result looped out to the overseas echo and back. */
+var STR_SHORT = { bits: 'Bits', toScreen: 'To screen', toMemory: 'To memory', readLoop: 'Read', colours: 'Colours', laterals: 'Laterals', whale: 'Whale', diagonals: 'Diagonals', photos: 'Photos', rotation: 'Turn' }, STR_HOLD = 450, STR_LABEL = { bits: 'Every bit', toScreen: 'Memory to screen', toMemory: 'Screen to memory', readLoop: 'Read loop', colours: 'Six colours', laterals: 'Laterals, verticals', whale: 'Whale, FANFARE', diagonals: 'Diagonals', photos: 'Photograph x 6', rotation: 'Turn 360' };
+var STR = { running: false, res: null, prev: null, stage: '', img: null }, STR_KEY = 'ai2orbit-striper';
+try { STR.prev = JSON.parse(localStorage.getItem(STR_KEY) || 'null'); } catch (e){}
+function strSignals(tS){ var f = 1 * Math.log10(tS * 1000) + 29700 * Math.sin(tS) + 5 * Math.tan(tS); return { f: f, root: Math.sqrt(Math.abs(f)) }; }
+function nextFrame(){ return new Promise(function(r){ requestAnimationFrame(function(){ r(); }); }); }
+async function striper(){
+  if (STR.running) return; STR.running = true;
+  var cv = el('str'), dpr = Math.min(window.devicePixelRatio || 1, 2), W = Math.min(1600, Math.round((cv.clientWidth || 600) * dpr)), H = Math.min(900, Math.round((cv.clientHeight || 360) * dpr));
+  cv.width = W; cv.height = H; var g = cv.getContext('2d'), R = { W: W, H: H, st: {}, at: Date.now() }, t, i, k;
+  function sync(){ g.getImageData(0, 0, 1, 1); }                 /* reading one pixel makes the screen work finish before the clock stops */
+  async function tm(name, label, fn){ STR.stage = label; await nextFrame(); var t0 = performance.now(); fn(); sync(); R.st[name] = performance.now() - t0; await new Promise(function(r){ setTimeout(r, STR_HOLD); }); }       /* held on screen to be seen - not timed */
+  try {
+    if (!STR.img){ STR.img = new Image(); STR.img.src = 'striper-sky.jpg'; await STR.img.decode(); }
+    var px = new Uint32Array(W * H);
+    STR.stage = 'One bit'; t = performance.now(); for (k = 0; k < 1000000; k++){ i = (Math.imul(k, 0x9E3779B1) >>> 0) % px.length; px[i] |= 1 << (k & 31); } R.bitNs = (performance.now() - t) * 1e6 / 1e6;
+    px.fill(0); var bitsOn = 0;
+    await tm('bits', 'Every bit of the picture', function(){ for (i = 0; i < px.length; i++){ var x = i % W, y = (i / W) | 0, c = 0xFF000000 | ((y * 255 / H) & 255) << 16 | ((x * 255 / W) & 255) << 8 | 120, v = 0;
+      for (var b = 0; b < 32; b++) v |= c & (1 << b); px[i] = v; } });
+    var id = new ImageData(new Uint8ClampedArray(px.buffer), W, H);
+    await tm('toScreen', 'Memory to the screen', function(){ g.putImageData(id, 0, 0); });
+    var back; await tm('toMemory', 'Screen back to memory', function(){ back = g.getImageData(0, 0, W, H); });
+    R.sameBack = back.data[4 * (W + 1)] === id.data[4 * (W + 1)] && back.data[4 * (px.length - 1) + 1] === id.data[4 * (px.length - 1) + 1];
+    var sum = 0; await tm('readLoop', 'Reading memory as a loop', function(){ for (var p = 0; p < 3; p++) for (i = 0; i < px.length; i++) sum = (sum + px[i]) | 0; }); R.sum = sum;
+    var COLS = [['#7b4a1e', 'Brown'], ['#000000', 'Black'], ['#ffffff', 'White'], ['#ffd400', 'Yellow'], ['#ff8c00', 'Orange'], ['#000000', 'Black']], colMs = 0;
+    for (k = 0; k < COLS.length; k++){ await tm('colour', 'Colours: ' + COLS[k][1], function(){ g.fillStyle = COLS[k][0]; g.fillRect(0, 0, W, H); }); colMs += R.st.colour; }
+    delete R.st.colour; R.st.colours = colMs;
+    await tm('laterals', 'Green laterals and verticals', function(){ g.fillStyle = '#000'; g.fillRect(0, 0, W, H); g.strokeStyle = '#2bd94a'; g.lineWidth = Math.max(1, dpr);
+      for (var rep = 0; rep < 4; rep++){ var up = rep * H * 0.06; g.beginPath();
+        for (k = 0; k <= 40; k++){ var y = H - H * (Math.pow(10, k / 40) - 1) / 9 - up; g.moveTo(0, y); g.lineTo(W, y); }       /* tight at the start, sparser going up */
+        for (k = 0; k <= 30; k++){ var x = W * (Math.pow(10, k / 30) - 1) / 9; g.moveTo(x, 0); g.lineTo(x, H); } g.stroke(); } });
+    await tm('whale', 'The whale and FANFARE', function(){ var x0 = W * 0.6, w = W * 0.38, base = H * 0.72; g.fillStyle = '#e02020'; g.beginPath(); g.moveTo(x0, base);
+      for (k = 0; k <= 60; k++){ var u = k / 60, y = base - H * 0.42 * Math.log10(1 + 9 * Math.min(1, u / 0.35)) * (u < 0.35 ? 1 : Math.max(0, 1 - (u - 0.35) / 0.4)); if (u > 0.75) y = base - H * 0.3 * (u - 0.75) / 0.25; g.lineTo(x0 + w * u, y); }
+      g.lineTo(x0 + w, base - H * 0.38); g.lineTo(x0 + w * 0.96, base + H * 0.04); g.lineTo(x0 + w * 0.5, base + H * 0.12); g.lineTo(x0, base + H * 0.06); g.closePath(); g.fill();
+      g.fillStyle = '#ffffff'; g.font = '700 ' + Math.round(H * 0.11) + 'px monospace'; g.textAlign = 'center'; g.fillText('FANFARE', W / 2, H * 0.14); g.textAlign = 'left'; });
+    await tm('diagonals', 'The striper: a sideways hourglass', function(){ g.fillStyle = '#000'; g.fillRect(0, 0, W, H); g.lineWidth = Math.max(1, dpr);
+      function Y(p){ return H - p / 100 * H; }
+      for (k = 0; k < 24; k++){ var lo1 = 10.1 + k * 1.6, lo2 = 10.5 + k * 1.6, hi = 100 - k * 1.6; g.strokeStyle = 'hsl(' + (k * 15) + ',90%,60%)'; g.beginPath();
+        g.moveTo(0, Y(lo1)); g.lineTo(W, Y(hi)); g.lineTo(W, Y(lo2)); g.lineTo(0, Y(hi)); g.lineTo(0, Y(lo1)); g.stroke(); } });
+    var seed = 7; function rnd(){ seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+    await tm('photos', 'The photograph six times', function(){ for (k = 0; k < 6; k++){ var w2 = W * (0.2 + rnd() * 0.25), h2 = w2 * STR.img.height / STR.img.width; g.drawImage(STR.img, rnd() * (W - w2), rnd() * (H - h2), w2, h2); } });
+    var piece = document.createElement('canvas'); piece.width = piece.height = 100; piece.getContext('2d').drawImage(STR.img, 0, 0, 100, 100);
+    await tm('rotation', 'Turning 100 x 100 pixels a full circle', function(){ for (k = 0; k < 360; k++){ g.save(); g.translate(W / 2, H / 2); g.rotate(k * Math.PI / 180); g.drawImage(piece, -50, -50); g.restore(); } });
+    R.rotS = R.st.rotation / 1000; R.sig = strSignals(R.rotS); R.nominal = strSignals(0.05);
+    STR.stage = 'Result'; await nextFrame();
+    for (k = 0; k < 16; k++){ g.fillStyle = k % 2 ? '#3d7bff' : '#ff5fb4'; g.fillRect(0, k * H / 16, W, H / 16 + 1); }       /* pink and blue screen stripe */
+    var T = 0, names = ['bits', 'toScreen', 'toMemory', 'readLoop', 'colours', 'laterals', 'whale', 'diagonals', 'photos', 'rotation']; names.forEach(function(n){ T += R.st[n]; }); R.T = T;
+    R.ratioDiag = T / R.st.diagonals; R.ratioPhoto = T / R.st.photos; R.ratioLat = T / R.st.laterals; R.byteNs = T * 1e6 / (W * H * 4);
+    R.screenMs = R.st.toScreen + R.st.toMemory + R.st.colours + R.st.laterals + R.st.whale + R.st.diagonals + R.st.photos + R.st.rotation; R.implMs = R.st.bits; R.archMs = R.st.readLoop;
+    /* the bar chart: each stage's time, log scale, this run full and the previous run as a frame */
+    g.fillStyle = 'rgba(0,0,0,0.78)'; g.fillRect(0, 0, W, H); var bw = W / names.length, mx = Math.log10(1 + Math.max.apply(null, names.map(function(n){ return Math.max(R.st[n], STR.prev && STR.prev.st ? STR.prev.st[n] || 0 : 0); })));
+    names.forEach(function(n, j){ var h = Math.log10(1 + R.st[n]) / mx * H * 0.6; g.fillStyle = 'hsl(' + (j * 36) + ',80%,55%)'; g.fillRect(j * bw + bw * 0.2, H * 0.8 - h, bw * 0.6, h);
+      if (STR.prev && STR.prev.st && STR.prev.st[n]){ var hp = Math.log10(1 + STR.prev.st[n]) / mx * H * 0.6; g.strokeStyle = '#fff'; g.lineWidth = Math.max(1, dpr); g.strokeRect(j * bw + bw * 0.15, H * 0.8 - hp, bw * 0.7, hp); }
+      g.fillStyle = '#ddd'; g.font = Math.round(H * 0.03) + 'px monospace'; g.fillText(STR_SHORT[n], j * bw + 4, H * 0.86); g.fillText(fi(R.st[n], 1), j * bw + 4, H * 0.9); });
+    g.fillStyle = '#fff'; g.font = '700 ' + Math.round(H * 0.07) + 'px monospace'; g.fillText('Screen value ' + fi(R.sig.root, 2) + '   at 0,05 s: ' + fi(R.nominal.root, 2), W * 0.03, H * 0.1);
+    g.font = Math.round(H * 0.04) + 'px monospace'; g.fillText('Total ' + fi(T, 1) + ' ms, white frames: previous run', W * 0.03, H * 0.17);
+    /* the result looped out to the overseas echo and back, as if through the tower */
+    STR.stage = 'Looping the result out and back';
+    try { var body = new TextEncoder().encode(JSON.stringify({ st: R.st, T: R.T, sig: R.sig.root })), t1 = performance.now();
+      var rr = await fetch(FAR + 'anything', { method: 'POST', body: body, headers: { 'Content-Type': 'application/octet-stream' }, cache: 'no-store' }), jj = await rr.json(), dd = String(jj.data || '');
+      R.loopMs = performance.now() - t1; var got = echoBytes(dd); R.loopSame = got.length === body.length && got.every(function(v, q){ return v === body[q]; });
+      R.loopBps = 2 * body.length * 8 / (R.loopMs / 1000); R.loopBytes = body.length; USED.up += body.length; USED.down += dd.length; } catch (e){ R.loopErr = 'Did not answer'; }
+    if (STR.prev && STR.prev.T){ R.vsPrev = { T: R.T / STR.prev.T, diag: R.ratioDiag / STR.prev.ratioDiag, photo: R.ratioPhoto / STR.prev.ratioPhoto, lat: R.ratioLat / STR.prev.ratioLat, root: R.sig.root / STR.prev.root }; }
+    STR.res = R; STR.shownPrev = STR.prev;
+    try { localStorage.setItem(STR_KEY, JSON.stringify({ at: R.at, st: R.st, T: R.T, ratioDiag: R.ratioDiag, ratioPhoto: R.ratioPhoto, ratioLat: R.ratioLat, root: R.sig.root, W: W, H: H })); } catch (e){}
+    STR.prev = { at: R.at, st: R.st, T: R.T, ratioDiag: R.ratioDiag, ratioPhoto: R.ratioPhoto, ratioLat: R.ratioLat, root: R.sig.root };
+  } catch (e){ err = 'the screen striper failed: ' + (e.message || e); }
+  STR.stage = 'Done'; STR.running = false;
+}
+el('strAgain').onclick = function(){ striper(); };
+el('strFull').onclick = function(){ var cv = el('str'); var go = cv.requestFullscreen || cv.webkitRequestFullscreen; if (go){ go.call(cv); setTimeout(striper, 600); } else striper(); };
+function renderStriper(){
+  var R = STR.res, pv = STR.shownPrev; el('strStage').textContent = STR.running ? 'Running: ' + STR.stage : R ? 'Done ' + clock(new Date(R.at)) + ' - ' + R.W + ' x ' + R.H + ' pixels' : 'Waits for its turn';
+  if (!R){ el('tstr').innerHTML = ''; return; }
+  var x = function(v){ return fi(v, 3); };
+  rows('tstr', [['Screen value', fi(R.sig.root, 2) + ' - root of 1 log + 29700 sin + 5 tan of the turn time'], ['Same at 0,05 s', fi(R.nominal.root, 2) + ' - the fixed point to compare screens'],
+    ['Turn of 100 x 100 pixels', fi(R.st.rotation, 1) + ' ms for 360 steps of one degree'], ['One bit', fi(R.bitNs, 2) + ' ns'], ['A byte, whole run', fi(R.byteNs, 2) + ' ns'],
+    ['Total', fi(R.T, 1) + ' ms'], ['Total to diagonals', x(R.ratioDiag)], ['Total to photographs', x(R.ratioPhoto)], ['Total to laterals and verticals', x(R.ratioLat)],
+    ['Total ratio, kelvin form', fi(R.ratioDiag, 3) + ' K, no Celsius taken off'],
+    ['Graphics : implementation : architecture', fi(R.screenMs / R.archMs, 2) + ' : ' + fi(R.implMs / R.archMs, 2) + ' : 1 - screen work, bit work, plain memory reading'],
+    ['Picture back from the screen', R.sameBack ? 'Same as sent' : 'NOT AS SENT'],
+    ['Looped out and back, Virginia US', R.loopMs ? fi(R.loopMs, 0) + ' ms, ' + big(R.loopBps, 0) + ' bit/s, ' + bytesTxt(R.loopBytes) + (R.loopSame ? ', came back the same' : ', CAME BACK CHANGED') : R.loopErr || 'Measuring'],
+    ['To the previous run', R.vsPrev ? 'Total ' + x(R.vsPrev.T) + ', diagonals ' + x(R.vsPrev.diag) + ', photographs ' + x(R.vsPrev.photo) + ', laterals ' + x(R.vsPrev.lat) + ', screen value ' + x(R.vsPrev.root) : 'First run on this browser']]);
+  var L = STR_LABEL;
+  var h = Object.keys(L).map(function(n){ var v = R.st[n]; return '<tr><td>' + L[n] + '</td><td class="v">' + fi(v, 1) + '</td><td>' + fi(Math.log10(v), 2) + '</td><td>' + big(v * v, 0) + '</td><td>' + (pv && pv.st && pv.st[n] ? fi(v / pv.st[n], 2) : '-') + '</td></tr>'; }).join('');
+  if (el('tstrst').innerHTML !== h) el('tstrst').innerHTML = h;
+}
+
+/* ---------------- CPU SPHERE: facets per core, coloured by estimated heat on a fire scale ---------------- */
+var SPH = { yaw: 0, lat: 12, lon: 24, counts: null };
+var FIRE = [[25, [70, 0, 0], 'Dark red'], [35, [190, 20, 0], 'Red'], [45, [255, 110, 0], 'Orange'], [55, [255, 210, 40], 'Yellow'], [65, [255, 255, 220], 'White']];
+function fireCol(tC){ if (tC <= FIRE[0][0]) return FIRE[0][1]; for (var i = 1; i < FIRE.length; i++) if (tC <= FIRE[i][0]){ var a = FIRE[i - 1], b = FIRE[i], f = (tC - a[0]) / (b[0] - a[0]); return a[1].map(function(v, k){ return Math.round(v + (b[1][k] - v) * f); }); } return FIRE[FIRE.length - 1][1]; }
+function fireBand(tC){ return tC < 30 ? 0 : tC < 40 ? 1 : tC < 50 ? 2 : tC < 60 ? 3 : 4; }
+function drawSphere(){
+  var cv = el('sph'); if (!cv || !cv.clientWidth) return;
+  var o = canvasOf('sph', 320), g = o.g, W = o.W, H = o.H; g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+  SPH.yaw += 0.01; var r = Math.min(W, H) * 0.42, tilt = 0.45, cy = Math.cos(SPH.yaw), sy = Math.sin(SPH.yaw), ct = Math.cos(tilt), st = Math.sin(tilt);
+  function P(la, lo){ var x = Math.cos(la) * Math.cos(lo), y = Math.sin(la), z = Math.cos(la) * Math.sin(lo); var x2 = x * cy + z * sy, z2 = -x * sy + z * cy; return [x2, y * ct - z2 * st, y * st + z2 * ct]; }
+  var counts = FIRE.map(function(){ return [0, 0]; }), faces = [];
+  for (var a = 0; a < SPH.lat; a++) for (var b = 0; b < SPH.lon; b++){
+    var la0 = -Math.PI / 2 + a * Math.PI / SPH.lat, la1 = la0 + Math.PI / SPH.lat, lo0 = b * 2 * Math.PI / SPH.lon, lo1 = lo0 + 2 * Math.PI / SPH.lon;
+    var gpu = a >= SPH.lat - 2, core = C[Math.floor(b * C.length / SPH.lon)] || { heat: 0 }, tC = ROOM + (gpu ? G.heat : core.heat), band = fireBand(tC);
+    var q = [P(la0, lo0), P(la0, lo1), P(la1, lo1), P(la1, lo0)], cz = (q[0][2] + q[1][2] + q[2][2] + q[3][2]) / 4, facing = cz > 0;
+    counts[band][0]++; if (facing) counts[band][1]++;
+    if (facing) faces.push({ z: cz, q: q, col: fireCol(tC) });
+  }
+  faces.sort(function(m, n){ return m.z - n.z; });
+  faces.forEach(function(f){ var lit = 0.45 + 0.55 * f.z; g.fillStyle = 'rgb(' + f.col.map(function(v){ return Math.round(v * lit); }).join(',') + ')'; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 1;
+    g.beginPath(); f.q.forEach(function(p, i){ var X = W / 2 + p[0] * r, Y = H / 2 - p[1] * r; if (i) g.lineTo(X, Y); else g.moveTo(X, Y); }); g.closePath(); g.fill(); g.stroke(); });
+  SPH.counts = counts;
+}
+function renderSphere(){
+  var c = SPH.counts; if (!c) return; var all = SPH.lat * SPH.lon, face = c.reduce(function(s, x){ return s + x[1]; }, 0), ranges = ['Under 30 C', '30 - 40 C', '40 - 50 C', '50 - 60 C', '60 C and over'];
+  el('tsph').innerHTML = FIRE.map(function(f, i){ return '<tr><td class="v"><i style="display:inline-block;width:10px;height:10px;background:rgb(' + f[1].join(',') + ');margin-right:6px"></i>' + f[2] + '</td><td>' + ranges[i] + '</td><td class="v">' + c[i][0] + '</td><td>' + fi(c[i][0] / all * 100, 1) + ' %</td><td class="v">' + c[i][1] + '</td><td>' + fi(face ? c[i][1] / face * 100 : 0, 1) + ' %</td></tr>'; }).join('');
+  rows('tsph2', [['Facets', all + ' - ' + SPH.lat + ' bands of ' + SPH.lon], ['Facing the eye', face + ', ' + fi(face / all * 100, 1) + ' %'], ['Colours showing', String(c.filter(function(x){ return x[0]; }).length) + ' of ' + FIRE.length],
+    ['Graphics to processor, heat', fi((ROOM + G.heat) / (ROOM + C.reduce(function(s, k){ return s + k.heat; }, 0) / Math.max(1, C.length)), 3) + ' - estimated heats, in C']]);
 }
 
 /* ---------------- NETWORK: near echo, overseas echo, down, up - matched to 4G and 5G ---------------- */
@@ -427,6 +565,8 @@ async function probeNet(){
 
 /* ---------------- FILE TEST: a pack of files to an overseas echo server and back, 3, 4 then 5 at once ---------------- */
 var FT = { rounds: [], startAt: null, next: null, busy: false, alerts: 0, allow: false, lastAlert: null, timer: null };
+/* the echo hands back text as text, and anything else as a base64 data address */
+function echoBytes(d){ return d.indexOf('data:') === 0 ? b64bytes(d.slice(d.indexOf(',') + 1)) : new TextEncoder().encode(d); }
 function b64bytes(s){ var bin = atob(s), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; }
 async function sha(u){ return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', u))).map(function(x){ return (x < 16 ? '0' : '') + x.toString(16); }).join(''); }
 async function sendOne(size){
@@ -434,7 +574,7 @@ async function sendOne(size){
   var h = await sha(u), r = await fetch(FAR + 'anything', { method: 'POST', body: u, headers: { 'Content-Type': 'application/octet-stream' }, cache: 'no-store' });
   if (!r.ok) throw new Error('the server answered ' + r.status);
   var txt = await r.text(); USED.up += size; USED.down += txt.length;
-  var j = JSON.parse(txt), d = String(j.data || ''), back = b64bytes(d.slice(d.indexOf(',') + 1));
+  var j = JSON.parse(txt), d = String(j.data || ''), back = echoBytes(d);
   return { sizeOk: back.length === size, hashOk: (await sha(back)) === h };
 }
 async function ftRound(){
@@ -560,7 +700,7 @@ function renderProbes(){
   el('btrips').textContent = String(BRK.trips); el('blast').textContent = BRK.last ? clock(BRK.last) : 'None yet';
 }
 function render(){
-  drawHeat(); drawChart(); drawMem(); drawLadder(); drawFile(); renderProbes();
+  drawHeat(); drawChart(); drawMem(); drawLadder(); drawFile(); renderProbes(); renderStriper(); renderSphere();
   var L = hist[hist.length - 1] || [0, 0, null, 0, 0, 0], slow = C.filter(function(c){ return c.slowing; }).length, hottest = C.reduce(function(m, c){ return Math.max(m, c.heat); }, 0);
   el('lcv').textContent = el('lc').value + ' %'; el('lgv').textContent = el('lg').value + ' %';
   el('tnow').innerHTML = [['Processor, estimated', fi(ROOM + L[1], 1) + ' C average, hottest core ' + fi(ROOM + hottest, 1) + ' C'],
@@ -583,6 +723,8 @@ function selfCheck(){
   if (started && nowS() > 4 && C.every(function(c){ return !c.rep.length; })) f.push('the threads have stopped reporting');
   if (P.memX && P.memX.counted !== P.memX.bits) f.push('a single bit write went missing in memory');
   if (P.mem.length > 1 && P.mem.some(function(m){ return !(m.ns > 0) || !(m.scan > 0); })) f.push('a memory figure is not a positive number');
+  if (STR.res && Object.keys(STR.res.st).some(function(n){ return !(STR.res.st[n] >= 0); })) f.push('a screen striper time is not a number');
+  if (STR.res && !STR.res.sameBack) f.push('the picture came back from the screen changed');
   if (err) f.push(err);
   fails = f; var box = el('chk');
   if (f.length){ box.style.display = 'block'; box.innerHTML = '<b style="color:#e0645f">THIS PAGE IS NOT CLEAN</b><br>' + f.join('<br>'); } else box.style.display = 'none';
@@ -592,7 +734,7 @@ function tableText(id){ return Array.from(el(id).querySelectorAll('tr')).map(fun
 function textOf(){ var L = ['BROWSER THERMALS', 'AI2Orbit', 'Taken ' + stampNow(), 'Temperatures are estimates; load and speed are measured', ''];
   C.forEach(function(c, i){ L.push('Core ' + (i + 1) + ': ' + fi(ROOM + c.heat, 1) + ' C estimated, load ' + fi(c.load * 100, 0) + ' %, speed ' + (c.speed === null ? 'idle' : fi(c.speed, 0) + ' %') + (c.slowing ? ', slowing' : '')); });
   L.push('Graphics: ' + fi(ROOM + G.heat, 1) + ' C estimated, ' + fi(G.frameMs, 1) + ' ms a frame', 'Breaker: ' + (BRK.tripped ? 'tripped' : 'closed') + ', trips at ' + el('trip').value + ' C, ' + BRK.trips + ' trips');
-  [['MEMORY', 'tmem'], ['MEMORY BY BLOCK (block, one read, scan, level)', 'tmemrows'], ['BUS', 'tbus'], ['SCREEN', 'tscr'], ['GRAPHICS CHIP', 'tgfx'], ['DEVICE', 'tdev'], ['NETWORK', 'tnet'], ['FILE TEST', 'tfile']]
+  [['SCREEN STRIPER', 'tstr'], ['SCREEN STRIPER STAGES (stage, ms, log10, square, to previous)', 'tstrst'], ['CPU SPHERE (colour, heat, facets, of all, facing, of facing)', 'tsph'], ['CPU SPHERE TOTALS', 'tsph2'], ['MEMORY', 'tmem'], ['MEMORY BY BLOCK (block, one read, scan, level)', 'tmemrows'], ['BUS', 'tbus'], ['SCREEN', 'tscr'], ['GRAPHICS CHIP', 'tgfx'], ['DEVICE', 'tdev'], ['NETWORK', 'tnet'], ['FILE TEST', 'tfile']]
     .forEach(function(s){ L.push('', s[0]); tableText(s[1]).forEach(function(x){ L.push(x); }); });
   L.push('', 'FILE TEST ROUNDS (round; time; Mbit/s 3, 4, 5 at once; files; changed; alert)');
   FT.rounds.forEach(function(r){ L.push(r.n + '; ' + clock(r.at) + '; ' + r.stages.map(function(s){ return s.ok ? fi(s.mbit, 2) : 'failed'; }).join('; ') + '; ' + r.files + '; ' + r.changed + '; ' + (r.alert ? 'ALERT' : 'ok')); });
@@ -636,7 +778,7 @@ el('refs').innerHTML = REFS.map(function(t){ return '<div class="card"><div styl
  ['Estimated', 'The kind of device, the cache level of each block size, the 4G or 5G class of the link'],
  ['Not told to any browser', 'The real temperature of the processor or the graphics chip, tower signal, the hypervisor'],
  ['The sign of real heat', 'A core that runs slower than when it was cold, under the same load, is being held back - usually by heat'],
- ['Order', 'Screen, memory, bus, graphics and disk first with no load; then the heat load; network and the file test beside it']]
+ ['Order', 'Screen, memory, bus, graphics, disk and the screen striper first with no load; then the heat load; network and the file test beside it']]
 .forEach(function(r){ el('thow').innerHTML += '<tr><td class="k">' + r[0] + '</td><td class="v">' + r[1] + '</td></tr>'; });
 
 /* ---------------- START: no button ---------------- */
@@ -652,5 +794,7 @@ window.__read = function(){ var L = hist[hist.length - 1]; return { cores: NW, s
   breaker: { tripped: BRK.tripped, trips: BRK.trips }, mem: P.mem, memX: P.memX, bus: P.bus, gfx: P.gfx, disk: P.disk, dev: P.dev, screen: P.screen, net: P.net, file: FT.rounds.map(function(r){ return { ok: r.ok, mbit: r.mbit, files: r.files, changed: r.changed, alert: r.alert }; }), fails: fails }; };
 window.__selfCheck = selfCheck;
 window.__ftRound = ftRound;
+window.__striper = function(){ return STR.res; };
+window.__sphere = function(){ return SPH.counts; };
 </script>
 </body></html>
