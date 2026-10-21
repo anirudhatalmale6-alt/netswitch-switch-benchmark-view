@@ -8,18 +8,24 @@
   #bar{position:fixed;left:0;right:0;top:0;background:#f00;color:#fff;display:flex;align-items:baseline;gap:8px;padding:6px 10px;font-weight:700;letter-spacing:.3px;z-index:9;flex-wrap:wrap}
   #bar i{font-style:normal;flex:1 1 auto;min-width:0;font-weight:400}
   #pg{padding:58px 12px 70px;max-width:1100px}
-  h2{font-size:10px;letter-spacing:2px;color:var(--muted);font-weight:400;margin:16px 0 6px;text-transform:uppercase}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px;min-width:0}
+  h2{font-size:10px;letter-spacing:2px;color:var(--muted);font-weight:400;margin:16px 0 6px;text-transform:uppercase;scroll-margin-top:50px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px;min-width:0;overflow-x:auto}
   canvas{display:block;width:100%}
-  #heat{height:300px} #chart{height:220px} #gpu{height:90px}
+  #heat{height:300px} #chart{height:220px} #gpu{height:90px} #brk{height:320px;touch-action:none;cursor:grab} #mem{height:230px} #ladder{height:230px} #fchart{height:150px}
   .names{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--ink2);margin-top:6px}
   .names i{display:inline-block;width:16px;height:3px;border-radius:2px;margin-right:6px;vertical-align:3px}
   .scale{height:10px;border-radius:3px;background:linear-gradient(90deg,#2050ff,#20c0ff,#20e060,#ffe040,#ff8020,#ff2020);margin-top:6px}
   table{width:100%;border-collapse:collapse}
   td{padding:4px;border-bottom:1px solid #0e1a26;vertical-align:middle;font-variant-numeric:tabular-nums}
   td.k{color:var(--ink2)} td.v{color:var(--ink);font-weight:700}
+  thead td{color:var(--muted);font-size:11px}
+  tr.hit td{background:#14321f}
   input[type=range]{width:100%;accent-color:#ff8020}
+  select{background:#0e1a26;color:var(--ink);border:1px solid var(--line);border-radius:3px;font:inherit;padding:2px 4px}
+  #jump{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 6px}
+  #jump a,.btn{display:inline-block;background:#16293a;color:#9fd6f5;text-decoration:none;border-radius:4px;padding:5px 9px;font-size:12px;cursor:pointer;border:0;font:inherit}
+  #falert{display:none;margin-top:8px;padding:8px 10px;border:1px solid #a33;background:#3a0c0c;color:#ffd0d0;border-radius:4px;font-weight:700}
   #chk{margin-top:12px;padding:8px 10px;border:1px solid #5a1d1d;background:#1a0808;border-radius:4px;font-size:11px;line-height:1.6}
   #always{position:fixed;right:10px;bottom:10px;z-index:10;display:flex;gap:6px}
   #always a{display:block;background:#4fd1ff;color:#05080c;font-weight:700;text-decoration:none;border-radius:4px;padding:8px 12px;font-size:12px;box-shadow:0 2px 10px #000a}
@@ -27,10 +33,12 @@
   #cr{margin-top:14px;padding:3px 7px;display:inline-flex;align-items:center;gap:6px;background:#d0cefd;border-radius:3px}
   #cr img{width:17px;height:auto;display:block}
   #crText{color:#12261a;font-weight:400;font-size:9px;line-height:1.2;white-space:nowrap}
+  @media (max-width:600px){ #bar{font-size:11px;padding:5px 8px} #pg{padding-top:78px} h2{scroll-margin-top:80px} }
 </style></head><body>
-<div id="bar"><b id="stamp">B105</b><i id="line">Warming up</i></div>
+<div id="bar"><b id="stamp">B106</b><i id="line">Warming up</i></div>
 <div id="pg">
-  <h2>Browser Thermals</h2>
+  <div id="jump"><a href="#s-heat">Thermals</a><a href="#s-brk">Breaker 3D</a><a href="#s-thr">Threads</a><a href="#s-mem">Memory DDR</a><a href="#s-bus">Bus</a><a href="#s-scr">Screen</a><a href="#s-gfx">Graphics</a><a href="#s-dev">Device</a><a href="#s-net">4G 5G</a><a href="#s-file">File Test 24 h</a><a href="#s-ref">Reference</a></div>
+  <h2 id="s-heat">Browser Thermals</h2>
   <div class="grid">
     <div class="card"><canvas id="heat"></canvas><div class="scale"></div>
       <div class="names"><span>Cold, ambient</span><span style="margin-left:auto">Hot</span></div>
@@ -47,6 +55,64 @@
   </tbody></table></div>
   <h2>Now</h2>
   <div class="card"><table><tbody id="tnow"></tbody></table></div>
+
+  <h2 id="s-brk">Breaker, 3D</h2>
+  <div class="grid">
+    <div class="card"><canvas id="brk"></canvas><div class="names"><span>Drag to turn</span><span>Middle breaker: the processor circuit</span></div></div>
+    <div class="card"><table><tbody>
+      <tr><td class="k">Trips at</td><td><input type="range" id="trip" min="35" max="70" value="55"></td><td class="v" id="tripv"></td></tr>
+      <tr><td class="k">State</td><td class="v" colspan="2" id="bstate"></td></tr>
+      <tr><td class="k">Trips so far</td><td class="v" colspan="2" id="btrips"></td></tr>
+      <tr><td class="k">Last trip</td><td class="v" colspan="2" id="blast"></td></tr>
+      <tr><td class="k">When it trips</td><td class="v" colspan="2">The processor load is cut to zero</td></tr>
+      <tr><td class="k">Closes again</td><td class="v" colspan="2">By itself, 10 C under the trip level</td></tr>
+      <tr><td colspan="3"><button class="btn" id="breset">Close now</button></td></tr>
+    </tbody></table></div>
+  </div>
+
+  <h2 id="s-thr">Processor Threads</h2>
+  <div class="card"><table><thead><tr><td>Thread</td><td>Load</td><td>Work per busy ms</td><td>Speed vs cold</td><td>Heat, est.</td></tr></thead><tbody id="tthr"></tbody></table></div>
+
+  <h2 id="s-mem">Memory, DDR, Drill Down To One Bit</h2>
+  <div class="grid">
+    <div class="card"><canvas id="mem"></canvas><div class="names"><span><i style="background:#4fd1ff"></i>One random read, ns</span><span><i style="background:#ff8020"></i>Scan, GB/s</span></div></div>
+    <div class="card"><table><tbody id="tmem"></tbody></table></div>
+  </div>
+  <div class="card" style="margin-top:10px"><table><thead><tr><td>Block</td><td>One random read</td><td>Scan</td><td>Level, from the read time</td></tr></thead><tbody id="tmemrows"></tbody></table></div>
+
+  <h2 id="s-bus">Bus</h2>
+  <div class="card"><table><tbody id="tbus"></tbody></table></div>
+
+  <h2 id="s-scr">Screen</h2>
+  <div class="card"><table><tbody id="tscr"></tbody></table></div>
+
+  <h2 id="s-gfx">Graphics Chip</h2>
+  <div class="card"><table><tbody id="tgfx"></tbody></table></div>
+
+  <h2 id="s-dev">Device</h2>
+  <div class="card"><table><tbody id="tdev"></tbody></table></div>
+
+  <h2 id="s-net">Network, 4G And 5G</h2>
+  <div class="grid">
+    <div class="card"><table><tbody id="tnet"></tbody></table></div>
+    <div class="card"><canvas id="ladder"></canvas><div class="names"><span><i style="background:#4fd1ff"></i>Down, measured</span><span><i style="background:#ff8020"></i>Up, measured</span><span>Bands: typical speeds, peak marks: the standard</span></div></div>
+  </div>
+
+  <h2 id="s-file">File Test, 24 Hours</h2>
+  <div class="grid">
+    <div class="card"><table><tbody>
+      <tr><td class="k">A round every</td><td><select id="fevery"><option value="5">5 min</option><option value="15" selected>15 min</option><option value="60">60 min</option></select></td></tr>
+      <tr><td class="k">File size</td><td><select id="fsize"><option value="16">16 KB</option><option value="64" selected>64 KB</option><option value="256">256 KB</option></select></td></tr>
+      <tr><td class="k">Alerts</td><td><button class="btn" id="fallow">Allow sound and notices</button></td></tr>
+      <tr><td colspan="2"><div id="falert"></div></td></tr>
+    </tbody></table><table style="margin-top:6px"><tbody id="tfile"></tbody></table></div>
+    <div class="card"><canvas id="fchart"></canvas><div class="names"><span><i style="background:#4fd1ff"></i>Round speed, Mbit/s</span><span><i style="background:#e0645f"></i>Alert</span></div>
+      <table style="margin-top:6px"><thead><tr><td>Round</td><td>Time</td><td>3 at once</td><td>4 at once</td><td>5 at once</td><td>Files</td></tr></thead><tbody id="tflog"></tbody></table></div>
+  </div>
+
+  <h2 id="s-ref">Reference</h2>
+  <div class="grid" id="refs"></div>
+
   <h2>What Is Measured And What Is Estimated</h2>
   <div class="card"><table><tbody id="thow"></tbody></table></div>
   <div id="chk" style="display:none"></div>
@@ -56,12 +122,20 @@
 <div id="always"><a id="dlDxf" class="alt" download="browser-thermals.dxf">DXF</a><a id="dlTxt" download="browser-thermals.txt">Download</a></div>
 <script>
 /* ==================================================================
-   BROWSER THERMALS - a drawing of the heat the browser makes.
+   BROWSER THERMALS - a drawing of the heat the browser makes, and on
+   the same page every other part a browser can measure: threads,
+   memory down to one bit, the buses, the screen, the graphics chip,
+   the network against 4G and 5G, and a 24 hour file test overseas.
 
    NO BROWSER IS TOLD A TEMPERATURE: not the processor's, not the
    graphics chip's. What a page CAN do is make the load, measure the
    load it really got, and measure how fast the work runs - a chip
    that gets too hot slows itself down, and that slowing is measured.
+
+   ORDER AT START: the screen, memory, bus, graphics and disk are
+   measured FIRST, with no heat load running, so the load cannot spoil
+   them. Then the heat load starts. The network and the file test run
+   beside it - they wait on the wire, not on the processor.
 
    THE LOAD: one thread per core works for the share of each 50 ms set
    by the processor lever; the graphics lever sets how much is drawn
@@ -74,13 +148,11 @@
    25. Those two figures are a typical laptop, chosen and said; the
    page never calls the result a reading.
 
-   THE DRAWING: one square per core and one for the graphics, coloured
-   from cold blue to hot red by the estimated heat, with the measured
-   speed and the load written in. If a core's speed falls under its
-   cold speed while the load stays, it is marked as slowing - the one
-   sign of heat a browser can really see.
+   THE BREAKER: when the hottest core's estimate reaches the trip
+   level, the breaker trips and cuts the processor load to zero; it
+   closes again by itself 10 degrees lower.
    ================================================================== */
-var NW = Math.max(2, Math.min(16, navigator.hardwareConcurrency || 4)), PERIOD = 50, TAU_S = 60, RISE_FULL = 45, ROOM = 25, PROG_ON = 40, PROG_OFF = 20;
+var NW = Math.max(2, Math.min(16, navigator.hardwareConcurrency || 4)), PERIOD = 50, TAU_S = 60, RISE_FULL = 45, ROOM = 25, PROG_ON = 40, PROG_OFF = 20, RECLOSE = 10;
 var WORKER = [
 "var duty = 0;",
 "onmessage = function(e){ duty = e.data.duty; };",
@@ -91,13 +163,22 @@ var WORKER = [
 "  var busy = performance.now() - t0;",
 "  setTimeout(function(){ postMessage({ busy: busy, wall: performance.now() - t0, units: units, z: sink > 1e300 }); loop(); }, Math.max(0, " + PERIOD + " - busy)); })();"].join("\n");
 var URLW = URL.createObjectURL(new Blob([WORKER], { type: 'text/javascript' }));
-var C = [], G = { load: 0, frameMs: 16.7, heat: 0, base: null, speed: 100 }, t0 = performance.now(), hist = [], fails = [], err = null, lastT = performance.now();
+var C = [], G = { load: 0, frameMs: 16.7, heat: 0, base: null, speed: 100 }, t0 = performance.now(), hist = [], fails = [], err = null, lastT = performance.now(), started = false;
+var BRK = { tripped: false, trips: 0, last: null, phi: 0.45, yaw: -0.55, pitch: 0.32, drag: null, smash: 0, sparks: [] };
+var P = { screen: null, mem: [], memX: null, bus: null, gfx: null, disk: null, dev: null, net: null, phase: 'Measuring the screen' };
 function el(id){ return document.getElementById(id); }
 function two(n){ return (n < 10 ? '0' : '') + n; }
 function stampNow(){ var d = new Date(); return String(d.getFullYear()) + two(d.getMonth() + 1) + two(d.getDate()) + two(d.getHours()) + two(d.getMinutes()) + two(d.getSeconds()); }
+function dayTxt(d){ return d.getDate() + '.' + (d.getMonth() + 1) + '.' + d.getFullYear() + ' ' + two(d.getHours()) + ':' + two(d.getMinutes()); }
+function clock(d){ return two(d.getHours()) + ':' + two(d.getMinutes()) + ':' + two(d.getSeconds()); }
 function fi(n, d){ if (n === null || n === undefined || !isFinite(n)) return '-'; return n.toFixed(d === undefined ? 1 : d).replace('.', ','); }
+function big(n, d){ if (n === null || n === undefined || !isFinite(n)) return '-'; var s = n.toFixed(d || 0).split('.'); return s[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + (s[1] ? ',' + s[1] : ''); }
+function bytesTxt(n){ return n >= 1048576 ? big(n / 1048576, n % 1048576 ? 1 : 0) + ' MB' : big(n / 1024) + ' KB'; }
+function median(a){ var s = a.slice().sort(function(x, y){ return x - y; }); return s.length ? s[s.length >> 1] : null; }
 function nowS(){ return (performance.now() - t0) / 1000; }
-function asked(){ var on = !el('prog').checked || (nowS() % (PROG_ON + PROG_OFF)) < PROG_ON; return { cpu: on ? +el('lc').value / 100 : 0, gpu: on ? +el('lg').value / 100 : 0, on: on }; }
+function rows(id, list){ el(id).innerHTML = list.map(function(r){ return '<tr' + (r[2] ? ' class="hit"' : '') + '><td class="k">' + r[0] + '</td><td class="v">' + r[1] + '</td></tr>'; }).join(''); }
+function asked(){ if (!started) return { cpu: 0, gpu: 0, on: false };
+  var on = !el('prog').checked || (nowS() % (PROG_ON + PROG_OFF)) < PROG_ON; return { cpu: on && !BRK.tripped ? +el('lc').value / 100 : 0, gpu: on ? +el('lg').value / 100 : 0, on: on }; }
 /* the heat model: d(heat)/dt = (load x rise at full - heat) / time constant */
 function heatStep(h, load, dt){ return h + (load * RISE_FULL - h) * Math.min(1, dt / TAU_S); }
 function hue(t){ var x = Math.max(0, Math.min(1, t / RISE_FULL)), stops = [[32, 80, 255], [32, 192, 255], [32, 224, 96], [255, 224, 64], [255, 128, 32], [255, 32, 32]];
@@ -108,17 +189,23 @@ function step(){
   C.forEach(function(c){
     c.w.postMessage({ duty: a.cpu });
     while (c.rep.length && c.rep[0][0] < now - 500) c.rep.shift();
+    if (!started) return;
     var b = 0, w = 0, u = 0; c.rep.forEach(function(r){ b += r[1]; w += r[2]; u += r[3]; });
-    c.load = w > 0 ? b / w : 0; var rate = b > 0 ? u / b : null;                     /* work per busy ms: how fast the core runs */
+    c.load = w > 0 ? b / w : 0; var rate = b > 0 ? u / b : null; c.rate = rate;          /* work per busy ms: how fast the core runs */
     /* COLD SPEED: the middle of what the core did in its first seconds under load - not one lucky moment */
-    if (rate !== null && nowS() > 1.5 && nowS() < 8 && c.load > 0.3){ c.cold.push(rate); var srt = c.cold.slice().sort(function(x, y){ return x - y; }); c.base = srt[srt.length >> 1]; }
+    if (rate !== null && nowS() > 1.5 && nowS() < 8 && c.load > 0.3){ c.cold.push(rate); c.base = median(c.cold); }
     c.speed = (rate !== null && c.base && c.load > 0.3) ? Math.min(100, rate / c.base * 100) : null;   /* idle: no speed to judge */
     c.heat = heatStep(c.heat, c.load, dt);
     c.slowing = c.speed !== null && c.load > 0.5 && c.speed < 85;
   });
+  if (!started) return;
   G.load = a.gpu; G.heat = heatStep(G.heat, Math.min(1, G.busy || 0), dt);
   var live = C.filter(function(c){ return c.speed !== null; }), avgH = C.reduce(function(s, c){ return s + c.heat; }, 0) / C.length, avgS = live.length ? live.reduce(function(s, c){ return s + c.speed; }, 0) / live.length : null, avgL = C.reduce(function(s, c){ return s + c.load; }, 0) / C.length;
   hist.push([nowS(), avgH, avgS, a.cpu, avgL, G.heat]); while (hist.length && hist[0][0] < nowS() - 180) hist.shift();
+  /* the breaker: trips on the hottest core's estimate, closes again RECLOSE degrees lower */
+  var hot = ROOM + C.reduce(function(m, c){ return Math.max(m, c.heat); }, 0), trip = +el('trip').value;
+  if (!BRK.tripped && hot >= trip){ BRK.tripped = true; BRK.trips++; BRK.last = new Date(); BRK.smash = performance.now(); sparksGo(); }
+  else if (BRK.tripped && hot <= trip - RECLOSE) BRK.tripped = false;
 }
 /* the graphics load: draw this many shapes on the small canvas every frame, and time it */
 function gpuFrame(){
@@ -129,10 +216,13 @@ function gpuFrame(){
   g.fillStyle = '#05080c'; g.fillRect(0, 0, W, H);
   for (var i = 0; i < n; i++){ var x = (i * 37 + t * 0.2) % W, y = (i * 53) % H; g.fillStyle = 'hsla(' + ((i * 7 + t * 0.05) % 360) + ',80%,60%,0.5)'; g.beginPath(); g.arc(x, y, 3 + (i % 5), 0, 6.283); g.fill(); }
   var spent = performance.now() - t; G.busy = Math.min(1, spent / 16.7); G.frameMs = spent;
+  drawBreaker();
 }
+function canvasOf(id, hDefault){ var cv = el(id), dpr = Math.min(window.devicePixelRatio || 1, 2), W = cv.clientWidth || 300, H = cv.clientHeight || hDefault;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H); return { g: g, W: W, H: H }; }
 function drawHeat(){
-  var cv = el('heat'), dpr = Math.min(window.devicePixelRatio || 1, 2), W = cv.clientWidth || 300, H = cv.clientHeight || 300;
-  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  var o = canvasOf('heat', 300), g = o.g, W = o.W, H = o.H;
   var cells = C.map(function(c, i){ return { name: 'Core ' + (i + 1), heat: c.heat, load: c.load, speed: c.speed, slowing: c.slowing }; }).concat([{ name: 'Graphics', heat: G.heat, load: G.busy || 0, speed: null, gpu: true }]);
   var cols = Math.ceil(Math.sqrt(cells.length * W / H)), rows = Math.ceil(cells.length / cols), cw = W / cols, ch = H / rows;
   cells.forEach(function(c, i){ var x = (i % cols) * cw, y = Math.floor(i / cols) * ch;
@@ -144,24 +234,343 @@ function drawHeat(){
     if (!c.gpu) g.fillText(c.speed !== null ? 'Speed ' + fi(c.speed, 0) + ' %' + (c.slowing ? ', SLOWING' : '') : 'Idle', x + 8, y + 62); });
 }
 function drawChart(){
-  var cv = el('chart'), dpr = Math.min(window.devicePixelRatio || 1, 2), W = cv.clientWidth || 300, H = cv.clientHeight || 220;
-  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  var o = canvasOf('chart', 220), g = o.g, W = o.W, H = o.H;
   var span = 180, X = function(t){ return W - (nowS() - t) / span * (W - 10); }, Y = function(v){ return 10 + (1 - v) * (H - 30); };
   [[3, '#8ea9c2', 1], [1, '#ff8020', 1 / RISE_FULL], [2, '#4fd1ff', 0.01]].forEach(function(s){ g.strokeStyle = s[1]; g.lineWidth = 2; g.beginPath();
     var pen = false; hist.forEach(function(h){ if (h[s[0]] === null){ pen = false; return; } var v = h[s[0]] * s[2]; if (pen) g.lineTo(X(h[0]), Y(v)); else { g.moveTo(X(h[0]), Y(v)); pen = true; } }); g.stroke(); });
   g.fillStyle = '#6d8ba3'; g.font = '10px monospace'; g.fillText('The last 3 minutes', 6, H - 4);
 }
+
+/* ---------------- THE BREAKER, 3D: boxes, turned, lit, painted back to front ---------------- */
+function box(c, ax, ay, az, hx, hy, hz, col){   /* centre, three axes, three half sizes */
+  var v = [], s = [-1, 1]; s.forEach(function(i){ s.forEach(function(j){ s.forEach(function(k){
+    v.push([c[0] + ax[0] * hx * i + ay[0] * hy * j + az[0] * hz * k, c[1] + ax[1] * hx * i + ay[1] * hy * j + az[1] * hz * k, c[2] + ax[2] * hx * i + ay[2] * hy * j + az[2] * hz * k]); }); }); });
+  return { v: v, f: [[0, 1, 3, 2], [4, 6, 7, 5], [0, 4, 5, 1], [2, 3, 7, 6], [0, 2, 6, 4], [1, 5, 7, 3]], col: col }; }
+function breakerParts(x, phi, lev){
+  var X = [1, 0, 0], Y = [0, 1, 0], Z = [0, 0, 1], d = [0, Math.cos(phi), Math.sin(phi)], n = [0, -Math.sin(phi), Math.cos(phi)];
+  return [box([x, 0, -0.4], X, Y, Z, 0.87, 4.5, 2.4, [228, 230, 234]), box([x, 0, 2.6], X, Y, Z, 0.87, 2.3, 0.6, [214, 217, 222]),
+    box([x, 3.9, 0.9], X, Y, Z, 0.45, 0.3, 0.45, [70, 74, 80]), box([x, -3.9, 0.9], X, Y, Z, 0.45, 0.3, 0.45, [70, 74, 80]),
+    box([x, 0.25 + d[1] * 1.1, 3.2 + d[2] * 1.1], X, d, n, 0.42, 1.1, 0.28, lev)]; }
+function sparksGo(){ for (var i = 0; i < 40; i++){ var a = Math.random() * 6.283, s = 2 + Math.random() * 6; BRK.sparks.push({ x: 0, y: 0.3, z: 3.6, vx: Math.cos(a) * s * 0.6, vy: Math.sin(a) * s, vz: Math.random() * 4, life: 1 }); } }
+function drawBreaker(){
+  var cv = el('brk'); if (!cv || !cv.clientWidth) return;
+  var o = canvasOf('brk', 320), g = o.g, W = o.W, H = o.H, t = performance.now();
+  if (!BRK.drag && !BRK.turned) BRK.yaw = -0.45 + 0.3 * Math.sin(t / 2500);
+  var target = BRK.tripped ? Math.PI - 0.45 : 0.45; BRK.phi += (target - BRK.phi) * 0.35;
+  var shake = t - BRK.smash < 600 ? (1 - (t - BRK.smash) / 600) * 6 : 0, sx = (Math.random() - 0.5) * shake, sy = (Math.random() - 0.5) * shake;
+  var bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#1b2733'); bg.addColorStop(1, '#070b10'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  var cy = Math.cos(BRK.yaw), sy2 = Math.sin(BRK.yaw), cp = Math.cos(BRK.pitch), sp = Math.sin(BRK.pitch), sc = Math.min(W, H) / 13, dist = 30;
+  function rot(p){ var x = p[0] * cy + p[2] * sy2, z = -p[0] * sy2 + p[2] * cy, y = p[1] * cp - z * sp; z = p[1] * sp + z * cp; return [x, y, z]; }
+  function proj(r){ var f = dist / (dist - r[2]); return [W / 2 + r[0] * sc * f + sx, H / 2 - r[1] * sc * f + sy]; }
+  var parts = [box([0, 0, -3.1], [1, 0, 0], [0, 1, 0], [0, 0, 1], 4.4, 1.7, 0.3, [150, 156, 164])]
+    .concat(breakerParts(-1.8, 0.45, [30, 32, 36])).concat(breakerParts(0, BRK.phi, BRK.tripped ? [255, 60, 40] : [255, 140, 40])).concat(breakerParts(1.8, 0.45, [30, 32, 36]));
+  /* whole boxes back to front (they never cut into each other), and in each box only the faces turned to the eye */
+  var L = [0.4, 0.6, 0.7], ln = Math.hypot(L[0], L[1], L[2]); L = L.map(function(q){ return q / ln; });
+  var drawn = parts.map(function(bx){ var r = bx.v.map(rot), c = [0, 0, 0]; r.forEach(function(q){ c[0] += q[0] / 8; c[1] += q[1] / 8; c[2] += q[2] / 8; }); return { r: r, c: c, b: bx }; });
+  drawn.sort(function(a, b){ var da = Math.hypot(a.c[0], a.c[1], dist - a.c[2]), db = Math.hypot(b.c[0], b.c[1], dist - b.c[2]); return db - da; });
+  drawn.forEach(function(d){ d.b.f.forEach(function(f){
+    var p = f.map(function(i){ return d.r[i]; }), m = [0, 0, 0]; p.forEach(function(q){ m[0] += q[0] / 4; m[1] += q[1] / 4; m[2] += q[2] / 4; });
+    var nn = [m[0] - d.c[0], m[1] - d.c[1], m[2] - d.c[2]], u = [p[1][0] - p[0][0], p[1][1] - p[0][1], p[1][2] - p[0][2]], w = [p[3][0] - p[0][0], p[3][1] - p[0][1], p[3][2] - p[0][2]];
+    var cr = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]], cl = Math.hypot(cr[0], cr[1], cr[2]) || 1;
+    if (cr[0] * nn[0] + cr[1] * nn[1] + cr[2] * nn[2] < 0) cl = -cl; cr = cr.map(function(q){ return q / cl; });          /* the face normal, pointing out of the box */
+    if (cr[0] * -m[0] + cr[1] * -m[1] + cr[2] * (dist - m[2]) <= 0) return;                                                 /* turned away */
+    var lit = 0.35 + 0.65 * Math.max(0, cr[0] * L[0] + cr[1] * L[1] + cr[2] * L[2]), pts = p.map(proj);
+    g.fillStyle = 'rgb(' + d.b.col.map(function(c){ return Math.round(c * lit); }).join(',') + ')'; g.strokeStyle = 'rgba(0,0,0,0.3)'; g.lineWidth = 0.6;
+    g.beginPath(); pts.forEach(function(q, i){ if (i) g.lineTo(q[0], q[1]); else g.moveTo(q[0], q[1]); }); g.closePath(); g.fill(); g.stroke(); }); });
+  /* print on the face: rating, and the I / O marks */
+  [[[0, -2.9, 2.05], 'C16', '#202830'], [[0, 1.9, 3.25], 'I', '#202830'], [[0, -1.6, 3.25], 'O', '#202830']].forEach(function(m){ var q = proj(rot(m[0])); g.fillStyle = m[2]; g.font = '700 ' + Math.round(sc * 0.55) + 'px monospace'; g.textAlign = 'center'; g.fillText(m[1], q[0], q[1]); });
+  g.textAlign = 'left';
+  BRK.sparks = BRK.sparks.filter(function(s){ s.life -= 0.025; s.vy -= 0.35; s.x += s.vx * 0.05; s.y += s.vy * 0.05; s.z += s.vz * 0.05; return s.life > 0; });
+  BRK.sparks.forEach(function(s){ var a = proj(rot([s.x, s.y, s.z])), b = proj(rot([s.x - s.vx * 0.04, s.y - s.vy * 0.04, s.z - s.vz * 0.04])); g.strokeStyle = 'rgba(255,' + Math.round(160 + 90 * s.life) + ',60,' + s.life + ')'; g.lineWidth = 2; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); });
+  if (shake){ g.fillStyle = 'rgba(255,40,20,' + (shake / 30) + ')'; g.fillRect(0, 0, W, H); }
+  g.fillStyle = BRK.tripped ? '#ff6a50' : '#7fe0a0'; g.font = '700 14px monospace'; g.fillText(BRK.tripped ? 'TRIPPED - load cut' : 'CLOSED - load on', 10, 22);
+  g.fillStyle = '#8ea9c2'; g.font = '11px monospace'; g.fillText('Hottest core ' + fi(ROOM + C.reduce(function(m, c){ return Math.max(m, c.heat); }, 0), 1) + ' C est., trips at ' + el('trip').value + ' C', 10, 40);
+}
+(function(){ var cv = el('brk');
+  cv.addEventListener('pointerdown', function(e){ BRK.drag = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', function(e){ if (!BRK.drag) return; BRK.turned = true; BRK.yaw += (e.clientX - BRK.drag[0]) * 0.01; BRK.pitch = Math.max(-1.2, Math.min(1.2, BRK.pitch + (e.clientY - BRK.drag[1]) * 0.01)); BRK.drag = [e.clientX, e.clientY]; });
+  cv.addEventListener('pointerup', function(){ BRK.drag = null; }); cv.addEventListener('pointercancel', function(){ BRK.drag = null; });
+  el('breset').onclick = function(){ BRK.tripped = false; }; })();
+
+/* ---------------- MEASURED FIRST: screen, memory, bus, graphics, disk ---------------- */
+function frames(n){ return new Promise(function(res){ var t = [], k = 0; (function f(ts){ t.push(ts); if (++k > n) res(t); else requestAnimationFrame(f); })(performance.now()); }); }
+async function probeScreen(){
+  var t = await frames(90), d = []; for (var i = 2; i < t.length; i++) d.push(t[i] - t[i - 1]);
+  var ms = median(d), hz = 1000 / ms, RATES = [50, 60, 70, 72, 75, 80, 90, 96, 100, 120, 144, 165, 240], near = RATES.reduce(function(b, r){ return Math.abs(r - hz) < Math.abs(b - hz) ? r : b; }, 60);
+  var dpr = window.devicePixelRatio || 1, sw = screen.width, sh = screen.height;
+  P.screen = { hz: hz, near: near, ms: ms, late: d.filter(function(x){ return x > ms * 1.5; }).length, n: d.length, dpr: dpr, sw: sw, sh: sh, dw: Math.round(sw * dpr), dh: Math.round(sh * dpr), depth: screen.colorDepth,
+    hdr: matchMedia('(dynamic-range: high)').matches, p3: matchMedia('(color-gamut: p3)').matches };
+}
+var MEMW = [
+"function now(){ return performance.now(); }",
+"onmessage = function(e){ var sizes = e.data.sizes, i, j, t;",
+"  sizes.forEach(function(n){",
+"    var lines = n >> 6, a = new Int32Array(n >> 2), p = new Int32Array(lines);",
+"    for (i = 0; i < lines; i++) p[i] = i;",
+"    for (i = lines - 1; i > 0; i--){ j = Math.floor(Math.random() * i); t = p[i]; p[i] = p[j]; p[j] = t; }",   /* Sattolo: one cycle through every line */
+"    for (i = 0; i < lines; i++) a[i << 4] = p[i] << 4;",
+"    var k = 0, steps = 0, t0 = now(), dt; do { for (i = 0; i < 50000; i++) k = a[k]; steps += 50000; dt = now() - t0; } while (dt < 50);",
+"    var reps = 0, t1 = now(), d2; do { a.indexOf(-1); reps++; d2 = now() - t1; } while (d2 < 30);",
+"    postMessage({ part: { bytes: n, ns: dt * 1e6 / steps, scan: n * reps / d2 / 1e6, k: k } });",
+"  });",
+"  var N = 32 << 20, f = new Float64Array(N >> 3), b = new Float64Array(N >> 3), r = 0, tw = now(), dw;",
+"  do { f.fill(r + 0.5); r++; dw = now() - tw; } while (dw < 60);",
+"  var write = N * r / dw / 1e6, rc = 0, tc = now(), dc; do { b.set(f); rc++; dc = now() - tc; } while (dc < 60);",
+"  var copy = 2 * N * rc / dc / 1e6;",
+   /* ONE BIT AT A TIME: 8 388 608 bits, each set once, in an order that jumps all over the block; then counted back */
+"  var NB = 1 << 23, m = NB - 1, w = new Uint32Array(NB >> 5), tb = now(), idx;",
+"  for (i = 0; i < NB; i++){ idx = Math.imul(i, 0x9E3779B1) & m; w[idx >>> 5] |= 1 << (idx & 31); }",
+"  var bt = now() - tb, cnt = 0, v;",
+"  for (i = 0; i < w.length; i++){ v = w[i]; v = v - ((v >>> 1) & 0x55555555); v = (v & 0x33333333) + ((v >>> 2) & 0x33333333); cnt += Math.imul((v + (v >>> 4)) & 0x0F0F0F0F, 0x01010101) >>> 24; }",
+"  var one = Math.imul(1, 0x9E3779B1) & m;",
+"  postMessage({ done: { write: write, copy: copy, bits: NB, bitNs: bt * 1e6 / NB, counted: cnt, slot: one >>> 5, bit: one & 31 } });",
+"};"].join("\n");
+function probeMemory(){ return new Promise(function(res){
+  var sizes = []; for (var s = 4096; s <= (64 << 20); s *= 2) sizes.push(s);
+  var w = new Worker(URL.createObjectURL(new Blob([MEMW], { type: 'text/javascript' })));
+  w.onmessage = function(e){ if (e.data.part) P.mem.push(e.data.part); else { P.memX = e.data.done; w.terminate(); res(); } };
+  w.onerror = function(e){ err = 'the memory test failed: ' + (e.message || ''); res(); };
+  w.postMessage({ sizes: sizes }); }); }
+function levelOf(ns){ return ns < 2.5 ? 'L1 cache' : ns < 7 ? 'L2 cache' : ns < 30 ? 'L3 cache' : 'DDR memory'; }
+async function probeBus(){
+  var w = new Worker(URL.createObjectURL(new Blob(["onmessage = function(e){ var b = e.data.buf; if (e.data.move) postMessage({ buf: b }, [b]); else postMessage({ buf: b }); };"], { type: 'text/javascript' })));
+  function trip(buf, move){ return new Promise(function(res){ var t = performance.now(); w.onmessage = function(e){ res([performance.now() - t, e.data.buf]); }; if (move) w.postMessage({ buf: buf, move: true }, [buf]); else w.postMessage({ buf: buf, move: false }); }); }
+  /* many trips timed together: a browser clock can be as coarse as 1 ms, too coarse for one trip */
+  var buf, r, i, t, SZ = 16 << 20;
+  t = performance.now(); for (i = 0; i < 200; i++) await trip(new ArrayBuffer(8), false); var small = (performance.now() - t) / 200;
+  buf = new ArrayBuffer(SZ); t = performance.now(); for (i = 0; i < 6; i++) await trip(buf, false); var copy = (performance.now() - t) / 6;
+  t = performance.now(); for (i = 0; i < 100; i++){ r = await trip(buf, true); buf = r[1]; } var moved = (performance.now() - t) / 100;
+  w.terminate();
+  P.bus = { echoUs: small * 1000, size: SZ, copyMs: copy, copyGBs: 2 * SZ / copy / 1e6, moveMs: moved };
+}
+async function probeGfx(){
+  var out = { ok: false };
+  try {
+    var cv = document.createElement('canvas'); cv.width = cv.height = 1024; var gl = cv.getContext('webgl', { antialias: false, preserveDrawingBuffer: false });
+    if (!gl){ P.gfx = out; return; }
+    var dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    out.renderer = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); out.vendor = dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR);
+    out.maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+    function sh(type, src){ var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; }
+    var pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, 'attribute vec2 p; varying vec2 u; void main(){ u = p * 0.5 + 0.5; gl_Position = vec4(p, 0.0, 1.0); }'));
+    gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\nvarying vec2 u; uniform sampler2D t; uniform float a; void main(){ gl_FragColor = vec4(texture2D(t, u).rgb, a); }'));
+    gl.linkProgram(pr); gl.useProgram(pr);
+    var vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    var loc = gl.getAttribLocation(pr, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    var tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    var S = 1024, data = new Uint8Array(S * S * 4), px = new Uint8Array(4), all = new Uint8Array(S * S * 4), i, t;
+    for (i = 0; i < data.length; i += 4){ data[i] = i & 255; data[i + 1] = (i >> 8) & 255; data[i + 2] = (i >> 16) & 255; data[i + 3] = 255; }
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, S, S, 0, gl.RGBA, gl.UNSIGNED_BYTE, data); gl.uniform1f(gl.getUniformLocation(pr, 'a'), 1);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);           /* warm up */
+    t = performance.now(); for (i = 0; i < 8; i++){ data[0] = i; gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, S, S, gl.RGBA, gl.UNSIGNED_BYTE, data); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); }
+    out.upGBs = 8 * S * S * 4 / (performance.now() - t) / 1e6;
+    t = performance.now(); for (i = 0; i < 5; i++){ gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); gl.readPixels(0, 0, S, S, gl.RGBA, gl.UNSIGNED_BYTE, all); }
+    out.downGBs = 5 * S * S * 4 / (performance.now() - t) / 1e6;
+    out.readBack = all[1] === data[1] && all[4 * 513 + 2] === data[4 * 513 + 2];                                   /* the picture came back as sent */
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.uniform1f(gl.getUniformLocation(pr, 'a'), 0.5);
+    t = performance.now(); for (i = 0; i < 60; i++) gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    out.gpuMpx = 60 * S * S / (performance.now() - t) / 1000;
+    /* the same blend done by the processor, one pixel at a time */
+    var cpu = new Uint32Array(S * S), src = new Uint32Array(data.buffer), passes = 0; t = performance.now();
+    do { for (i = 0; i < cpu.length; i++){ var a = cpu[i], b = src[i]; cpu[i] = ((((a & 0xFF00FF) + (b & 0xFF00FF)) >>> 1) & 0xFF00FF) | ((((a >>> 8 & 0xFF00FF) + (b >>> 8 & 0xFF00FF)) << 7) & 0xFF00FF00); } passes++; } while (performance.now() - t < 80);
+    out.cpuMpx = passes * S * S / (performance.now() - t) / 1000;
+    out.ok = true; var lose = gl.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext();
+  } catch (e){ out.error = String(e.message || e); }
+  P.gfx = out;
+}
+async function probeDisk(){
+  var out = { ok: false };
+  try {
+    if (navigator.storage && navigator.storage.estimate){ var est = await navigator.storage.estimate(); out.quota = est.quota; }
+    var root = await navigator.storage.getDirectory(), fh = await root.getFileHandle('ai2orbit-probe.bin', { create: true }), SZ = 8 << 20, buf = new Uint8Array(SZ), i;
+    for (i = 0; i < SZ; i += 65536) crypto.getRandomValues(buf.subarray(i, i + 65536));
+    var t = performance.now(), wr = await fh.createWritable(); await wr.write(buf); await wr.close(); out.writeMs = performance.now() - t;
+    t = performance.now(); var got = new Uint8Array(await (await fh.getFile()).arrayBuffer()); out.readMs = performance.now() - t;
+    out.same = got.length === SZ && got[0] === buf[0] && got[SZ >> 1] === buf[SZ >> 1] && got[SZ - 1] === buf[SZ - 1];
+    out.size = SZ; await root.removeEntry('ai2orbit-probe.bin'); out.ok = true;
+  } catch (e){ out.error = String(e.message || e).slice(0, 80); }
+  P.disk = out;
+}
+function probeDevice(){
+  var ua = navigator.userAgent, touch = (navigator.maxTouchPoints || 0) > 0, ipad = /Macintosh/.test(ua) && touch, mobi = /Mobi|iPhone/.test(ua), android = /Android/.test(ua);
+  var kind = mobi ? 'Phone' : (ipad || android || /iPad|Tablet/.test(ua)) ? 'Tablet' : (navigator.hardwareConcurrency || 0) >= 24 ? 'Desktop, workstation or server' : 'Laptop or desktop';
+  var d = [], last = performance.now(), k; for (k = 0; k < 200000 && d.length < 50; k++){ var n = performance.now(); if (n !== last){ d.push(n - last); last = n; } }
+  P.dev = { kind: kind, cores: navigator.hardwareConcurrency || null, mem: navigator.deviceMemory || null, touch: navigator.maxTouchPoints || 0, timerUs: d.length ? Math.min.apply(null, d) * 1000 : null,
+    isolated: !!window.crossOriginIsolated };
+}
+async function probeAll(){
+  try { probeDevice(); P.phase = 'Measuring the screen'; await probeScreen(); P.phase = 'Measuring memory down to one bit'; await probeMemory();
+    P.phase = 'Measuring the bus between threads'; await probeBus(); P.phase = 'Measuring the graphics chip'; await probeGfx(); P.phase = 'Measuring the disk'; await probeDisk(); }
+  catch (e){ err = 'a measurement failed: ' + (e.message || e); }
+  P.phase = null; t0 = performance.now(); lastT = t0; started = true;
+}
+
+/* ---------------- NETWORK: near echo, overseas echo, down, up - matched to 4G and 5G ---------------- */
+var NEAR = 'https://speed.cloudflare.com/', FAR = 'https://httpbin.org/', USED = { up: 0, down: 0 };
+async function timed(url, opt){ var t = performance.now(), r = await fetch(url, Object.assign({ cache: 'no-store', mode: 'cors' }, opt || {})), b = await r.arrayBuffer(); USED.down += b.byteLength; return { ms: performance.now() - t, r: r, buf: b }; }
+var GENS = [   /* typical speed down in Mbit/s and typical echo in ms, as found in daily use - not the peaks of the standard */
+  ['2G EDGE', 0.05, 0.2, 300, 1000, 0.236], ['3G HSPA', 0.5, 8, 80, 300, 42], ['4G LTE', 8, 80, 30, 70, 150], ['4G LTE-Advanced', 80, 300, 20, 45, 1000], ['5G mid band', 150, 1000, 12, 30, 20000], ['5G mmWave', 800, 3000, 5, 15, 20000]];
+function genBySpeed(m){ var hit = null; GENS.forEach(function(g){ if (m >= g[1]) hit = g; }); return hit; }
+function genByEcho(ms){ var hit = null; GENS.forEach(function(g){ if (ms <= g[4]) hit = g; }); return hit; }
+async function probeNet(){
+  var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection, out = { claim: c ? { type: c.type || null, eff: c.effectiveType || null, down: c.downlink, rtt: c.rtt } : null };
+  P.net = out;
+  try { var near = [], r, i; for (i = 0; i < 8; i++){ r = await timed(NEAR + '__down?bytes=0'); near.push(r.ms); out.colo = r.r.headers.get('cf-meta-colo'); }
+    out.nearMs = median(near.slice(1)); } catch (e){ out.nearErr = 'Did not answer'; }
+  try { var far = []; for (i = 0; i < 6; i++){ r = await timed(FAR + 'status/204'); far.push(r.ms); } out.farMs = median(far.slice(1)); } catch (e){ out.farErr = 'Did not answer'; }
+  try { var DN = 4000000; r = await timed(NEAR + '__down?bytes=' + DN); out.downMbit = DN * 8 / r.ms / 1000; } catch (e){ out.downErr = 'Did not answer'; }
+  try { var UP = 1 << 20, ub = new Uint8Array(UP); for (i = 0; i < UP; i += 65536) crypto.getRandomValues(ub.subarray(i, i + 65536));
+    var t = performance.now(), ur = await fetch(NEAR + '__up', { method: 'POST', body: ub, cache: 'no-store' }); await ur.arrayBuffer(); out.colo = out.colo || ur.headers.get('cf-meta-colo'); out.upMbit = UP * 8 / (performance.now() - t) / 1000; USED.up += UP; } catch (e){ out.upErr = 'Did not answer'; }
+  out.done = true;
+}
+
+/* ---------------- FILE TEST: a pack of files to an overseas echo server and back, 3, 4 then 5 at once ---------------- */
+var FT = { rounds: [], startAt: null, next: null, busy: false, alerts: 0, allow: false, lastAlert: null, timer: null };
+function b64bytes(s){ var bin = atob(s), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; }
+async function sha(u){ return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', u))).map(function(x){ return (x < 16 ? '0' : '') + x.toString(16); }).join(''); }
+async function sendOne(size){
+  var u = new Uint8Array(size); for (var i = 0; i < size; i += 65536) crypto.getRandomValues(u.subarray(i, Math.min(size, i + 65536)));
+  var h = await sha(u), r = await fetch(FAR + 'anything', { method: 'POST', body: u, headers: { 'Content-Type': 'application/octet-stream' }, cache: 'no-store' });
+  if (!r.ok) throw new Error('the server answered ' + r.status);
+  var txt = await r.text(); USED.up += size; USED.down += txt.length;
+  var j = JSON.parse(txt), d = String(j.data || ''), back = b64bytes(d.slice(d.indexOf(',') + 1));
+  return { sizeOk: back.length === size, hashOk: (await sha(back)) === h };
+}
+async function ftRound(){
+  if (FT.busy) return; FT.busy = true;
+  var size = +el('fsize').value * 1024, round = { n: FT.rounds.length + 1, at: new Date(), stages: [], ok: true, changed: 0, files: 0 };
+  for (var n = 3; n <= 5; n++){
+    var t = performance.now(), st = { n: n, ok: true };
+    try { var res = await Promise.all(Array.from({ length: n }, function(){ return sendOne(size); }));
+      st.ms = performance.now() - t; st.mbit = 2 * n * size * 8 / st.ms / 1000;
+      res.forEach(function(x){ round.files++; if (!x.sizeOk || !x.hashOk) round.changed++; }); }
+    catch (e){ st.ok = false; st.err = String(e.message || e).slice(0, 60); round.ok = false; }
+    round.stages.push(st);
+  }
+  var ok = round.stages.filter(function(s){ return s.ok; }); round.mbit = ok.length ? median(ok.map(function(s){ return s.mbit; })) : null;
+  var before = FT.rounds.filter(function(r){ return r.ok && r.mbit; }).map(function(r){ return r.mbit; }); round.usual = before.length >= 3 ? median(before) : null;
+  if (!round.ok) ftAlert('Round ' + round.n + ' failed: ' + round.stages.filter(function(s){ return !s.ok; })[0].err);
+  else if (round.changed) ftAlert('Round ' + round.n + ': ' + round.changed + ' file(s) came back changed');
+  else if (round.usual && round.mbit < round.usual * 0.5){ round.drop = true; ftAlert('Round ' + round.n + ': speed dropped to ' + fi(round.mbit, 2) + ' Mbit/s, usual ' + fi(round.usual, 2)); }
+  round.alert = !round.ok || round.changed > 0 || !!round.drop;
+  FT.rounds.push(round); FT.busy = false;
+}
+function ftAlert(msg){
+  FT.alerts++; FT.lastAlert = clock(new Date()) + ' ' + msg; var a = el('falert'); a.style.display = 'block'; a.textContent = 'ALERT ' + FT.lastAlert;
+  document.title = '! ALERT - BROWSER THERMALS';
+  try { if (navigator.vibrate) navigator.vibrate([300, 100, 300]); } catch (e){}
+  if (FT.allow){ try { var ac = FT.ac || (FT.ac = new (window.AudioContext || window.webkitAudioContext)()), o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = 880; o.connect(g); g.connect(ac.destination); g.gain.value = 0.2; o.start(); o.stop(ac.currentTime + 0.6); } catch (e){} }
+  try { if (window.Notification && Notification.permission === 'granted') new Notification('File test alert', { body: msg }); } catch (e){}
+}
+function ftSchedule(){
+  if (FT.timer) clearTimeout(FT.timer);
+  if (Date.now() - FT.startAt >= 24 * 3600e3){ FT.next = null; return; }
+  var every = +el('fevery').value * 60e3; FT.next = Date.now() + every;
+  FT.timer = setTimeout(function(){ ftRound().then(ftSchedule); }, every);
+}
+el('fevery').onchange = ftSchedule;
+el('fallow').onclick = function(){ FT.allow = true; try { FT.ac = FT.ac || new (window.AudioContext || window.webkitAudioContext)(); FT.ac.resume(); } catch (e){}
+  try { if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch (e){} el('fallow').textContent = 'Sound on'; };
+function perRoundBytes(){ var s = +el('fsize').value * 1024; return 12 * s * (1 + 4 / 3) + 12 * 600; }
+
+/* ---------------- DRAWINGS: memory steps, the 4G / 5G ladder, the file test ---------------- */
+function drawMem(){
+  var o = canvasOf('mem', 230), g = o.g, W = o.W, H = o.H; if (!P.mem.length) { g.fillStyle = '#6d8ba3'; g.font = '11px monospace'; g.fillText(P.phase || '', 8, 20); return; }
+  var maxNs = Math.max.apply(null, P.mem.map(function(m){ return m.ns; })), maxS = Math.max.apply(null, P.mem.map(function(m){ return m.scan; })), n = 15;
+  var X = function(i){ return 30 + i / (n - 1) * (W - 50); }, Yl = function(v){ return H - 24 - Math.log(1 + v) / Math.log(1 + maxNs) * (H - 44); }, Ys = function(v){ return H - 24 - v / maxS * (H - 44); };
+  [['#ff8020', 'scan', Ys], ['#4fd1ff', 'ns', Yl]].forEach(function(s){ g.strokeStyle = s[0]; g.lineWidth = 2; g.beginPath(); P.mem.forEach(function(m, i){ if (i) g.lineTo(X(i), s[2](m[s[1]])); else g.moveTo(X(i), s[2](m[s[1]])); }); g.stroke();
+    g.fillStyle = s[0]; P.mem.forEach(function(m, i){ g.beginPath(); g.arc(X(i), s[2](m[s[1]]), 2.5, 0, 6.283); g.fill(); }); });
+  g.fillStyle = '#8ea9c2'; g.font = '10px monospace';
+  P.mem.forEach(function(m, i){ if (i % 2 === 0) g.fillText(m.bytes >= 1048576 ? (m.bytes >> 20) + 'M' : (m.bytes >> 10) + 'K', X(i) - 8, H - 8); });
+  g.fillStyle = '#4fd1ff'; g.fillText(fi(maxNs, 0) + ' ns', 4, 14); g.fillStyle = '#ff8020'; g.fillText(fi(maxS, 1) + ' GB/s', W - 80, 14);
+}
+function drawLadder(){
+  var o = canvasOf('ladder', 230), g = o.g, W = o.W, H = o.H, lo = -2, hi = 4.5, X = function(m){ return 10 + (Math.log10(Math.max(m, 0.01)) - lo) / (hi - lo) * (W - 20); };
+  var n = P.net || {}, hitD = n.downMbit ? genBySpeed(n.downMbit) : null, row = (H - 50) / GENS.length;
+  GENS.forEach(function(gn, i){ var y = 8 + i * row, on = hitD === gn;
+    g.fillStyle = on ? '#1f6b3a' : '#16293a'; g.fillRect(X(gn[1]), y, X(gn[2]) - X(gn[1]), row - 6);
+    g.fillStyle = '#e0645f'; g.fillRect(X(gn[5]) - 1, y, 2, row - 6);
+    g.fillStyle = on ? '#bff5cf' : '#8ea9c2'; g.font = '10px monospace'; g.fillText(gn[0], Math.min(X(gn[1]) + 3, W - 110), y + row / 2); });
+  g.strokeStyle = '#26394a'; g.fillStyle = '#6d8ba3'; [0.01, 0.1, 1, 10, 100, 1000, 10000].forEach(function(m){ g.beginPath(); g.moveTo(X(m), 4); g.lineTo(X(m), H - 34); g.stroke(); g.fillText(m >= 1 ? big(m) : String(m).replace('.', ','), X(m) - 6, H - 22); });
+  g.fillText('Mbit/s, steps of ten', 10, H - 6);
+  [['downMbit', '#4fd1ff'], ['upMbit', '#ff8020']].forEach(function(s){ if (!n[s[0]]) return; g.strokeStyle = s[1]; g.lineWidth = 3; g.beginPath(); g.moveTo(X(n[s[0]]), 4); g.lineTo(X(n[s[0]]), H - 34); g.stroke(); g.lineWidth = 1; });
+}
+function drawFile(){
+  var o = canvasOf('fchart', 150), g = o.g, W = o.W, H = o.H, R = FT.rounds; g.fillStyle = '#6d8ba3'; g.font = '10px monospace';
+  if (!R.length){ g.fillText('The first round is on its way', 8, 20); return; }
+  var mx = Math.max.apply(null, R.map(function(r){ return r.mbit || 0; })) || 1, X = function(i){ return 20 + (R.length < 2 ? 0 : i / (R.length - 1) * (W - 40)); }, Y = function(v){ return H - 20 - v / mx * (H - 40); };
+  g.strokeStyle = '#4fd1ff'; g.lineWidth = 2; g.beginPath(); var pen = false;
+  R.forEach(function(r, i){ if (!r.mbit){ pen = false; return; } if (pen) g.lineTo(X(i), Y(r.mbit)); else { g.moveTo(X(i), Y(r.mbit)); pen = true; } }); g.stroke();
+  R.forEach(function(r, i){ g.fillStyle = r.alert ? '#e0645f' : '#4fd1ff'; g.beginPath(); g.arc(X(i), r.mbit ? Y(r.mbit) : H - 20, r.alert ? 4 : 2.5, 0, 6.283); g.fill(); });
+  g.fillStyle = '#6d8ba3'; g.fillText(fi(mx, 2) + ' Mbit/s', 4, 12); g.fillText('Round 1 to ' + R.length, 4, H - 4);
+}
+
+/* ---------------- THE TABLES ---------------- */
+function renderProbes(){
+  var s = P.screen, x = P.memX, b = P.bus, q = P.gfx, d = P.disk, v = P.dev, n = P.net;
+  var mrows = P.mem.map(function(m){ return '<tr><td>' + bytesTxt(m.bytes) + '</td><td class="v">' + fi(m.ns, 1) + ' ns</td><td class="v">' + fi(m.scan, 1) + ' GB/s</td><td>' + levelOf(m.ns) + '</td></tr>'; }).join('');
+  if (el('tmemrows').innerHTML !== mrows) el('tmemrows').innerHTML = mrows;
+  var DDR = [['DDR3-1600', 12.8], ['DDR4-2400', 19.2], ['DDR4-3200', 25.6], ['LPDDR4X-4266', 34.1], ['DDR5-4800', 38.4], ['DDR5-6400', 51.2], ['LPDDR5X-8533', 68.3]];
+  var nearD = x ? DDR.reduce(function(a, r){ return Math.abs(r[1] - x.copy) < Math.abs(a[1] - x.copy) ? r : a; }) : null, last = P.mem[P.mem.length - 1];
+  rows('tmem', x ? [['Write, one thread', fi(x.write, 1) + ' GB/s'], ['Copy, one thread', fi(x.copy, 1) + ' GB/s (read and write)'],
+    ['Nearest DDR channel', nearD[0] + ', ' + fi(nearD[1], 1) + ' GB/s for one 64 bit channel'],
+    ['DDR echo, one read', last ? fi(last.ns, 0) + ' ns at ' + bytesTxt(last.bytes) : '-'],
+    ['One bit written', fi(x.bitNs, 2) + ' ns a bit, ' + big(x.bits) + ' bits each set once'],
+    ['Bits counted back', big(x.counted) + ' of ' + big(x.bits) + (x.counted === x.bits ? ' - every bit landed' : ' - BITS MISSING')],
+    ['First write landed in', 'Slot ' + big(x.slot) + ', bit ' + x.bit + ' (slot = one 32 bit word)'],
+    ['Memory, as the browser rounds it', v && v.mem ? fi(v.mem, v.mem < 1 ? 2 : 0) + ' GB or more' : 'Not given by this browser']] : [[P.phase || 'Waiting', '-']]);
+  rows('tbus', b ? [['Thread to thread, echo', fi(b.echoUs, 0) + ' microseconds for a tiny message there and back'],
+    ['Thread to thread, copied', fi(b.copyGBs, 2) + ' GB/s - ' + bytesTxt(b.size) + ' there and back in ' + fi(b.copyMs, 1) + ' ms'],
+    ['Thread to thread, handed over', fi(b.moveMs, 2) + ' ms there and back for the same ' + bytesTxt(b.size) + ' - ownership moves, no bytes copied'],
+    ['Processor to graphics chip', q && q.ok ? fi(q.upGBs, 2) + ' GB/s, pictures sent up' : 'Not available here'],
+    ['Graphics chip to processor', q && q.ok ? fi(q.downGBs, 2) + ' GB/s, pictures read back' + (q.readBack ? ', same as sent' : ', NOT AS SENT') : 'Not available here'],
+    ['Disk, written', d && d.ok ? fi(d.size / d.writeMs / 1000, 0) + ' MB/s - ' + bytesTxt(d.size) + ' in ' + fi(d.writeMs, 0) + ' ms' : d ? 'Not available in this browser' : '-'],
+    ['Disk, read back', d && d.ok ? fi(d.size / d.readMs / 1000, 0) + ' MB/s' + (d.same ? ', same bytes' : ', NOT THE SAME BYTES') + ' (may come from the memory cache)' : d ? 'Not available in this browser' : '-']] : [[P.phase || 'Waiting', '-']]);
+  rows('tscr', s ? [['Refresh, measured', fi(s.hz, 1) + ' Hz, one frame every ' + fi(s.ms, 2) + ' ms'], ['Nearest common rate', s.near + ' Hz'],
+    ['Late frames', s.late + ' of ' + s.n + ' (longer than 1,5 frames)'], ['Screen, page pixels', s.sw + ' x ' + s.sh], ['Screen, device pixels', s.dw + ' x ' + s.dh + ' - ' + fi(s.dpr, 2) + ' device pixels a page pixel'],
+    ['Pixels a second at this rate', big(s.dw * s.dh * s.hz / 1e6, 0) + ' million'], ['Colour depth', s.depth + ' bits'], ['High dynamic range', s.hdr ? 'Yes' : 'No'], ['Wide colour, P3', s.p3 ? 'Yes' : 'No']] : [[P.phase || 'Waiting', '-']]);
+  rows('tgfx', q ? (q.ok ? [['Graphics chip, as the browser names it', q.renderer || 'Not given by this browser'], ['Maker, as the browser names it', q.vendor || 'Not given by this browser'],
+    ['Largest picture', q.maxTex + ' x ' + q.maxTex + ' pixels'], ['Fill, graphics chip', big(q.gpuMpx, 0) + ' million pixels a second, half see-through'],
+    ['Fill, processor, one thread', big(q.cpuMpx, 0) + ' million pixels a second, the same blend'], ['Graphics to processor ratio', fi(q.gpuMpx / q.cpuMpx, 1) + ' to 1'],
+    ['Screen frames the chip could fill', s ? big(q.gpuMpx * 1e6 / (s.dw * s.dh), 0) + ' a second at ' + s.dw + ' x ' + s.dh : '-']] : [['Graphics chip', 'WebGL is not available here' + (q.error ? ': ' + q.error : '')]]) : [[P.phase || 'Waiting', '-']]);
+  rows('tdev', v ? [['Kind, estimated', v.kind + ' - from the browser name, touch and cores'], ['Cores', v.cores ? v.cores + ' threads' : 'Not given by this browser'],
+    ['Touch points', String(v.touch)], ['Memory', v.mem ? fi(v.mem, v.mem < 1 ? 2 : 0) + ' GB or more, rounded by the browser' : 'Not given by this browser'],
+    ['Disk room for this page', d && d.quota ? bytesTxt(d.quota) : 'Not given by this browser'], ['Timer step', v.timerUs ? fi(v.timerUs, 0) + ' microseconds - browsers coarsen the clock on purpose' : '-'],
+    ['Hypervisor', 'Not visible to a web page; a virtual machine shows here as the machine it pretends to be'],
+    ['Tower signal, dBm', 'Not given to web pages']] : [['Device', '-']]);
+  if (n){ var hs = n.downMbit ? genBySpeed(n.downMbit) : null, he = n.nearMs ? genByEcho(n.nearMs) : null;
+    rows('tnet', [['Browser says', n.claim ? (n.claim.eff ? n.claim.eff.toUpperCase() + ' class' : 'No class') + (n.claim.type ? ', ' + n.claim.type : '') + (n.claim.down ? ', about ' + fi(n.claim.down, 1) + ' Mbit/s' : '') + (n.claim.rtt ? ', echo about ' + n.claim.rtt + ' ms' : '') + ' - an estimate' : 'Nothing - this browser keeps the link type to itself'],
+      ['Echo, nearest data centre', n.nearMs ? fi(n.nearMs, 0) + ' ms' + (n.colo ? ' (' + n.colo + ')' : '') : n.nearErr || 'Measuring'],
+      ['Echo, overseas, Virginia US', n.farMs ? fi(n.farMs, 0) + ' ms' : n.farErr || 'Measuring'],
+      ['Down, measured', n.downMbit ? fi(n.downMbit, 1) + ' Mbit/s' : n.downErr || 'Measuring'], ['Up, measured', n.upMbit ? fi(n.upMbit, 1) + ' Mbit/s' : n.upErr || 'Measuring'],
+      ['Speed is like', hs ? hs[0] : n.done ? '-' : 'Measuring', !!hs], ['Echo is like', he ? he[0] : n.done ? '-' : 'Measuring', !!he],
+      ['Radio unit and tower', 'Signal, cell and band are not given to web pages'], ['Data used by this page', bytesTxt(USED.up + USED.down)]]); }
+  var R = FT.rounds, lr = R[R.length - 1], every = +el('fevery').value, perDay = perRoundBytes() * 24 * 60 / every;
+  rows('tfile', [['Overseas end', 'Echo server httpbin.org, Virginia US - keeps nothing, sends each file straight back'], ['A round', '3 files at once, then 4, then 5 - each sent, returned, size and SHA-256 checked'],
+    ['Rounds done', R.length + (FT.busy ? ', one running now' : '')], ['Last round', lr ? (lr.ok ? fi(lr.mbit, 2) + ' Mbit/s, ' + lr.files + ' files, ' + (lr.changed ? lr.changed + ' CHANGED' : 'all came back the same') : 'FAILED') : 'On its way'],
+    ['Usual speed', lr && lr.usual ? fi(lr.usual, 2) + ' Mbit/s (middle of the rounds before)' : 'After 3 rounds'], ['Alert when', 'A round fails, a file comes back changed, or speed falls under half the usual'],
+    ['Alerts', FT.alerts ? FT.alerts + ' - last ' + FT.lastAlert : 'None'], ['Next round', FT.next ? clock(new Date(FT.next)) : FT.startAt ? '24 hours done' : '-'],
+    ['Runs until', FT.startAt ? dayTxt(new Date(FT.startAt + 24 * 3600e3)) + ', while this page stays open' : '-'],
+    ['Data for 24 hours at this pace', bytesTxt(perDay)]]);
+  var log = R.slice(-12).reverse().map(function(r){ return '<tr' + (r.alert ? ' style="color:#ffb0a8"' : '') + '><td>' + r.n + '</td><td>' + clock(r.at) + '</td>' + r.stages.map(function(s){ return '<td>' + (s.ok ? fi(s.mbit, 2) : 'Failed') + '</td>'; }).join('') + '<td>' + (r.changed ? r.changed + ' changed' : r.files + ' same') + '</td></tr>'; }).join('');
+  if (el('tflog').innerHTML !== log) el('tflog').innerHTML = log;
+  el('tthr').innerHTML = C.map(function(c, i){ return '<tr><td>' + (i + 1) + '</td><td class="v">' + fi(c.load * 100, 0) + ' %</td><td class="v">' + (c.rate ? fi(c.rate, 2) + ' units' : 'Idle') + '</td><td class="v">' + (c.speed !== null ? fi(c.speed, 0) + ' %' + (c.slowing ? ' SLOWING' : '') : 'Idle') + '</td><td class="v">' + fi(ROOM + c.heat, 1) + ' C</td></tr>'; }).join('');
+  el('tripv').textContent = el('trip').value + ' C'; el('bstate').textContent = BRK.tripped ? 'Tripped - processor load cut' : 'Closed - load on';
+  el('btrips').textContent = String(BRK.trips); el('blast').textContent = BRK.last ? clock(BRK.last) : 'None yet';
+}
 function render(){
-  drawHeat(); drawChart();
-  var L = hist[hist.length - 1] || [0, 0, 100, 0, 0, 0], slow = C.filter(function(c){ return c.slowing; }).length, hottest = C.reduce(function(m, c){ return Math.max(m, c.heat); }, 0);
+  drawHeat(); drawChart(); drawMem(); drawLadder(); drawFile(); renderProbes();
+  var L = hist[hist.length - 1] || [0, 0, null, 0, 0, 0], slow = C.filter(function(c){ return c.slowing; }).length, hottest = C.reduce(function(m, c){ return Math.max(m, c.heat); }, 0);
   el('lcv').textContent = el('lc').value + ' %'; el('lgv').textContent = el('lg').value + ' %';
   el('tnow').innerHTML = [['Processor, estimated', fi(ROOM + L[1], 1) + ' C average, hottest core ' + fi(ROOM + hottest, 1) + ' C'],
     ['Graphics, estimated', fi(ROOM + G.heat, 1) + ' C, drawing takes ' + fi(G.frameMs, 1) + ' ms a frame'],
     ['Load really run', fi(L[4] * 100, 0) + ' per cent of ' + NW + ' cores'], ['Speed, measured', L[2] === null ? 'Idle, nothing to judge' : fi(L[2], 0) + ' per cent of the cold speed'],
-    ['Cores slowing', slow ? slow + ' - running slower than when cold under the same load: heat, or other programs taking the core' : 'None'], ['Programme', asked().on ? 'On' : 'Off, cooling']]
+    ['Cores slowing', slow ? slow + ' - running slower than when cold under the same load: heat, or other programs taking the core' : 'None'],
+    ['Programme', !started ? 'Waits for the measurements' : BRK.tripped ? 'Breaker tripped, cooling' : asked().on ? 'On' : 'Off, cooling']]
     .map(function(r){ return '<tr><td class="k">' + r[0] + '</td><td class="v">' + r[1] + '</td></tr>'; }).join('');
   el('hNote').textContent = 'Squares coloured by estimated heat; load and speed are measured. Temperatures are estimates, never readings.';
-  el('line').textContent = 'Processor about ' + fi(ROOM + L[1], 0) + ' C estimated, load ' + fi(L[4] * 100, 0) + ' %, speed ' + (L[2] === null ? 'idle' : fi(L[2], 0) + ' % of cold') + ', ' + slow + (slow === 1 ? ' core' : ' cores') + ' slowing - ' + NW + ' cores';
+  el('line').textContent = !started ? P.phase + ' - the heat load starts after' : 'Processor about ' + fi(ROOM + L[1], 0) + ' C estimated, load ' + fi(L[4] * 100, 0) + ' %, speed ' + (L[2] === null ? 'idle' : fi(L[2], 0) + ' % of cold') + ', ' + slow + (slow === 1 ? ' core' : ' cores') + ' slowing' + (BRK.tripped ? ', BREAKER TRIPPED' : '') + ' - ' + NW + ' cores';
   selfCheck(); refreshDownloads();
 }
 function selfCheck(){
@@ -171,36 +580,77 @@ function selfCheck(){
   var cr = el('crText'), cs = getComputedStyle(cr);
   if (cr.textContent.trim() !== 'Copyright AI2Orbit All Rights Reserved 2026.' || +cs.fontWeight > 400 || parseFloat(cs.fontSize) > 10) f.push('the copyright line is not exact, small and plain');
   C.forEach(function(c, i){ if (c.heat < -1e-9 || c.heat > RISE_FULL + 1e-9) f.push('core ' + (i + 1) + ' heat is outside the model'); });
-  if (nowS() > 4 && C.every(function(c){ return !c.rep.length; })) f.push('the threads have stopped reporting');
+  if (started && nowS() > 4 && C.every(function(c){ return !c.rep.length; })) f.push('the threads have stopped reporting');
+  if (P.memX && P.memX.counted !== P.memX.bits) f.push('a single bit write went missing in memory');
+  if (P.mem.length > 1 && P.mem.some(function(m){ return !(m.ns > 0) || !(m.scan > 0); })) f.push('a memory figure is not a positive number');
   if (err) f.push(err);
   fails = f; var box = el('chk');
   if (f.length){ box.style.display = 'block'; box.innerHTML = '<b style="color:#e0645f">THIS PAGE IS NOT CLEAN</b><br>' + f.join('<br>'); } else box.style.display = 'none';
   return f;
 }
+function tableText(id){ return Array.from(el(id).querySelectorAll('tr')).map(function(tr){ return Array.from(tr.children).map(function(td){ return td.innerText.trim(); }).filter(Boolean).join(': '); }).filter(Boolean); }
 function textOf(){ var L = ['BROWSER THERMALS', 'AI2Orbit', 'Taken ' + stampNow(), 'Temperatures are estimates; load and speed are measured', ''];
   C.forEach(function(c, i){ L.push('Core ' + (i + 1) + ': ' + fi(ROOM + c.heat, 1) + ' C estimated, load ' + fi(c.load * 100, 0) + ' %, speed ' + (c.speed === null ? 'idle' : fi(c.speed, 0) + ' %') + (c.slowing ? ', slowing' : '')); });
-  L.push('Graphics: ' + fi(ROOM + G.heat, 1) + ' C estimated, ' + fi(G.frameMs, 1) + ' ms a frame', '', 'LAST 3 MINUTES (s; heat C est.; speed %; load %)');
+  L.push('Graphics: ' + fi(ROOM + G.heat, 1) + ' C estimated, ' + fi(G.frameMs, 1) + ' ms a frame', 'Breaker: ' + (BRK.tripped ? 'tripped' : 'closed') + ', trips at ' + el('trip').value + ' C, ' + BRK.trips + ' trips');
+  [['MEMORY', 'tmem'], ['MEMORY BY BLOCK (block, one read, scan, level)', 'tmemrows'], ['BUS', 'tbus'], ['SCREEN', 'tscr'], ['GRAPHICS CHIP', 'tgfx'], ['DEVICE', 'tdev'], ['NETWORK', 'tnet'], ['FILE TEST', 'tfile']]
+    .forEach(function(s){ L.push('', s[0]); tableText(s[1]).forEach(function(x){ L.push(x); }); });
+  L.push('', 'FILE TEST ROUNDS (round; time; Mbit/s 3, 4, 5 at once; files; changed; alert)');
+  FT.rounds.forEach(function(r){ L.push(r.n + '; ' + clock(r.at) + '; ' + r.stages.map(function(s){ return s.ok ? fi(s.mbit, 2) : 'failed'; }).join('; ') + '; ' + r.files + '; ' + r.changed + '; ' + (r.alert ? 'ALERT' : 'ok')); });
+  L.push('', 'LAST 3 MINUTES (s; heat C est.; speed %; load %)');
   hist.filter(function(h, i){ return i % 10 === 0; }).forEach(function(h){ L.push(fi(h[0], 1) + '; ' + fi(ROOM + h[1], 1) + '; ' + (h[2] === null ? 'idle' : fi(h[2], 0)) + '; ' + fi(h[4] * 100, 0)); });
   L.push('', 'Copyright AI2Orbit All Rights Reserved 2026.'); return L.join('\n'); }
-function dxfOf(){ var o = []; function p(a, b){ o.push(a, String(b)); } p(0, 'SECTION'); p(2, 'ENTITIES');
-  for (var i = 1; i < hist.length; i++){ p(0, 'LINE'); p(8, 'HEAT_ESTIMATED'); p(10, hist[i - 1][0]); p(20, ROOM + hist[i - 1][1]); p(30, 0); p(11, hist[i][0]); p(21, ROOM + hist[i][1]); p(31, 0);
-    if (hist[i - 1][2] !== null && hist[i][2] !== null){ p(0, 'LINE'); p(8, 'SPEED_MEASURED'); p(10, hist[i - 1][0]); p(20, hist[i - 1][2]); p(30, 0); p(11, hist[i][0]); p(21, hist[i][2]); p(31, 0); } }
+function dxfOf(){ var o = []; function p(a, b){ o.push(a, String(b)); } function line(layer, x1, y1, x2, y2){ p(0, 'LINE'); p(8, layer); p(10, x1); p(20, y1); p(30, 0); p(11, x2); p(21, y2); p(31, 0); }
+  p(0, 'SECTION'); p(2, 'ENTITIES');
+  for (var i = 1; i < hist.length; i++){ line('HEAT_ESTIMATED', hist[i - 1][0], ROOM + hist[i - 1][1], hist[i][0], ROOM + hist[i][1]);
+    if (hist[i - 1][2] !== null && hist[i][2] !== null) line('SPEED_MEASURED', hist[i - 1][0], hist[i - 1][2], hist[i][0], hist[i][2]); }
+  for (i = 1; i < P.mem.length; i++) line('MEMORY_READ_NS_BY_LOG2_BYTES', Math.log2(P.mem[i - 1].bytes), P.mem[i - 1].ns, Math.log2(P.mem[i].bytes), P.mem[i].ns);
+  var R = FT.rounds.filter(function(r){ return r.mbit; }); for (i = 1; i < R.length; i++) line('FILE_TEST_MBIT_BY_ROUND', R[i - 1].n, R[i - 1].mbit, R[i].n, R[i].mbit);
   p(0, 'ENDSEC'); p(0, 'EOF'); return o.join('\r\n') + '\r\n'; }
 var lastDl = 0;
 function refreshDownloads(){ if (performance.now() - lastDl < 2000) return; lastDl = performance.now();
   el('dlTxt').href = URL.createObjectURL(new Blob([textOf()], { type: 'text/plain' })); el('dlDxf').href = URL.createObjectURL(new Blob([dxfOf()], { type: 'image/vnd.dxf' })); }
-[['Measured', 'The load each core really ran, how fast each core works (and if it slows under the same load), the time each graphics frame takes'],
+
+/* ---------------- REFERENCE: the standards, for the measured figures to be held against ---------------- */
+function wl(fGHz){ var m = 0.299792458 / fGHz; return m >= 0.01 ? fi(m * 100, 1) + ' cm' : fi(m * 1000, 1) + ' mm'; }
+var REFS = [
+ ['Mobile', ['Generation', 'Peak down, standard', 'Typical down', 'Typical echo'], [['2G EDGE', '0,236 Mbit/s', '0,05 - 0,2 Mbit/s', '300 - 1000 ms'], ['3G HSPA+', '42 Mbit/s', '0,5 - 8 Mbit/s', '80 - 300 ms'],
+   ['4G LTE, category 4', '150 Mbit/s', '8 - 80 Mbit/s', '30 - 70 ms'], ['4G LTE-Advanced', '1 000 Mbit/s', '80 - 300 Mbit/s', '20 - 45 ms'], ['5G NR', '20 000 Mbit/s', '150 - 1 000 Mbit/s mid band', '12 - 30 ms; 1 ms target']]],
+ ['Radio Bands And Wavelength', ['Band', 'Range', 'Wavelength', 'Used by'], [['800 MHz', '0,79 - 0,86 GHz', wl(0.8), '4G, long reach'], ['2,4 GHz', '2,400 - 2,4835 GHz', wl(2.45), 'Wi-Fi 4 to 7, Bluetooth'],
+   ['3,5 GHz', '3,4 - 3,8 GHz', wl(3.5), '5G mid band'], ['5 GHz', '5,150 - 5,895 GHz', wl(5.5), 'Wi-Fi 5 to 7'], ['6 GHz', '5,925 - 7,125 GHz', wl(6.5), 'Wi-Fi 6E, 7, 8'],
+   ['26 GHz mmWave', '24,25 - 27,5 GHz', wl(26), '5G mmWave'], ['60 GHz', '57 - 71 GHz', wl(60), 'WiGig']]],
+ ['Wi-Fi, WiMAX, Bluetooth', ['Name', 'Standard', 'Peak', 'Year'], [['Wi-Fi 4', '802.11n', '600 Mbit/s', '2009'], ['Wi-Fi 5', '802.11ac', '6 933 Mbit/s', '2013'], ['Wi-Fi 6 and 6E', '802.11ax', '9 608 Mbit/s', '2019 and 2020'],
+   ['Wi-Fi 7', '802.11be', '46 000 Mbit/s', '2024'], ['Wi-Fi 8', '802.11bn', 'Being drafted; aims at steadiness', '-'], ['WiMAX', '802.16e', 'About 40 Mbit/s', '2005'], ['WiMAX 2', '802.16m', '365 Mbit/s moving, 1 000 still', '2011'],
+   ['Bluetooth 5.0', 'LE 2M', '2 Mbit/s', '2016'], ['Bluetooth 5.1 to 5.4', 'Direction, LE Audio, sub-rating, PAwR', '2 Mbit/s', '2019 - 2023'], ['Bluetooth 6.0', 'Channel sounding, distance', '2 Mbit/s', '2024']]],
+ ['Fixed Lines', ['Line', 'Down', 'Up', 'Reach'], [['Phone modem V.21', '300 bit/s at 300 baud', '300 bit/s', 'Phone band 300 - 3 400 Hz'], ['Phone modem V.32', '9 600 bit/s at 2 400 baud', '9 600 bit/s', 'Phone line'],
+   ['Phone modem V.34', '33,6 kbit/s at up to 3 429 baud', '33,6 kbit/s', 'Phone line'], ['Phone modem V.90', '56 kbit/s', '33,6 kbit/s', 'Phone line'],
+   ['ADSL', '8 Mbit/s', '1 Mbit/s', 'About 5 km'], ['ADSL2+', '24 Mbit/s', '1,4 Mbit/s', 'Under 2 km for full'], ['VDSL2', '100 Mbit/s; 300 with 35b', '50 Mbit/s', 'Under 500 m for full'], ['G.fast', '1 000 Mbit/s shared', 'Shared', 'Under 100 m'],
+   ['Cat 5e cable', '1 Gbit/s', '1 Gbit/s', '100 m, 100 MHz'], ['Cat 6A cable', '10 Gbit/s', '10 Gbit/s', '100 m, 500 MHz'], ['Cat 8 cable', '40 Gbit/s', '40 Gbit/s', '30 m, 2 000 MHz'], ['Fibre, single mode', '100 Gbit/s and more', 'Same', 'Tens of km']]],
+ ['Memory', ['Kind', 'Transfers a second', 'One 64 bit channel', 'Where'], [['DDR3-1600', '1 600 million', '12,8 GB/s', 'Older desktops'], ['DDR4-3200', '3 200 million', '25,6 GB/s', 'Desktops, servers'],
+   ['LPDDR4X-4266', '4 266 million', '34,1 GB/s', 'Phones, tablets'], ['DDR5-4800', '4 800 million', '38,4 GB/s', 'Desktops, servers'], ['DDR5-6400', '6 400 million', '51,2 GB/s', 'Desktops'], ['LPDDR5X-8533', '8 533 million', '68,3 GB/s', 'Phones, laptops']]],
+ ['Screen Rates', ['Rate', 'One frame', 'Where', ''], [['60 Hz', '16,7 ms', 'Most screens', ''], ['70 Hz', '14,3 ms', 'Old text mode', ''], ['80 Hz', '12,5 ms', 'Some monitors', ''], ['90 Hz', '11,1 ms', 'Phones', ''],
+   ['96 Hz', '10,4 ms', 'Phones, film at 4 x 24', ''], ['120 Hz', '8,3 ms', 'Phones, tablets, laptops', ''], ['144 Hz', '6,9 ms', 'Game monitors', ''], ['240 Hz', '4,2 ms', 'Game monitors', '']]]];
+el('refs').innerHTML = REFS.map(function(t){ return '<div class="card"><div style="color:#8ea9c2;font-size:11px;margin-bottom:4px">' + t[0] + '</div><table><thead><tr>' + t[1].map(function(h){ return '<td>' + h + '</td>'; }).join('') + '</tr></thead><tbody>' +
+  t[2].map(function(r){ return '<tr>' + r.map(function(c, i){ return '<td' + (i ? '' : ' class="v"') + '>' + c + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>'; }).join('');
+[['Measured', 'Thread load and speed, frame time, memory read and write down to one bit, the buses, the screen rate, graphics fill, the network echo, down and up, the file test'],
  ['Estimated', 'The temperatures: a simple heat model of the measured load, room ' + ROOM + ' C, full load ' + RISE_FULL + ' degrees over it, time constant ' + TAU_S + ' s - typical laptop figures, chosen'],
- ['Not told to any browser', 'The real temperature of the processor or the graphics chip'],
- ['The sign of real heat', 'A core that runs slower than when it was cold, under the same load, is being held back - usually by heat']]
+ ['Estimated', 'The kind of device, the cache level of each block size, the 4G or 5G class of the link'],
+ ['Not told to any browser', 'The real temperature of the processor or the graphics chip, tower signal, the hypervisor'],
+ ['The sign of real heat', 'A core that runs slower than when it was cold, under the same load, is being held back - usually by heat'],
+ ['Order', 'Screen, memory, bus, graphics and disk first with no load; then the heat load; network and the file test beside it']]
 .forEach(function(r){ el('thow').innerHTML += '<tr><td class="k">' + r[0] + '</td><td class="v">' + r[1] + '</td></tr>'; });
-try { for (var i = 0; i < NW; i++){ (function(){ var c = { w: new Worker(URLW), rep: [], load: 0, heat: 0, speed: null, base: null, cold: [], slowing: false };
+
+/* ---------------- START: no button ---------------- */
+try { for (var i = 0; i < NW; i++){ (function(){ var c = { w: new Worker(URLW), rep: [], load: 0, heat: 0, speed: null, base: null, cold: [], slowing: false, rate: null };
   c.w.onmessage = function(e){ c.rep.push([performance.now(), e.data.busy, e.data.wall, e.data.units]); }; c.w.onerror = function(e){ err = 'a thread failed: ' + (e.message || ''); }; C.push(c); })(); } }
 catch (e){ err = 'threads could not start here: ' + (e.message || e); }
 requestAnimationFrame(gpuFrame);
 setInterval(function(){ try { step(); } catch (e){ err = String(e.message || e); } }, 100);
 setInterval(render, 250);
-window.__read = function(){ var L = hist[hist.length - 1]; return { cores: NW, heat: L ? L[1] : null, speed: L ? L[2] : null, load: L ? L[4] : null, gpuHeat: G.heat, slowing: C.filter(function(c){ return c.slowing; }).length, fails: fails }; };
+probeAll();
+probeNet().then(function(){ FT.startAt = Date.now(); return ftRound(); }).then(ftSchedule);
+window.__read = function(){ var L = hist[hist.length - 1]; return { cores: NW, started: started, heat: L ? L[1] : null, speed: L ? L[2] : null, load: L ? L[4] : null, gpuHeat: G.heat, slowing: C.filter(function(c){ return c.slowing; }).length,
+  breaker: { tripped: BRK.tripped, trips: BRK.trips }, mem: P.mem, memX: P.memX, bus: P.bus, gfx: P.gfx, disk: P.disk, dev: P.dev, screen: P.screen, net: P.net, file: FT.rounds.map(function(r){ return { ok: r.ok, mbit: r.mbit, files: r.files, changed: r.changed, alert: r.alert }; }), fails: fails }; };
 window.__selfCheck = selfCheck;
+window.__ftRound = ftRound;
 </script>
 </body></html>
