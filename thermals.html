@@ -35,9 +35,9 @@
   #crText{color:#12261a;font-weight:400;font-size:9px;line-height:1.2;white-space:nowrap}
   @media (max-width:600px){ #bar{font-size:11px;padding:5px 8px} #pg{padding-top:78px} h2{scroll-margin-top:80px} }
 </style></head><body>
-<div id="bar"><b id="stamp">B110</b><i id="line">Warming up</i></div>
+<div id="bar"><b id="stamp">B111</b><i id="line">Warming up</i></div>
 <div id="pg">
-  <div id="jump"><a href="#s-heat">Thermals</a><a href="#s-brk">Breaker 3D</a><a href="#s-thr">Threads</a><a href="#s-mem">Memory DDR</a><a href="#s-bus">Bus</a><a href="#s-scr">Screen</a><a href="#s-gfx">Graphics</a><a href="#s-str">Screen Striper</a><a href="#s-sph">CPU Sphere</a><a href="#s-dev">Device</a><a href="#s-net">4G 5G</a><a href="#s-file">File Test 24 h</a><a href="#s-ref">Reference</a></div>
+  <div id="jump"><a href="#s-heat">Thermals</a><a href="#s-brk">Breaker 3D</a><a href="#s-thr">Threads</a><a href="#s-mem">Memory DDR</a><a href="#s-bus">Bus</a><a href="#s-scr">Screen</a><a href="#s-gfx">Graphics</a><a href="#s-str">Screen Striper</a><a href="#s-sph">CPU Sphere</a><a href="#s-frm">Formulas</a><a href="#s-dev">Device</a><a href="#s-net">4G 5G</a><a href="#s-file">File Test 24 h</a><a href="#s-ref">Reference</a></div>
   <h2 id="s-heat">Browser Thermals</h2>
   <div class="grid">
     <div class="card"><canvas id="heat"></canvas><div class="scale"></div>
@@ -103,6 +103,10 @@
       <table style="margin-top:6px"><tbody id="tsph2"></tbody></table></div>
   </div>
 
+  <h2 id="s-frm">Formulas As Given, All Calculations Shown</h2>
+  <div class="card"><table><tbody><tr><td class="k">Value for the GPU line</td><td><input id="fval" value="0,123" style="width:8em;background:#0e1a26;color:#d7e6f2;border:1px solid #16293a;border-radius:3px;font:inherit;padding:3px 5px"></td></tr></tbody></table>
+    <table style="margin-top:6px"><thead><tr><td>Line</td><td>Calculation</td><td>Result</td><td>Time</td></tr></thead><tbody id="tfrm"></tbody></table></div>
+
   <h2 id="s-dev">Device</h2>
   <div class="card"><table><tbody id="tdev"></tbody></table></div>
 
@@ -166,7 +170,8 @@
    level, the breaker trips and cuts the processor load to zero; it
    closes again by itself 10 degrees lower.
    ================================================================== */
-var NW = Math.max(2, Math.min(16, navigator.hardwareConcurrency || 4)), PERIOD = 50, TAU_S = 60, RISE_FULL = 45, ROOM = 25, PROG_ON = 40, PROG_OFF = 20, RECLOSE = 10;
+/* one core is always left free for the screen and the touch - loading every core jams the UI */
+var NW = Math.max(1, Math.min(16, (navigator.hardwareConcurrency || 4) - 1)), PERIOD = 50, TAU_S = 60, RISE_FULL = 45, ROOM = 25, PROG_ON = 40, PROG_OFF = 20, RECLOSE = 10;
 var WORKER = [
 "var duty = 0;",
 "onmessage = function(e){ duty = e.data.duty; };",
@@ -190,7 +195,10 @@ function big(n, d){ if (n === null || n === undefined || !isFinite(n)) return '-
 function bytesTxt(n){ return n >= 1048576 ? big(n / 1048576, n % 1048576 ? 1 : 0) + ' MB' : big(n / 1024) + ' KB'; }
 function median(a){ var s = a.slice().sort(function(x, y){ return x - y; }); return s.length ? s[s.length >> 1] : null; }
 function nowS(){ return (performance.now() - t0) / 1000; }
-function rows(id, list){ el(id).innerHTML = list.map(function(r){ return '<tr' + (r[2] ? ' class="hit"' : '') + '><td class="k">' + r[0] + '</td><td class="v">' + r[1] + '</td></tr>'; }).join(''); }
+function rows(id, list){ var h = list.map(function(r){ return '<tr' + (r[2] ? ' class="hit"' : '') + '><td class="k">' + r[0] + '</td><td class="v">' + r[1] + '</td></tr>'; }).join(''); if (el(id).innerHTML !== h) el(id).innerHTML = h; }   /* written only when changed */
+/* UI JAM: the main thread is asked to wake every 100 ms; how late it wakes is how long the screen and the touch were stuck */
+var JAM = { lag: [], worst: 0 }; (function(){ var due = performance.now() + 100; setInterval(function(){ var now = performance.now(), late = Math.max(0, now - due); due = now + 100; JAM.lag.push([now, late]); while (JAM.lag.length && JAM.lag[0][0] < now - 60000) JAM.lag.shift(); }, 100); })();
+function jamNow(){ var L = JAM.lag, worst = 0, sum = 0, jams = 0; L.forEach(function(x){ worst = Math.max(worst, x[1]); sum += x[1]; if (x[1] > 50) jams++; }); return { worst: worst, avg: L.length ? sum / L.length : 0, jams: jams, n: L.length }; }
 function asked(){ if (!started || STR.running) return { cpu: 0, gpu: 0, on: false };
   var on = !el('prog').checked || (nowS() % (PROG_ON + PROG_OFF)) < PROG_ON; return { cpu: on && !BRK.tripped ? +el('lc').value / 100 : 0, gpu: on ? +el('lg').value / 100 : 0, on: on }; }
 /* the heat model: d(heat)/dt = (load x rise at full - heat) / time constant */
@@ -467,6 +475,9 @@ async function striper(){
         g.moveTo(0, Y(lo1)); g.lineTo(W, Y(hi)); g.lineTo(W, Y(lo2)); g.lineTo(0, Y(hi)); g.lineTo(0, Y(lo1)); g.stroke(); } });
     var seed = 7; function rnd(){ seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
     await tm('photos', 'The photograph six times', function(){ for (k = 0; k < 6; k++){ var w2 = W * (0.2 + rnd() * 0.25), h2 = w2 * STR.img.height / STR.img.width; g.drawImage(STR.img, rnd() * (W - w2), rnd() * (H - h2), w2, h2); } });
+    /* the picture after the photographs, read back: R, G and B summed over every pixel */
+    var t1 = performance.now(), pxs = g.getImageData(0, 0, W, H).data, rs = 0, gs = 0, bs = 0; for (i = 0; i < pxs.length; i += 4){ rs += pxs[i]; gs += pxs[i + 1]; bs += pxs[i + 2]; }
+    R.rgb = { r: rs, g: gs, b: bs, ms: performance.now() - t1, px: W * H };
     var piece = document.createElement('canvas'); piece.width = piece.height = 100; piece.getContext('2d').drawImage(STR.img, 0, 0, 100, 100);
     await tm('rotation', 'Turning 100 x 100 pixels a full circle', function(){ for (k = 0; k < 360; k++){ g.save(); g.translate(W / 2, H / 2); g.rotate(k * Math.PI / 180); g.drawImage(piece, -50, -50); g.restore(); } });
     R.rotS = R.st.rotation / 1000; R.sig = strSignals(R.rotS); R.nominal = strSignals(0.05);
@@ -513,6 +524,39 @@ function renderStriper(){
   var h = Object.keys(L).map(function(n){ var v = R.st[n]; return '<tr><td>' + L[n] + '</td><td class="v">' + fi(v, 1) + '</td><td>' + fi(Math.log10(v), 2) + '</td><td>' + big(v * v, 0) + '</td><td>' + (pv && pv.st && pv.st[n] ? fi(v / pv.st[n], 2) : '-') + '</td></tr>'; }).join('');
   if (el('tstrst').innerHTML !== h) el('tstrst').innerHTML = h;
 }
+
+/* ---------------- FORMULAS AS GIVEN: every line written out, its result, and the time it takes ---------------- */
+function sci(n, d){ if (n === null || n === undefined || !isFinite(n)) return 'Not defined'; var a = Math.abs(n); if (a !== 0 && (a >= 1e9 || a < 1e-4)){ var e = Math.floor(Math.log10(a)), m = n / Math.pow(10, e); return fi(m, d === undefined ? 4 : d) + ' x 10^' + e; } return fi(n, d === undefined ? 4 : d); }
+function usOf(fn){ var n = 0, t = performance.now(), r; do { r = fn(); n++; } while (performance.now() - t < 4); return { us: (performance.now() - t) * 1000 / n, r: r }; }
+function lnChain(x){ var steps = [], v = x; for (var k = 0; k < 4; k++){ if (!(v > 0)) return { steps: steps, v: NaN }; v = Math.log(v); steps.push(v); } return { steps: steps, v: v }; }
+function renderFormulas(){
+  var R = STR.res, out = [], val = parseFloat(String(el('fval').value).replace(',', '.'));
+  if (R && R.rgb){ var c = R.rgb, tot = c.r + c.g + c.b;
+    out.push(['Picture after the photographs', 'R, G, B summed over ' + big(c.px) + ' pixels', 'R ' + big(c.r) + ', G ' + big(c.g) + ', B ' + big(c.b), fi(c.ms, 1) + ' ms']);
+    var lt = usOf(function(){ return Math.log(tot); }); out.push(['RGB total, log', 'ln(' + big(tot) + ')', sci(lt.r), fi(lt.us, 3) + ' us']);
+    [['R', c.r], ['G', c.g]].forEach(function(p){ var ch = usOf(function(){ var q = lnChain(p[1]); return [q, Math.sin(q.v), Math.tan(q.v)]; }), q = ch.r[0];
+      out.push([p[0] + ' line', 'ln ln ln ln ' + p[0] + ' = ' + q.steps.map(function(v){ return sci(v); }).join(' > ') + '; then sin, tan', 'sin ' + sci(ch.r[1]) + ', tan ' + sci(ch.r[2]), fi(ch.us, 3) + ' us']); });
+    var bl = usOf(function(){ var a = Math.log(c.b); return [a, Math.tan(a), Math.atan(a)]; });
+    out.push(['B line', 'ln B = ' + sci(bl.r[0]) + '; then tan, arctan', 'tan ' + sci(bl.r[1]) + ', arctan ' + sci(bl.r[2]), fi(bl.us, 3) + ' us']);
+  } else out.push(['Picture after the photographs', 'Waits for the screen striper', '-', '-']);
+  var big9 = usOf(function(){ var a = Math.log10(1000000000), b = Math.sqrt(0.000577); return [a, b, a / b]; });
+  out.push(['Large sum against a root', 'log10 1 000 000 000 = ' + sci(big9.r[0]) + '; root of 0,000577 = ' + sci(big9.r[1], 6), sci(big9.r[2]) + '; hyp 3 566,778 is ' + sci(3566.778 / big9.r[2]) + ' times it', fi(big9.us, 3) + ' us']);
+  var inv = usOf(function(){ return 1 / 48277994.999969887899007998005984; });
+  out.push(['One over a long number', '1 / 48 277 994,999969887899007998005984 (16 digits held)', sci(inv.r, 6), fi(inv.us, 3) + ' us']);
+  out.push(['Work time', '(17,798 - 10,57) / 13,79', sci((17.798 - 10.57) / 13.79), '-']);
+  out.push(['Division', '579 944,9 x 4 / 112 798', sci(579944.9 * 4 / 112798) + '; the given 22 654,09765625 is 579 944,9 x 4 / 102,4', '-']);
+  var X = usOf(function(){ return 41977929575967988305.9 / (1 / Math.pow(500000000000, 1.03)); });
+  out.push(['Compare figure', '41 977 929 575 967 988 305,9 / (1 / 500 000 000 000^1,03)', sci(X.r), fi(X.us, 3) + ' us']);
+  out.push(['Screen value at the end against it', R ? fi(R.sig.root, 2) + ' / compare figure' : 'Waits for the screen striper', R ? sci(R.sig.root / X.r) : '-', '-']);
+  var gpuC = isFinite(val) ? val * 1000 - 74 : NaN, est = ROOM + G.heat, comp = gpuC - est;
+  out.push(['GPU C from the value', isFinite(val) ? fi(val, 3) + ' > ' + fi(val * 1000, 0) + ' - 74' : 'Type a value', isFinite(gpuC) ? fi(gpuC, 1) + ' C' : 'Not defined', '-']);
+  out.push(['Graphics chip, this page now', 'Estimated from the graphics load', fi(est, 1) + ' C', '-']);
+  out.push(['Component', fi(gpuC, 1) + ' - ' + fi(est, 1), isFinite(comp) ? fi(comp, 1) : 'Not defined', '-']);
+  out.push(['Screen GPU architecture fit', 'graphics : implementation : architecture : component', R ? fi(R.screenMs / R.archMs, 2) + ' : ' + fi(R.implMs / R.archMs, 2) + ' : 1 : ' + (isFinite(comp) ? fi(comp, 1) : '-') : 'Waits for the screen striper', '-']);
+  var h = out.map(function(r){ return '<tr><td class="k">' + r[0] + '</td><td>' + r[1] + '</td><td class="v">' + r[2] + '</td><td>' + r[3] + '</td></tr>'; }).join('');
+  if (el('tfrm').innerHTML !== h) el('tfrm').innerHTML = h;
+}
+var frmT = 0;
 
 /* ---------------- CPU SPHERE: facets per core, coloured by estimated heat on a fire scale ---------------- */
 var SPH = { yaw: 0, lat: 12, lon: 24, counts: null };
@@ -695,20 +739,23 @@ function renderProbes(){
     ['Data for 24 hours at this pace', bytesTxt(perDay)]]);
   var log = R.slice(-12).reverse().map(function(r){ return '<tr' + (r.alert ? ' style="color:#ffb0a8"' : '') + '><td>' + r.n + '</td><td>' + clock(r.at) + '</td>' + r.stages.map(function(s){ return '<td>' + (s.ok ? fi(s.mbit, 2) : 'Failed') + '</td>'; }).join('') + '<td>' + (r.changed ? r.changed + ' changed' : r.files + ' same') + '</td></tr>'; }).join('');
   if (el('tflog').innerHTML !== log) el('tflog').innerHTML = log;
-  el('tthr').innerHTML = C.map(function(c, i){ return '<tr><td>' + (i + 1) + '</td><td class="v">' + fi(c.load * 100, 0) + ' %</td><td class="v">' + (c.rate ? fi(c.rate, 2) + ' units' : 'Idle') + '</td><td class="v">' + (c.speed !== null ? fi(c.speed, 0) + ' %' + (c.slowing ? ' SLOWING' : '') : 'Idle') + '</td><td class="v">' + fi(ROOM + c.heat, 1) + ' C</td></tr>'; }).join('');
+  var thrH = C.map(function(c, i){ return '<tr><td>' + (i + 1) + '</td><td class="v">' + fi(c.load * 100, 0) + ' %</td><td class="v">' + (c.rate ? fi(c.rate, 2) + ' units' : 'Idle') + '</td><td class="v">' + (c.speed !== null ? fi(c.speed, 0) + ' %' + (c.slowing ? ' SLOWING' : '') : 'Idle') + '</td><td class="v">' + fi(ROOM + c.heat, 1) + ' C</td></tr>'; }).join(''); if (el('tthr').innerHTML !== thrH) el('tthr').innerHTML = thrH;
   el('tripv').textContent = el('trip').value + ' C'; el('bstate').textContent = BRK.tripped ? 'Tripped - processor load cut' : 'Closed - load on';
   el('btrips').textContent = String(BRK.trips); el('blast').textContent = BRK.last ? clock(BRK.last) : 'None yet';
 }
 function render(){
-  drawHeat(); drawChart(); drawMem(); drawLadder(); drawFile(); renderProbes(); renderStriper(); renderSphere();
+  drawHeat(); drawChart(); drawMem(); drawLadder(); drawFile(); renderProbes(); renderStriper(); renderSphere(); if (performance.now() - frmT > 2000){ frmT = performance.now(); renderFormulas(); }
   var L = hist[hist.length - 1] || [0, 0, null, 0, 0, 0], slow = C.filter(function(c){ return c.slowing; }).length, hottest = C.reduce(function(m, c){ return Math.max(m, c.heat); }, 0);
   el('lcv').textContent = el('lc').value + ' %'; el('lgv').textContent = el('lg').value + ' %';
-  el('tnow').innerHTML = [['Processor, estimated', fi(ROOM + L[1], 1) + ' C average, hottest core ' + fi(ROOM + hottest, 1) + ' C'],
+  var nowH = [['Processor, estimated', fi(ROOM + L[1], 1) + ' C average, hottest core ' + fi(ROOM + hottest, 1) + ' C'],
     ['Graphics, estimated', fi(ROOM + G.heat, 1) + ' C, drawing takes ' + fi(G.frameMs, 1) + ' ms a frame'],
     ['Load really run', fi(L[4] * 100, 0) + ' per cent of ' + NW + ' cores'], ['Speed, measured', L[2] === null ? 'Idle, nothing to judge' : fi(L[2], 0) + ' per cent of the cold speed'],
     ['Cores slowing', slow ? slow + ' - running slower than when cold under the same load: heat, or other programs taking the core' : 'None'],
-    ['Programme', !started ? 'Waits for the measurements' : BRK.tripped ? 'Breaker tripped, cooling' : asked().on ? 'On' : 'Off, cooling']]
+    ['Programme', !started ? 'Waits for the measurements' : BRK.tripped ? 'Breaker tripped, cooling' : asked().on ? 'On' : 'Off, cooling'],
+    ['UI jam, last minute', (function(){ var j = jamNow(); return j.jams + ' stalls over 50 ms, worst ' + fi(j.worst, 0) + ' ms, average late ' + fi(j.avg, 1) + ' ms' + (j.jams ? '' : ' - smooth'); })()],
+    ['Cores loaded', NW + ' of ' + (navigator.hardwareConcurrency || NW) + ' - one left free for the screen']]
     .map(function(r){ return '<tr><td class="k">' + r[0] + '</td><td class="v">' + r[1] + '</td></tr>'; }).join('');
+  if (el('tnow').innerHTML !== nowH) el('tnow').innerHTML = nowH;
   el('hNote').textContent = 'Squares coloured by estimated heat; load and speed are measured. Temperatures are estimates, never readings.';
   el('line').textContent = !started ? P.phase + ' - the heat load starts after' : 'Processor about ' + fi(ROOM + L[1], 0) + ' C estimated, load ' + fi(L[4] * 100, 0) + ' %, speed ' + (L[2] === null ? 'idle' : fi(L[2], 0) + ' % of cold') + ', ' + slow + (slow === 1 ? ' core' : ' cores') + ' slowing' + (BRK.tripped ? ', BREAKER TRIPPED' : '') + ' - ' + NW + ' cores';
   selfCheck(); refreshDownloads();
@@ -734,7 +781,7 @@ function tableText(id){ return Array.from(el(id).querySelectorAll('tr')).map(fun
 function textOf(){ var L = ['BROWSER THERMALS', 'AI2Orbit', 'Taken ' + stampNow(), 'Temperatures are estimates; load and speed are measured', ''];
   C.forEach(function(c, i){ L.push('Core ' + (i + 1) + ': ' + fi(ROOM + c.heat, 1) + ' C estimated, load ' + fi(c.load * 100, 0) + ' %, speed ' + (c.speed === null ? 'idle' : fi(c.speed, 0) + ' %') + (c.slowing ? ', slowing' : '')); });
   L.push('Graphics: ' + fi(ROOM + G.heat, 1) + ' C estimated, ' + fi(G.frameMs, 1) + ' ms a frame', 'Breaker: ' + (BRK.tripped ? 'tripped' : 'closed') + ', trips at ' + el('trip').value + ' C, ' + BRK.trips + ' trips');
-  [['SCREEN STRIPER', 'tstr'], ['SCREEN STRIPER STAGES (stage, ms, log10, square, to previous)', 'tstrst'], ['CPU SPHERE (colour, heat, facets, of all, facing, of facing)', 'tsph'], ['CPU SPHERE TOTALS', 'tsph2'], ['MEMORY', 'tmem'], ['MEMORY BY BLOCK (block, one read, scan, level)', 'tmemrows'], ['BUS', 'tbus'], ['SCREEN', 'tscr'], ['GRAPHICS CHIP', 'tgfx'], ['DEVICE', 'tdev'], ['NETWORK', 'tnet'], ['FILE TEST', 'tfile']]
+  [['FORMULAS AS GIVEN (line, calculation, result, time)', 'tfrm'], ['SCREEN STRIPER', 'tstr'], ['SCREEN STRIPER STAGES (stage, ms, log10, square, to previous)', 'tstrst'], ['CPU SPHERE (colour, heat, facets, of all, facing, of facing)', 'tsph'], ['CPU SPHERE TOTALS', 'tsph2'], ['MEMORY', 'tmem'], ['MEMORY BY BLOCK (block, one read, scan, level)', 'tmemrows'], ['BUS', 'tbus'], ['SCREEN', 'tscr'], ['GRAPHICS CHIP', 'tgfx'], ['DEVICE', 'tdev'], ['NETWORK', 'tnet'], ['FILE TEST', 'tfile']]
     .forEach(function(s){ L.push('', s[0]); tableText(s[1]).forEach(function(x){ L.push(x); }); });
   L.push('', 'FILE TEST ROUNDS (round; time; Mbit/s 3, 4, 5 at once; files; changed; alert)');
   FT.rounds.forEach(function(r){ L.push(r.n + '; ' + clock(r.at) + '; ' + r.stages.map(function(s){ return s.ok ? fi(s.mbit, 2) : 'failed'; }).join('; ') + '; ' + r.files + '; ' + r.changed + '; ' + (r.alert ? 'ALERT' : 'ok')); });
