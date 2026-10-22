@@ -1,8 +1,9 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>OIL, NOW AND 2035</title>
+<title>WORLD OIL MARKETS AND 2035</title>
 <script src="oil_data.js"></script>
+<script src="oil_markets.js"></script>
 <style>
   :root{ --bg:#05080c; --panel:#0a121a; --line:#16293a; --ink:#d7e6f2; --ink2:#8ea9c2; --muted:#6d8ba3; }
   html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font:13px/1.5 ui-monospace,"DejaVu Sans Mono",Consolas,monospace}
@@ -32,10 +33,13 @@
   #crText{color:#12261a;font-weight:400;font-size:9px;line-height:1.2;white-space:nowrap}
   @media (max-width:600px){ #bar{font-size:11px;padding:5px 8px} #pg{padding-top:78px} .tile b{font-size:24px} }
 </style></head><body>
-<div id="bar"><b id="stamp">B109</b><i id="line">Oil</i></div>
+<div id="bar"><b id="stamp">B112</b><i id="line">Oil</i></div>
 <div id="pg">
   <h2>Oil, Now And 2035</h2>
   <div class="tiles" id="tiles"></div>
+  <h2 id="mk">World Oil Markets, Every Kind</h2>
+  <div class="card"><table><thead><tr><td>Kind</td><td>Market</td><td class="n">Latest</td><td class="n">Per litre</td><td class="n">1 month</td><td class="n">12 months</td><td>Line</td><td class="n">Date</td></tr></thead><tbody id="tmk"></tbody></table></div>
+  <div class="card" style="margin-top:10px"><select id="mkSel"></select><canvas id="cMk" style="margin-top:8px"></canvas><div class="names"><span id="mkNote"></span></div></div>
   <h2>One Place</h2>
   <div class="card"><select id="place"></select></div>
   <div class="grid" style="margin-top:10px">
@@ -87,6 +91,36 @@ function chart(id, lines, unit){
     if (L.t){ g.setLineDash([6, 5]); g.globalAlpha = 0.7; g.beginPath(); g.moveTo(X(L.t.from), Y(L.t.at(L.t.from))); g.lineTo(X(END), Y(L.t.at(END))); g.stroke(); g.globalAlpha = 1; g.setLineDash([]);
       g.fillStyle = L.c; g.fillText(fi(L.t.at(END), 1) + unit, Math.min(X(END) - 60, W - 70), Y(L.t.at(END)) - 6); } });
 }
+/* WORLD OIL MARKETS: every kind with a public price - crude grades and fuels by the day (US EIA), crude and vegetable
+   oils by the month (World Bank Pink Sheet). Each also as US dollars a litre: a barrel is 158,987 litres, a US gallon
+   3,78541 litres, and a tonne of vegetable oil about 1 087 litres (0,92 kg a litre) - the conversion is said, not hidden. */
+var LITRES = { bbl: 158.987, gal: 3.78541, t: 1000 / 0.92 }, UNIT = { bbl: '$/barrel', gal: '$/gallon', t: '$/tonne' };
+function mkBack(s, days){ var last = s.pts[s.pts.length - 1], want;
+  if (s.freq === 'month'){ var y = +last[0].slice(0, 4), m = +last[0].slice(5) - Math.round(days / 30.4); while (m <= 0){ m += 12; y--; } want = y + '-' + (m < 10 ? '0' : '') + m; }
+  else { var d = new Date(last[0]); d.setDate(d.getDate() - days); want = d.toISOString().slice(0, 10); }
+  var hit = null; s.pts.forEach(function(p){ if (p[0] <= want) hit = p; }); return hit; }
+function chg(now, then){ if (!then || !then[1]) return '-'; var v = (now[1] / then[1] - 1) * 100; return '<span style="color:' + (v >= 0 ? '#3ddc84' : '#ff5f56') + '">' + (v >= 0 ? '+' : '') + fi(v, 1) + ' %</span>'; }
+function sparkTo(cv, pts){ var dpr = Math.min(window.devicePixelRatio || 1, 2), W = 110, H = 26; cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); var v = pts.map(function(p){ return p[1]; }), mn = Math.min.apply(null, v), mx = Math.max.apply(null, v);
+  g.beginPath(); v.forEach(function(x, i){ var X = i / (v.length - 1) * W, Y = 2 + (1 - (x - mn) / ((mx - mn) || 1)) * (H - 4); if (i) g.lineTo(X, Y); else g.moveTo(X, Y); });
+  g.strokeStyle = v[v.length - 1] >= v[0] ? '#3ddc84' : '#ff5f56'; g.lineWidth = 1.4; g.stroke(); }
+function renderMarkets(){
+  var groups = ['Crude oil', 'Fuels', 'Vegetable oils'], h = '';
+  groups.forEach(function(gname){ h += '<tr><td colspan="8" style="color:#ffd166;font-weight:700;padding-top:10px">' + gname + '</td></tr>';
+    MARKETS.forEach(function(s, i){ if (s.group !== gname) return; var last = s.pts[s.pts.length - 1], two = s.freq === 'month' ? s.pts.slice(-24) : s.pts;
+      h += '<tr><td class="v">' + s.name + '</td><td>' + s.market + ' (' + (s.freq === 'day' ? 'daily' : 'monthly') + ')</td><td class="n v">' + fi(last[1], s.unit === 't' ? 0 : 2) + ' ' + UNIT[s.unit] + '</td><td class="n">' + fi(last[1] / LITRES[s.unit], 3) + ' $/l</td>' +
+        '<td class="n">' + chg(last, mkBack(s, 30)) + '</td><td class="n">' + chg(last, mkBack(s, 365)) + '</td><td><canvas data-mk="' + i + '"></canvas></td><td class="n">' + last[0] + '</td></tr>'; }); });
+  el('tmk').innerHTML = h;
+  Array.from(el('tmk').querySelectorAll('canvas')).forEach(function(cv){ var s = MARKETS[+cv.dataset.mk]; sparkTo(cv, s.freq === 'month' ? s.pts.slice(-24) : s.pts); });
+  var s = MARKETS[+el('mkSel').value || 0], cv = el('cMk'), dpr = Math.min(window.devicePixelRatio || 1, 2), W = cv.clientWidth || 300, H = cv.clientHeight || 260; cv.width = W * dpr; cv.height = H * dpr;
+  var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H); var v = s.pts.map(function(p){ return p[1]; }), mx = Math.max.apply(null, v) * 1.08, mn = 0;
+  var X = function(i){ return 50 + i / (v.length - 1) * (W - 60); }, Y = function(x){ return 10 + (1 - (x - mn) / (mx - mn)) * (H - 34); };
+  g.strokeStyle = '#16293a'; g.fillStyle = '#6d8ba3'; g.font = '10px monospace';
+  for (var k = 0; k <= 4; k++){ var yv = mx * k / 4; g.beginPath(); g.moveTo(50, Y(yv)); g.lineTo(W - 10, Y(yv)); g.stroke(); g.fillText(fi(yv, yv < 10 ? 2 : 0), 2, Y(yv) + 3); }
+  [0, Math.floor(v.length / 2), v.length - 1].forEach(function(i){ g.fillText(s.pts[i][0], Math.min(X(i) - 20, W - 70), H - 8); });
+  g.strokeStyle = '#ffd166'; g.lineWidth = 1.6; g.beginPath(); v.forEach(function(x, i){ if (i) g.lineTo(X(i), Y(x)); else g.moveTo(X(i), Y(x)); }); g.stroke();
+  el('mkNote').textContent = s.name + ', ' + s.market + ' - ' + UNIT[s.unit] + ', ' + (s.freq === 'day' ? 'daily, ' : 'monthly, ') + s.pts[0][0] + ' to ' + s.pts[s.pts.length - 1][0] + ' - ' + s.src;
+}
 function render(){
   var place = el('place').value, use = series(place, 0), share = series(place, 1), prod = series(place, 2), elec = series(place, 3), tu = trend(use), ts = trend(share), lu = latest(use), ls = latest(share);
   var produces = prod.some(function(p){ return p[1] > 0; });   /* a place that produces none shows no production line */
@@ -104,10 +138,11 @@ function render(){
 }
 function selfCheck(){
   var f = [], txt = el('pg').innerText.replace(el('chk').innerText, '');
-  if (/[$€£]\s?[0-9]|[0-9]\s?[$€£]|\b(price[sd]?|euro|dollars?)\b/i.test(txt)) f.push('money wording reached the page');
+  /* market prices belong on this page, so no money check here */
   if (/\b(Infinity|NaN|undefined|null)\b/.test(txt)) f.push('a figure with no value reached the page');
   var cr = el('crText'), cs = getComputedStyle(cr);
   if (cr.textContent.trim() !== 'Copyright AI2Orbit All Rights Reserved 2026.' || +cs.fontWeight > 400 || parseFloat(cs.fontSize) > 10) f.push('the copyright line is not exact, small and plain');
+  var br = MARKETS[0].pts[MARKETS[0].pts.length - 1]; if (MARKETS[0].name !== 'Brent crude' || br[0] !== '2026-10-20' || br[1] !== 115.22) f.push('the Brent figure is not the source figure');
   var fu = series('Finland', 0); if (!fu.length || Math.abs(latest(fu)[1] - 86.686) > 0.01) f.push('the Finland figure is not the source figure');
   if (err) f.push(err);
   fails = f; var box = el('chk'); if (f.length){ box.style.display = 'block'; box.innerHTML = '<b style="color:#e0645f">THIS PAGE IS NOT CLEAN</b><br>' + f.join('<br>'); } else box.style.display = 'none'; return f;
@@ -124,10 +159,13 @@ function refresh(){ el('dlTxt').href = URL.createObjectURL(new Blob([textOf()], 
 [['Real', 'Oil used and produced, TWh a year, and oil shares, 1990 to 2024 - Our World in Data energy set (Energy Institute Statistical Review), CC BY 4.0'],
  ['Trend, not a forecast', 'A straight line through 2014 to the latest year, carried on to 2035, never below zero'],
  ['Target', 'Finland: carbon neutral by 2035, Climate Act 423/2022'],
- ['Places', Object.keys(OIL).length + ' places with oil figures to 2020 or later, regions included']]
+ ['Places', Object.keys(OIL).length + ' places with oil figures to 2020 or later, regions included'],
+ ['Markets', 'Crude and fuels by the day: US EIA spot prices. Crude and vegetable oils by the month: World Bank Pink Sheet, CC BY 4.0'],
+ ['Per litre', 'Barrel 158,987 l; US gallon 3,78541 l; vegetable oil 0,92 kg a litre, so a tonne is about 1 087 l']]
 .forEach(function(r){ el('thow').innerHTML += '<tr><td class="k">' + r[0] + '</td><td class="v">' + r[1] + '</td></tr>'; });
 el('place').innerHTML = Object.keys(OIL).sort().map(function(p){ return '<option' + (p === 'Finland' ? ' selected' : '') + '>' + p + '</option>'; }).join('');
-el('place').onchange = render; window.addEventListener('resize', render);
+el('mkSel').innerHTML = MARKETS.map(function(s, i){ return '<option value="' + i + '">' + s.group + ': ' + s.name + '</option>'; }).join(''); el('mkSel').onchange = renderMarkets;
+el('place').onchange = render; window.addEventListener('resize', function(){ render(); renderMarkets(); }); renderMarkets();
 try { render(); } catch (e){ err = String(e.message || e); selfCheck(); }
 window.__oil = function(){ var u = series('Finland', 0), t = trend(u); return { fin: latest(u), fin2035: t.at(END), places: Object.keys(OIL).length, fails: fails }; };
 </script>
