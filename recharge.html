@@ -22,6 +22,10 @@
   input[type=range]{width:100%;accent-color:#ff8020}
   select{background:#0e1a26;color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:5px 8px;font:inherit}
   canvas{display:block;width:100%;height:260px}
+  .btn{display:inline-block;background:#16293a;color:#9fd6f5;border:0;border-radius:4px;padding:6px 10px;font:inherit;cursor:pointer}
+  #tarea input{width:100%;min-width:52px;box-sizing:border-box;background:#0e1a26;color:var(--ink);border:1px solid var(--line);border-radius:3px;font:inherit;padding:3px 4px}
+  #tarea input{max-width:64px} #tarea input.nm{min-width:120px;max-width:none}
+  #tarea td.n{white-space:nowrap}
   .names{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--ink2);margin-top:6px}
   .names i{display:inline-block;width:16px;height:3px;border-radius:2px;margin-right:6px;vertical-align:3px}
   #chk{margin-top:12px;padding:8px 10px;border:1px solid #5a1d1d;background:#1a0808;border-radius:4px;font-size:11px;line-height:1.6}
@@ -33,7 +37,7 @@
   #crText{color:#12261a;font-weight:400;font-size:9px;line-height:1.2;white-space:nowrap}
   @media (max-width:600px){ #bar{font-size:11px;padding:5px 8px} #pg{padding-top:78px} h1{font-size:24px} }
 </style></head><body>
-<div id="bar"><b id="stamp">B113</b><i id="line">RECHARGE</i></div>
+<div id="bar"><b id="stamp">B114</b><i id="line">RECHARGE</i></div>
 <div id="pg">
   <h1>RECHARGE</h1>
   <div style="color:#8ea9c2">The connectivity domain - radio, core and network management - compared, and the radio's SISO, SIMO, MISO and MIMO speeds</div>
@@ -55,6 +59,15 @@
   </div>
   <div class="card" style="margin-top:10px"><canvas id="cv"></canvas>
     <div class="names"><span><i style="background:#8ea9c2"></i>One antenna, no fading (Shannon)</span><span><i style="background:#e0645f"></i>SISO</span><span><i style="background:#ffd166"></i>SIMO</span><span><i style="background:#7ee787"></i>MISO</span><span><i style="background:#4fd1ff"></i>MIMO</span><span>Mbit/s against signal to noise, dB</span></div></div>
+
+  <h2>Radio Areas: Local Input, Results And Differential</h2>
+  <div class="card">
+    <div style="font-size:11px;color:#6d8ba3;margin-bottom:6px">Each row is one radio area. The starting values are chosen to show the differences - type the measured values for each area (bandwidth, signal to noise, antennas, correlation). Kept in this browser.</div>
+    <table><thead><tr><td>Area</td><td>MHz</td><td>SNR dB</td><td>Tx</td><td>Rx</td><td>Corr.</td><td class="n">SISO Mbit/s</td><td class="n">MIMO Mbit/s</td><td class="n">Gain</td><td class="n">Against reference</td><td class="n">Rank</td><td></td></tr></thead><tbody id="tarea"></tbody></table>
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn" id="aAdd">Add an area</button><button class="btn" id="aReset">Starting values back</button>
+      <span style="color:#8ea9c2">Reference area</span><select id="aRef"></select></div>
+    <canvas id="cva" style="height:220px;margin-top:10px"></canvas>
+  </div>
 
   <h2>Before And After Use: The Bits</h2>
   <div class="grid">
@@ -159,6 +172,49 @@ var DOM = [['What it is', 'Antennas, radio units, baseband', 'Packet core: user 
   ['Measured in', 'Watts per cell, joules per bit, bit/s/Hz, latency', 'Packets per second, watts per server, joules per bit forwarded', 'CPU, memory, management traffic, alarms'],
   ['Before and after use', 'Idle cell power against loaded; bits sent; air latency', 'Idle server against loaded; bits in = bits out plus tunnel; added delay', 'Baseline against busy hour; polls and alarms']];
 el('tdom').innerHTML = DOM.map(function(r){ return '<tr><td class="k">' + r[0] + '</td><td>' + r[1] + '</td><td>' + r[2] + '</td><td>' + r[3] + '</td></tr>'; }).join('');
+/* ---------------- RADIO AREAS: local input per area, results, ranking and the differential to a reference area ---------------- */
+var AREA_KEY = 'ai2orbit-recharge-areas';
+var AREA_START = [['Dense city', 100, 12, 4, 4, 0.1], ['City', 100, 15, 4, 4, 0.2], ['Suburban', 100, 18, 4, 4, 0.4], ['Rural', 20, 8, 2, 2, 0.7], ['Open, line of sight', 20, 20, 2, 2, 0.9]];
+var AREAS = null, AREA_RES = [];
+try { AREAS = JSON.parse(localStorage.getItem(AREA_KEY) || 'null'); } catch (e){}
+if (!Array.isArray(AREAS) || !AREAS.length) AREAS = AREA_START.map(function(r){ return r.slice(); });
+function num(v, lo, hi, dflt){ var x = parseFloat(String(v).replace(',', '.')); return isFinite(x) ? Math.max(lo, Math.min(hi, x)) : dflt; }
+function saveAreas(){ try { localStorage.setItem(AREA_KEY, JSON.stringify(AREAS)); } catch (e){} }
+function areaTable(){
+  var refSel = el('aRef'), keep = refSel.value;
+  refSel.innerHTML = AREAS.map(function(a, i){ return '<option value="' + i + '">' + esc(a[0]) + '</option>'; }).join('');
+  refSel.value = keep !== '' && +keep < AREAS.length ? keep : '0';
+  el('tarea').innerHTML = AREAS.map(function(a, i){ return '<tr data-i="' + i + '"><td><input class="nm" data-k="0" value="' + esc(a[0]) + '"></td>' +
+    [1, 2, 3, 4, 5].map(function(k){ return '<td><input data-k="' + k + '" inputmode="decimal" value="' + String(a[k]).replace('.', ',') + '"></td>'; }).join('') +
+    '<td class="n v" id="as' + i + '"></td><td class="n v" id="am' + i + '"></td><td class="n" id="ag' + i + '"></td><td class="n" id="ad' + i + '"></td><td class="n" id="ar' + i + '"></td><td><button class="btn" data-del="' + i + '">x</button></td></tr>'; }).join('');
+}
+function esc(t){ return String(t).replace(/[&<>"']/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function areaCompute(){
+  AREA_RES = AREAS.map(function(a){ var bw = num(a[1], 1, 2000, 100), snr = num(a[2], -10, 50, 15), nt = Math.round(num(a[3], 1, 8, 2)), nr = Math.round(num(a[4], 1, 8, 2)), rho = num(a[5], 0, 0.99, 0.2);
+    var siso = capacity(1, 1, snr, rho, 800), mimo = capacity(nt, nr, snr, rho, 800); return { name: a[0], bw: bw, snr: snr, nt: nt, nr: nr, rho: rho, siso: siso * bw, mimo: mimo * bw }; });
+  var ref = AREA_RES[+el('aRef').value || 0] || AREA_RES[0], order = AREA_RES.map(function(r, i){ return i; }).sort(function(x, y){ return AREA_RES[y].mimo - AREA_RES[x].mimo; });
+  AREA_RES.forEach(function(r, i){ r.rank = order.indexOf(i) + 1; r.diff = r.mimo - ref.mimo; r.diffPct = ref.mimo ? (r.mimo / ref.mimo - 1) * 100 : 0;
+    el('as' + i).textContent = fi(r.siso, 0); el('am' + i).textContent = fi(r.mimo, 0); el('ag' + i).textContent = fi(r.mimo / r.siso, 2) + ' x';
+    el('ad' + i).innerHTML = r === ref ? 'Reference' : '<span style="color:' + (r.diff >= 0 ? '#3ddc84' : '#ff5f56') + '">' + (r.diff >= 0 ? '+' : '') + fi(r.diff, 0) + ' Mbit/s, ' + (r.diff >= 0 ? '+' : '') + fi(r.diffPct, 1) + ' %</span>';
+    el('ar' + i).textContent = r.rank + ' of ' + AREA_RES.length; });
+  drawAreas(ref); render();
+}
+function drawAreas(ref){
+  var cv = el('cva'), dpr = Math.min(window.devicePixelRatio || 1, 2), W = cv.clientWidth || 300, H = cv.clientHeight || 220; cv.width = W * dpr; cv.height = H * dpr;
+  var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H); if (!AREA_RES.length) return;
+  var mx = Math.max.apply(null, AREA_RES.map(function(r){ return r.mimo; })) * 1.12 || 1, n = AREA_RES.length, bh = (H - 20) / n;
+  AREA_RES.forEach(function(r, i){ var y = 6 + i * bh, w = r.mimo / mx * (W - 190), ws = r.siso / mx * (W - 190);
+    g.fillStyle = r === ref ? '#ffd166' : '#4fd1ff'; g.fillRect(150, y, w, bh * 0.55); g.fillStyle = '#e0645f'; g.fillRect(150, y + bh * 0.6, ws, bh * 0.22);
+    g.fillStyle = '#d7e6f2'; g.font = '11px monospace'; g.fillText(String(r.name).slice(0, 20), 4, y + bh * 0.45); g.fillText(fi(r.mimo, 0) + ' Mbit/s', 156 + w, y + bh * 0.45); });
+  g.fillStyle = '#6d8ba3'; g.font = '10px monospace'; g.fillText('MIMO (yellow = reference area), SISO in red', 150, H - 4);
+}
+el('tarea').addEventListener('change', function(e){ var t = e.target, tr = t.closest('tr'); if (!tr || t.dataset.k === undefined) return; var i = +tr.dataset.i, k = +t.dataset.k;
+  AREAS[i][k] = k === 0 ? (t.value.trim() || 'Area ' + (i + 1)) : num(t.value, -1e6, 1e6, AREAS[i][k]); saveAreas(); if (k === 0) areaTable(); areaCompute(); });
+el('tarea').addEventListener('click', function(e){ var d = e.target.dataset && e.target.dataset.del; if (d === undefined || AREAS.length < 2) return; AREAS.splice(+d, 1); saveAreas(); areaTable(); areaCompute(); });
+el('aAdd').onclick = function(){ AREAS.push(['Area ' + (AREAS.length + 1), 100, 15, 4, 4, 0.3]); saveAreas(); areaTable(); areaCompute(); };
+el('aReset').onclick = function(){ AREAS = AREA_START.map(function(r){ return r.slice(); }); saveAreas(); areaTable(); areaCompute(); };
+el('aRef').onchange = areaCompute;
+
 function render(){
   var pl = bits();
   rows('tuse', [['Before use', 'The idle baseline: cells on but empty, cores forwarding nothing, management polling'], ['After use', 'The same parts under load: power rises (radio most), bits flow with the overheads at the left, latency grows with queues'],
@@ -179,6 +235,7 @@ function selfCheck(){
   if (cr.textContent.trim() !== 'Copyright AI2Orbit All Rights Reserved 2026.' || +cs.fontWeight > 400 || parseFloat(cs.fontSize) > 10) f.push('the copyright line is not exact, small and plain');
   if (R){ if (R.siso > R.awgn + 1e-9) f.push('SISO fading came out above the no-fading limit');
     if (R.simo < R.siso - 0.05 || R.miso < R.siso - 0.05) f.push('more antennas came out slower than one'); }
+  AREA_RES.forEach(function(r){ if (!(r.mimo >= 0) || !(r.siso >= 0)) f.push('area ' + r.name + ' has no result'); });
   if (err) f.push(err);
   fails = f; var box = el('chk'); if (f.length){ box.style.display = 'block'; box.innerHTML = '<b style="color:#e0645f">THIS PAGE IS NOT CLEAN</b><br>' + f.join('<br>'); } else box.style.display = 'none'; return f;
 }
@@ -186,15 +243,17 @@ function textOf(){ var L = ['RECHARGE', 'AI2Orbit', 'Taken ' + stampNow(), ''];
   L.push('CONNECTIVITY DOMAIN (row; radio; core; management)'); DOM.forEach(function(r){ L.push(r.join('; ')); });
   if (R){ L.push('', 'RADIO: ' + R.bw + ' MHz, ' + R.snr + ' dB, ' + R.nt + ' x ' + R.nr + ', correlation ' + fi(R.rho, 2), 'MODE; BIT/S/HZ; MBIT/S');
     [['No fading', R.awgn], ['SISO', R.siso], ['SIMO', R.simo], ['MISO', R.miso], ['MIMO', R.mimo]].forEach(function(r){ L.push(r[0] + '; ' + fi(r[1], 3) + '; ' + fi(r[1] * R.bw, 1)); }); }
+  L.push('', 'RADIO AREAS (area; MHz; SNR dB; Tx x Rx; correlation; SISO Mbit/s; MIMO Mbit/s; against reference %; rank)');
+  AREA_RES.forEach(function(r){ L.push(r.name + '; ' + r.bw + '; ' + r.snr + '; ' + r.nt + ' x ' + r.nr + '; ' + fi(r.rho, 2) + '; ' + fi(r.siso, 0) + '; ' + fi(r.mimo, 0) + '; ' + fi(r.diffPct, 1) + '; ' + r.rank); });
   L.push('', 'Copyright AI2Orbit All Rights Reserved 2026.'); return L.join('\n'); }
 function dxfOf(){ var o = []; function p(a, b){ o.push(a, String(b)); } p(0, 'SECTION'); p(2, 'ENTITIES');
   if (CURVE) ['NO_FADING', 'SISO', 'SIMO', 'MISO', 'MIMO'].forEach(function(name, k){ for (var i = 1; i < CURVE.length; i++){ p(0, 'LINE'); p(8, name + '_MBITS'); p(10, CURVE[i - 1][0]); p(20, CURVE[i - 1][k + 1] * R.bw); p(30, 0); p(11, CURVE[i][0]); p(21, CURVE[i][k + 1] * R.bw); p(31, 0); } });
   p(0, 'ENDSEC'); p(0, 'EOF'); return o.join('\r\n') + '\r\n'; }
 function refresh(){ el('dlTxt').href = URL.createObjectURL(new Blob([textOf()], { type: 'text/plain' })); el('dlDxf').href = URL.createObjectURL(new Blob([dxfOf()], { type: 'image/vnd.dxf' })); }
 var tmr = null; ['bw', 'snr', 'nt', 'nr', 'rho'].forEach(function(id){ el(id).oninput = function(){ clearTimeout(tmr); tmr = setTimeout(compute, 150); }; });
-el('pl').oninput = render; window.addEventListener('resize', draw);
-try { compute(); } catch (e){ err = 'the calculation failed: ' + (e.message || e); selfCheck(); }
-window.__recharge = function(){ return { R: R, fails: fails }; };
+el('pl').oninput = render; window.addEventListener('resize', function(){ draw(); drawAreas(AREA_RES[+el('aRef').value || 0]); });
+try { compute(); areaTable(); areaCompute(); } catch (e){ err = 'the calculation failed: ' + (e.message || e); selfCheck(); }
+window.__recharge = function(){ return { R: R, areas: AREA_RES, fails: fails }; };
 window.__cap = capacity;
 </script>
 </body></html>
