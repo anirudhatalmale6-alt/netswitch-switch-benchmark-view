@@ -31,13 +31,14 @@
   #crText{color:#12261a;font-weight:400;font-size:9px;line-height:1.2;white-space:nowrap}
   @media (max-width:600px){ #bar{font-size:11px;padding:5px 8px} #pg{padding-top:78px} }
 </style></head><body>
-<div id="bar"><b id="stamp">B112</b><i id="line">Making the sample</i></div>
+<div id="bar"><b id="stamp">B113</b><i id="line">Making the sample</i></div>
 <div id="pg">
   <h2>Ringtone Maker, 5 s, 15 s And 59 s</h2>
   <div class="card">
     <table><tbody>
-      <tr><td class="k">Sound</td><td><input type="file" id="file" accept="audio/*"> <button class="btn" id="bSample">Use the sample</button></td></tr>
+      <tr><td class="k">Sound</td><td><input type="file" id="file" accept="audio/*,video/*,.mp3,.mp4,.m4a,.aac,.wav,.ogg,.oga,.opus,.flac,.webm,.mov,.3gp"> <button class="btn" id="bSample">Use the sample</button></td></tr>
       <tr><td class="k">Now using</td><td class="v" id="src">-</td></tr>
+      <tr><td class="k">State</td><td class="v" id="state">-</td></tr>
       <tr><td class="k">Start</td><td><input type="range" id="start" min="0" max="1000" value="0"></td></tr>
       <tr><td class="k">Start at</td><td class="v" id="startv">-</td></tr>
       <tr><td colspan="2"><button class="btn" id="bAuto">Loudest part again</button></td></tr>
@@ -131,12 +132,21 @@ function build(useAuto){
     '<div><audio controls preload="none" src="' + t.url + '" style="width:100%;max-width:420px;margin-top:4px"></audio></div><a class="btn go" download="' + esc(t.name) + '" href="' + t.url + '">Save ' + t.len + ' s</a></div>'; }).join('');
   drawWave(); snippet(); render();
 }
+/* decodeAudioData in its callback form too: older Safari returns no promise */
+function decode(ac, ab){ return new Promise(function(ok, no){ var p = ac.decodeAudioData(ab, ok, function(e){ no(e || new Error('the browser could not decode it')); }); if (p && p.then) p.then(ok, no); }); }
 async function load(arrayBuf, name){
-  try { var ac = new ACtx(); buf = await ac.decodeAudioData(arrayBuf); ac.close && ac.close(); srcName = name; el('src').textContent = name + ' - ' + fi(buf.duration, 1) + ' s, ' + buf.numberOfChannels + ' channel(s), ' + buf.sampleRate + ' Hz'; build(true); }
-  catch (e){ err = 'this sound could not be read: ' + (e.message || e); render(); }
+  err = null; el('state').textContent = 'Reading ' + name + ' (' + fi(arrayBuf.byteLength / 1048576, 1) + ' MB)';
+  var ac = null;
+  try { ac = new ACtx(); var b = await decode(ac, arrayBuf); buf = b; srcName = name;
+    el('src').textContent = name + ' - ' + fi(buf.duration, 1) + ' s, ' + buf.numberOfChannels + ' channel(s), ' + buf.sampleRate + ' Hz';
+    el('state').textContent = 'Read - three ringtones made'; build(true); }
+  catch (e){ el('state').innerHTML = '<span style="color:#ff8a80">' + esc(name) + ' could not be read in this browser - its sound format is not one this browser decodes. Chrome reads MP3, M4A and MP4 (AAC or MP3 sound); the last good sound stays loaded.</span>';
+    render(); }
+  finally { try { ac && ac.close && ac.close(); } catch (e2){} }
 }
-el('file').onchange = function(){ var f = el('file').files[0]; if (!f) return; var r = new FileReader(); r.onload = function(){ load(r.result, f.name); }; r.readAsArrayBuffer(f); };
-el('bSample').onclick = async function(){ buf = await makeSample(); srcName = 'sample'; el('src').textContent = 'The sample melody - ' + fi(buf.duration, 1) + ' s'; build(true); };
+el('file').onchange = function(){ var f = el('file').files[0]; if (!f) return; el('state').textContent = 'Opening ' + f.name; var r = new FileReader();
+  r.onload = function(){ load(r.result, f.name); }; r.onerror = function(){ el('state').textContent = f.name + ' could not be opened from the phone storage'; }; r.readAsArrayBuffer(f); el('file').value = ''; };
+el('bSample').onclick = async function(){ err = null; buf = await makeSample(); srcName = 'sample'; el('src').textContent = 'The sample melody - ' + fi(buf.duration, 1) + ' s'; el('state').textContent = 'Sample made - three ringtones ready'; build(true); };
 el('bAuto').onclick = function(){ build(true); };
 el('start').oninput = function(){ build(false); };
 function snippet(){
@@ -168,7 +178,7 @@ function dxfOf(){ var o = []; function p(a, b){ o.push(a, String(b)); } p(0, 'SE
   tones.forEach(function(t, i){ p(0, 'LINE'); p(8, 'RINGTONE_' + t.len + 'S'); p(10, t.start); p(20, i); p(30, 0); p(11, t.start + t.secs); p(21, i); p(31, 0); });
   p(0, 'ENDSEC'); p(0, 'EOF'); return o.join('\r\n') + '\r\n'; }
 function refresh(){ el('dlTxt').href = URL.createObjectURL(new Blob([textOf()], { type: 'text/plain' })); el('dlDxf').href = URL.createObjectURL(new Blob([dxfOf()], { type: 'image/vnd.dxf' })); }
-[['Sound in', 'Any file the browser can play: MP3, M4A, WAV, OGG - or the sample made here'],
+[['Sound in', 'MP3, M4A, AAC, WAV, OGG and the sound of MP4 videos - or the sample made here'],
  ['Three lengths', '5 s, 15 s and 59 s, each from the loudest part of the sound, or from the start set by hand'],
  ['Finish', 'Fade in 0,3 s, fade out 0,8 s, loudest peak at -1 dB, 44,1 kHz stereo WAV'],
  ['Android', 'Copy the WAV to the phone, then Settings, Sound, Ringtone'],
