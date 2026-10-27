@@ -71,11 +71,15 @@
 
   <div class="send">
     <a id="dlPdf" download="ai-cloud-report.pdf">Download PDF</a>
+    <a id="pgLink" class="alt">Page Link</a>
+    <a id="toOutlook" class="alt" target="_blank" rel="noopener">Open In Outlook</a>
     <a id="toGmail" target="_blank" rel="noopener">Open In Gmail</a>
     <a id="toMail" class="alt">Any Mail App</a>
     <a id="dlTxt" class="alt" download="ai-cloud-report.txt">Download Text</a>
     <a id="dlDxf" class="alt" download="ai-cloud-report.dxf">Download DXF</a>
   </div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px"><label for="pgBase" style="color:#9fd6f5">Link address</label><input id="pgBase" type="url" autocomplete="off" spellcheck="false" style="flex:1;min-width:200px;background:#0d1822;color:#dbe7f0;border:1px solid #2a3d4f;border-radius:4px;padding:6px"></div>
+  <div id="pgOut" style="margin-top:6px;word-break:break-all;color:#9fd6f5"></div>
   <div id="warn"></div>
 
   <h2>Sent From A Browser With No Server</h2>
@@ -469,6 +473,7 @@ function buildReport(ids){
   L.push('AI CLOUD REPORT');
   L.push('AI2Orbit Co.');
   L.push('Taken ' + stampNow() + '   Reference c.YTGaA.' + refDigits());
+  L.push('Report page: ' + pageAddr());
   L.push('Every figure below was measured on the device this was run on.');
   L.push('Asked for first: ' + (ids.length ? ids.join(', ') : 'nothing in particular')
          + '. Every other subject follows it.');
@@ -537,6 +542,19 @@ function shortReport(ids){
   return L.join('\n');
 }
 
+/* The page link follows the address the setup runs on - a local copy, an intranet host or a referral domain;
+   the Link address box takes another domain, kept on this device. */
+function hereAddr(){ return location.href.split('#')[0].split('?')[0]; }
+var PG_KEY = 'rp.pgBase.' + hereAddr();
+function pageAddr(){ var e = document.getElementById('pgBase'), v = e ? e.value.trim() : ''; return v ? v.split('#')[0] : hereAddr(); }
+function pgInit(){ var e = document.getElementById('pgBase'), v = ''; if (!e || e.dataset.on) return; e.dataset.on = '1';
+  try { v = localStorage.getItem(PG_KEY) || ''; } catch (x){}
+  e.value = v || hereAddr();
+  e.onchange = function(){ try { var x = e.value.trim(); if (!x || x === hereAddr()) localStorage.removeItem(PG_KEY); else localStorage.setItem(PG_KEY, x); } catch (y){} if (typeof update === 'function') update(); };
+  document.getElementById('pgLink').onclick = function(ev){ ev.preventDefault(); var u = pageAddr(), o = document.getElementById('pgOut');
+    function pick(){ o.textContent = u; try { var r = document.createRange(); r.selectNodeContents(o); var sl = getSelection(); sl.removeAllRanges(); sl.addRange(r); } catch (z){} }
+    try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(u).then(function(){ o.textContent = 'Copied - ' + u; }, pick); else pick(); } catch (z){ pick(); } }; }
+function outlookLink(subject, body){ return 'https://outlook.office.com/mail/deeplink/compose?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body); }
 function mailLinks(subject, body){
   var g = 'https://mail.google.com/mail/?view=cm&fs=1&tf=1&su='
         + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
@@ -660,6 +678,10 @@ function buildPDF(title, lines){
       body.push('T*');
     }
     body.push('ET');
+    /* every page carries the page link and the copyright at its foot */
+    var foot = 'Report page: ' + pageAddr(); if (foot.length > 140) foot = foot.slice(0, 137) + '...';
+    body.push('BT', '/F1 6 Tf', '1 0 0 1 40 34 Tm', '(' + pdfEscape(foot) + ') Tj', 'ET');
+    body.push('BT', '/F1 6 Tf', '1 0 0 1 40 24 Tm', '(' + pdfEscape('AI2ORBIT CO. Network system Pat. pend. Founded in 2018. Copyright 2018-2027. All rights reserved.') + ') Tj', 'ET');
     var stream = body.join('\n');
     objs.push('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] '
       + '/Resources << /Font << /F1 3 0 R >> >> /Contents ' + (5 + i*2) + ' 0 R >>');
@@ -748,6 +770,7 @@ function renderKeys(){
 }
 
 function update(){
+  pgInit();
   if (!ready) return;
   var text = document.getElementById('kwIn').value;
   var m = matchSections(text);
@@ -768,6 +791,8 @@ function update(){
   document.getElementById('out').textContent = reportText;
   document.getElementById('toGmail').href = gPick.links.gmail;
   document.getElementById('toMail').href = mPick.links.mailto;
+  document.getElementById('toOutlook').href = outlookLink(subject, gPick.body);
+  document.getElementById('pgLink').href = pageAddr();
   link(document.getElementById('dlTxt'), reportText, 'text/plain', 'ai-cloud-report.txt');
   var made = buildPDF('AI CLOUD REPORT - AI2ORBIT CO.', reportText.split('\n'));
   pdfPages = made.pages;
