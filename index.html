@@ -384,7 +384,7 @@ body{padding-top:0}
     <h1>6GGW</h1>
     <div class="tagline">5G GATEWAY ROUTER</div>
     <div class="sub">SWITCH · PERFORMANCE MONITOR · 6G GATEWAY · CPU·GPU · AREA MAP · TEST LOG TOOL</div>
-    <div class="version">AI2ORBIT Co. 2026 · NetSwitch engine v2.55.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
+    <div class="version">AI2ORBIT CO. 2018-2027 · NetSwitch engine v2.55.0 · serverless · installable app (PWA) — Android · iOS · Windows · Mac · Linux · any browser</div>
   </div>
 
   <div class="gsearch" style="display:flex;gap:8px;margin:0 0 12px;align-items:stretch">
@@ -1101,7 +1101,7 @@ All fields above are live inputs — divisor, grade, scale, times, labels and fo
     </div>
   </div>
 
-  <div class="foot">NETSWITCH · AI2ORBIT Co. 2026 · portable single-file build — runs offline, no install, no server</div>
+  <div class="foot">NETSWITCH · AI2ORBIT CO. 2018-2027 · portable single-file build — runs offline, no install, no server</div>
 </div>
 
 <script>
@@ -1890,7 +1890,7 @@ function runDramm(){
       L.push('');
       L.push('Note: CPU benchmarks measure computational throughput and may vary based on');
       L.push('      CPU frequency scaling, thermal throttling, and system load.');
-      L.push('AI2ORBIT Co. 2026  ·  ported to serverless web/APK for NetSwitch');
+      L.push('AI2ORBIT CO. 2018-2027  ·  ported to serverless web/APK for NetSwitch');
       L.push('========================================');
       out.textContent=L.join('\n');
       badge.textContent='DONE'; badge.className='badge pass';
@@ -2209,7 +2209,7 @@ function runTestLog(){
     L.push('CHAMBERLAIN OK 7365481296');
     L.push('QUANTARA 655/1SEC 2,4 LOG');
     L.push('GPS OK');
-    L.push('AI2ORBIT Co. 2026');
+    L.push('AI2ORBIT CO. Network system Pat. pend. Founded in 2018. Copyright 2018-2027. All rights reserved.');
   }
   L.push('=====================================================');
   document.getElementById('logOut').textContent=L.join('\n');
@@ -2227,7 +2227,8 @@ function downloadLog(){
 }
 function copyLog(){
   var t=document.getElementById('logOut').textContent;
-  if(navigator.clipboard)navigator.clipboard.writeText(t);
+  function pick(){ try{ var r=document.createRange(); r.selectNodeContents(document.getElementById('logOut')); var s=getSelection(); s.removeAllRanges(); s.addRange(r); }catch(e){} }
+  try{ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).catch(pick); else pick(); }catch(e){ pick(); } /* a policy that blocks the clipboard leaves the text selected to copy by hand */
 }
 
 /* ---------------- CPU · GPU (real device probe + LOG model) ---------------- */
@@ -3573,7 +3574,7 @@ function rtInstallApp(){
 }
 window.addEventListener('beforeinstallprompt',function(e){ e.preventDefault(); rtDeferredPrompt=e; var b=document.getElementById('rtInstall'); if(b)b.style.display='inline-block'; });
 window.addEventListener('appinstalled',function(){ var b=document.getElementById('rtInstall'); if(b)b.style.display='none'; });
-if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); }); }
+window.addEventListener('load',function(){ try { if(navigator.serviceWorker && navigator.serviceWorker.register) navigator.serviceWorker.register('sw.js').catch(function(){}); } catch(e){} });
 function rtInit(){
   var f=document.getElementById('rtFrom'), t=document.getElementById('rtTo'); if(!f)return;
   RT_PRIMARIES.forEach(function(n){f.add(new Option(n,n)); t.add(new Option(n,n));});
@@ -4533,5 +4534,6 @@ try{printMirrors();
     document.addEventListener('change',printMirrors);
     window.addEventListener('beforeprint',printMirrors);}catch(e){}
 </script>
+<div class="ai2o-cr" style="margin:14px 12px 70px;padding:3px 7px;display:inline-block;background:#d0cefd;border-radius:3px"><span style="color:#12261a;font-weight:400;font-size:9px;line-height:1.2;font-family:ui-monospace,monospace">AI2ORBIT CO. Network system Pat. pend. Founded in 2018. Copyright 2018-2027. All rights reserved.</span></div>
 </body>
 </html>

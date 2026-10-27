@@ -85,4 +85,4 @@ CHANNEL=rc DB_KEY="a-strong-secret" node server.js     # or PORT=80
 Front it with nginx/Caddy for TLS in rc/prod. No database server, no secrets in the repo, no
 outbound calls except the latency probe you request.
 
-© AI2ORBIT Co. 2026
+AI2ORBIT CO. Network system Pat. pend. Founded in 2018. Copyright 2018-2027. All rights reserved.

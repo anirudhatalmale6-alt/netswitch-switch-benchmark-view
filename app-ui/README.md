@@ -17,9 +17,9 @@ automated IP routing and rerouting.
    "Switching route… — call held", then recovers on the new path.
 4. **Copyright — two variants:**
    - **App / Windows** → a full **Copyright view**: AI2ORBIT sign + key-flag +
-     `© 2026 AI2Orbit Co. — AINetworkSwitch` + "Made in Finland" + the Avainlippu®
+     `AI2ORBIT CO. Copyright 2018-2027. All rights reserved. — AINetworkSwitch` + "Made in Finland" + the Avainlippu®
      registered-mark line. (Open with "About".)
-   - **Browser** → a slim **footer line**: `Copyright 2026 AI2Orbit Co.` + the
+   - **Browser** → a slim **footer line**: `AI2ORBIT CO. Network system Pat. pend. Founded in 2018. Copyright 2018-2027. All rights reserved.` + the
      Keylogo (key-flag). Always visible at the bottom of the console.
 
 ## Run

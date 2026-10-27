@@ -106,4 +106,4 @@ actually opens a socket to the target and times the round trip.
 - The only outbound calls are the latency probes you ask it to make. Set `DB_KEY` for rc/prod.
 - Android/Windows/Mac/Linux clients all just open the served page or call the API.
 
-© AI2ORBIT Co. 2026
+AI2ORBIT CO. Network system Pat. pend. Founded in 2018. Copyright 2018-2027. All rights reserved.

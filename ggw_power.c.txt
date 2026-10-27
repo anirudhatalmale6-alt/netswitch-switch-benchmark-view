@@ -1,5 +1,5 @@
 /* ggw_power - what the machine is actually drawing, in watts.
-   AI2ORBIT Co. (c) 2026.
+   AI2ORBIT CO. Network system Pat. pend. Founded in 2018. Copyright 2018-2027. All rights reserved.
 
    WHY THIS IS A NATIVE PROGRAM AND NOT A WEB PAGE. No browser hands a
    page a voltage, a current or a watt. Not one. That is not a gap in
