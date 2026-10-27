@@ -344,8 +344,9 @@ var MEMW = [
 "  for (i = 0; i < NB; i++){ idx = Math.imul(i, 0x9E3779B1) & m; w[idx >>> 5] |= 1 << (idx & 31); }",
 "  var bt = now() - tb, cnt = 0, v;",
 "  for (i = 0; i < w.length; i++){ v = w[i]; v = v - ((v >>> 1) & 0x55555555); v = (v & 0x33333333) + ((v >>> 2) & 0x33333333); cnt += Math.imul((v + (v >>> 4)) & 0x0F0F0F0F, 0x01010101) >>> 24; }",
-"  var one = Math.imul(1, 0x9E3779B1) & m;",
-"  postMessage({ done: { write: write, copy: copy, bits: NB, bitNs: bt * 1e6 / NB, counted: cnt, slot: one >>> 5, bit: one & 31 } });",
+"  var one = Math.imul(1, 0x9E3779B1) & m, doneMsg = { write: write, copy: copy, bits: NB, bitNs: bt * 1e6 / NB, counted: cnt, slot: one >>> 5, bit: one & 31 };",
+"  if (self.crypto && self.crypto.subtle && self.crypto.subtle.digest){ self.crypto.subtle.digest('SHA-256', w.buffer).then(function(hb){ var ha = new Uint8Array(hb), hs = ''; for (var q = 0; q < ha.length; q++) hs += (ha[q] < 16 ? '0' : '') + ha[q].toString(16); doneMsg.sha = hs; postMessage({ done: doneMsg }); }, function(){ postMessage({ done: doneMsg }); }); }",
+"  else postMessage({ done: doneMsg });",
 "};"].join("\n");
 function probeMemory(){ return new Promise(function(res){
   var sizes = []; for (var s = 4096; s <= (64 << 20); s *= 2) sizes.push(s);
@@ -703,6 +704,7 @@ function renderProbes(){
     ['One bit written', fi(x.bitNs, 2) + ' ns a bit, ' + big(x.bits) + ' bits each set once'],
     ['Bits counted back', big(x.counted) + ' of ' + big(x.bits) + (x.counted === x.bits ? ' - every bit landed' : ' - BITS MISSING')],
     ['First write landed in', 'Slot ' + big(x.slot) + ', bit ' + x.bit + ' (slot = one 32 bit word)'],
+    ['DDR block, SHA-256', x.sha ? x.sha.slice(0, 16) + ' ... ' + x.sha.slice(-16) + ' - the whole 1 MB bit block, checked at the end' : 'Not given by this browser'],
     ['Memory, as the browser rounds it', v && v.mem ? fi(v.mem, v.mem < 1 ? 2 : 0) + ' GB or more' : 'Not given by this browser']] : [[P.phase || 'Waiting', '-']]);
   rows('tbus', b ? [['Thread to thread, echo', fi(b.echoUs, 0) + ' microseconds for a tiny message there and back'],
     ['Thread to thread, copied', fi(b.copyGBs, 2) + ' GB/s - ' + bytesTxt(b.size) + ' there and back in ' + fi(b.copyMs, 1) + ' ms'],
@@ -769,6 +771,7 @@ function selfCheck(){
   C.forEach(function(c, i){ if (c.heat < -1e-9 || c.heat > RISE_FULL + 1e-9) f.push('core ' + (i + 1) + ' heat is outside the model'); });
   if (started && nowS() > 4 && C.every(function(c){ return !c.rep.length; })) f.push('the threads have stopped reporting');
   if (P.memX && P.memX.counted !== P.memX.bits) f.push('a single bit write went missing in memory');
+  if (P.memX && P.memX.sha && !/^[0-9a-f]{64}$/.test(P.memX.sha)) f.push('the DDR block hash is not a 256 bit value');
   if (P.mem.length > 1 && P.mem.some(function(m){ return !(m.ns > 0) || !(m.scan > 0); })) f.push('a memory figure is not a positive number');
   if (STR.res && Object.keys(STR.res.st).some(function(n){ return !(STR.res.st[n] >= 0); })) f.push('a screen striper time is not a number');
   if (STR.res && !STR.res.sameBack) f.push('the picture came back from the screen changed');
