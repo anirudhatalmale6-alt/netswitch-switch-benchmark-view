@@ -12,7 +12,7 @@
   #pg{padding:58px 12px 70px;max-width:1000px}
   h2{font-size:10px;letter-spacing:2px;color:var(--muted);font-weight:400;margin:16px 0 6px;text-transform:uppercase}
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px;min-width:0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px;min-width:0;contain:content}
   .card h3{margin:0 0 8px;font-size:11px;font-weight:700;color:var(--ink2);letter-spacing:.5px}
   canvas{display:block;width:100%;touch-action:none}
   .zwrap{position:relative} .zb{position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:4px}
@@ -187,8 +187,8 @@ function dijkstra(src, cut){
 }
 function bellman(src, cut){
   var d = N.map(function(){ return Infinity; }); d[src] = 0;
-  for (var k = 0; k < N.length; k++) links.forEach(function(l){ if (cut && cut[lkey(l[0], l[1])]) return;
-    if (d[l[0]] + l[2] < d[l[1]]) d[l[1]] = d[l[0]] + l[2]; if (d[l[1]] + l[2] < d[l[0]]) d[l[0]] = d[l[1]] + l[2]; });
+  for (var k = 0; k < N.length; k++){ var ch = false; links.forEach(function(l){ if (cut && cut[lkey(l[0], l[1])]) return;
+    if (d[l[0]] + l[2] < d[l[1]]){ d[l[1]] = d[l[0]] + l[2]; ch = true; } if (d[l[1]] + l[2] < d[l[0]]){ d[l[0]] = d[l[1]] + l[2]; ch = true; } }); if (!ch) break; }   /* settled: a further pass changes nothing */
   return d;
 }
 function loadMW(i){ return PLACES[i][3] * KW_PER_PERSON / 1000; }
@@ -224,7 +224,7 @@ function seasonAt(daysFromNow){ var d = new Date(Date.now() + daysFromNow * 864e
   return 1 + SEASON_SWING * Math.cos(2 * Math.PI * (doy - 15) / 365); }
 function chainOf(i){ var k = nat.feed[i]; if (k === null) return null; var c = i, out = [i];
   while (nat.paths[k].prev[c] >= 0){ c = nat.paths[k].prev[c]; out.push(c); } return out; }
-var lastNatShown = null, lastNatSup = null;
+var lastNatShown = null, lastNatSup = null, SUP_CELLS = null;
 /* PRODUCER DETAILS, as listed on OpenStreetMap: operator, owner, the year it started, how it makes power, heat
    it gives, its ENTSO-E code, address, and its generators - how many, which make and model, their output. A
    field nobody has listed is shown as not listed, never guessed. */
@@ -365,7 +365,7 @@ function locChooseTie(L, s){
   return best;
 }
 function locStep(L, now){
-  var t = (now - L.t0) / 1000, cyc = Math.floor(t / LOCAL_EVERY), x = t - cyc * LOCAL_EVERY;
+  var t = Math.max(0, (now - L.t0) / 1000), cyc = Math.floor(t / LOCAL_EVERY), x = t - cyc * LOCAL_EVERY;
   if (L.cyc !== cyc){ L.cyc = cyc; L.st = locNormal(L); L.step = 0;
     L.sec = L.sect[(cyc * 7 + 3) % L.sect.length]; }
   var S = L.st, sec = L.sec;
@@ -385,11 +385,30 @@ function locStep(L, now){
 
 /* ================= state ================= */
 var t0 = performance.now(), cut = {}, cutName = null, nat = null, cutN = 0, lastCut = -1, fails = [], loopError = null, locIdx = 0, locPinned = false, lastLocSwitch = 0;
-function cutNext(){
-  var base = solve({}), ranked = Object.keys(base.flow).sort(function(a, b){ return base.flow[b] - base.flow[a]; }).slice(0, 6);
+var BASE = null;
+function nextCut(){
+  var base = BASE || (BASE = solve({})), ranked = Object.keys(base.flow).sort(function(a, b){ return base.flow[b] - base.flow[a]; }).slice(0, 6);
   var k = ranked[cutN % ranked.length]; cutN++;
-  cut = {}; cut[k] = true;
-  var ab = k.split('-').map(Number); cutName = N[ab[0]][0] + ' to ' + N[ab[1]][0];
+  var c = {}; c[k] = true; var ab = k.split('-').map(Number); return { cut: c, name: N[ab[0]][0] + ' to ' + N[ab[1]][0] };
+}
+function cutNext(){ var x = nextCut(); cut = x.cut; cutName = x.name; }
+/* THE REROUTE IN THE BACKGROUND: the same code on a worker thread, so the map and tables keep moving while the
+   country is worked out again; if a browser policy refuses workers it runs here as before */
+var SW = null, SW_WAIT = null;
+(function(){ try {
+  var src = 'var N, adj, LEN = null, SUPPLY, SUPPLY_KIND, PLACES, NP, KW_PER_PERSON, MERIT;\n' + [km, lkey, dijkstra, loadMW, meritOf, solve].map(String).join('\n')
+    + '\nonmessage = function(e){ var m = e.data; if (m.init){ N = m.N; adj = m.adj; SUPPLY = m.SUPPLY; SUPPLY_KIND = m.SUPPLY_KIND; PLACES = m.PLACES; NP = m.NP; KW_PER_PERSON = m.KW; MERIT = m.MERIT; return; }'
+    + ' postMessage({ id: m.id, res: solve(m.cut) }); };';
+  SW = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+  SW.onerror = function(){ SW = null; SW_WAIT = null; };
+  SW.onmessage = function(e){ if (!SW_WAIT || e.data.id !== SW_WAIT.id) return; var w = SW_WAIT; SW_WAIT = null; cut = w.cut; cutName = w.name; nat = e.data.res; };
+  SW.postMessage({ init: 1, N: N, adj: adj, SUPPLY: SUPPLY, SUPPLY_KIND: SUPPLY_KIND, PLACES: PLACES, NP: NP, KW: KW_PER_PERSON, MERIT: MERIT });
+} catch (e){ SW = null; } })();
+function solveNext(){
+  var x = nextCut();
+  if (SW && !SW_WAIT){ SW_WAIT = { id: cutN, cut: x.cut, name: x.name, at: performance.now() }; try { SW.postMessage({ id: cutN, cut: x.cut }); return; } catch (e){ SW = null; SW_WAIT = null; } }
+  if (SW_WAIT && performance.now() - SW_WAIT.at < 30000) return;     /* the last one is still being worked out */
+  SW_WAIT = null; cut = x.cut; cutName = x.name; nat = solve(cut);
 }
 
 /* ================= drawing ================= */
@@ -398,7 +417,7 @@ function prep(cv){ var dpr = Math.min(window.devicePixelRatio || 1, 2), W = cv.c
   var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H); return { g: g, W: W, H: H }; }
 function col(r){ return r >= 1 ? '#d03b3b' : (r >= 0.8 ? '#fab219' : '#0ca30c'); }
 var KIND_COL = { nuclear: '#ffd23f', hydro: '#3987e5', wind: '#7fdbca', solar: '#ff9f1c', biomass: '#8bc34a', biogas: '#8bc34a', coal: '#9e9e9e', gas: '#b39ddb', oil: '#a1887f', waste: '#bcaaa4', link: '#e05d9a', other: '#cfd8dc' };
-var FINXY = null, VIEW = { z: 1, ox: 0, oy: 0 };
+var FINXY = null, VIEW = { z: 1, ox: 0, oy: 0 }, GL = null;
 function drawFin(){
   var c = prep(el('fin')), g = c.g, W = c.W, H = c.H;
   var lat0 = 59.6, lat1 = 69.2, lon0 = 20.5, lon1 = 31.8, k = Math.cos(64 * Math.PI / 180);
@@ -407,9 +426,15 @@ function drawFin(){
      readable at any zoom, instead of scaling the picture up */
   var X = function(p){ return (15 + (p[2] - lon0) * k * sc) * VIEW.z + VIEW.ox; }, Y = function(p){ return (H - 15 - (p[1] - lat0) * sc) * VIEW.z + VIEW.oy; };
   FINXY = { X: X, Y: Y, W: W, H: H };
-  if (el('realGrid').checked) GRID_LINES.forEach(function(l){ var c = l[3]; g.strokeStyle = l[0] >= 400 ? 'rgba(255,90,90,0.55)' : (l[0] >= 220 ? 'rgba(255,170,60,0.5)' : 'rgba(160,180,200,0.28)'); g.lineWidth = l[0] >= 400 ? 1.6 : 1;
-    g.beginPath(); for (var q = 0; q < c.length; q += 2){ var pp2 = [0, c[q], c[q + 1]]; if (q) g.lineTo(X(pp2), Y(pp2)); else g.moveTo(X(pp2), Y(pp2)); } g.stroke(); });
-  PRODUCERS_NO_MW.forEach(function(q){ var pp = [q[0], q[1], q[2]]; g.strokeStyle = KIND_COL[q[4]] || '#3987e5'; g.lineWidth = 1; g.strokeRect(X(pp) - 2, Y(pp) - 2, 4, 4); });
+  /* the real grid lines and the producers with no output do not move: drawn once into their own layer for each view,
+     then copied - redrawing every line four times a second jammed a phone */
+  var cvF = el('fin'), lkeyV = [cvF.width, cvF.height, VIEW.z, VIEW.ox, VIEW.oy, el('realGrid').checked].join('|');
+  if (!GL || GL.key !== lkeyV){ GL = GL || { c: document.createElement('canvas') }; GL.key = lkeyV; GL.c.width = cvF.width; GL.c.height = cvF.height;
+    var gg = GL.c.getContext('2d'), dpr = cvF.width / Math.max(1, W); gg.setTransform(dpr, 0, 0, dpr, 0, 0); gg.clearRect(0, 0, W, H);
+    if (el('realGrid').checked) GRID_LINES.forEach(function(l){ var c = l[3]; gg.strokeStyle = l[0] >= 400 ? 'rgba(255,90,90,0.55)' : (l[0] >= 220 ? 'rgba(255,170,60,0.5)' : 'rgba(160,180,200,0.28)'); gg.lineWidth = l[0] >= 400 ? 1.6 : 1;
+      gg.beginPath(); for (var q = 0; q < c.length; q += 2){ var pp2 = [0, c[q], c[q + 1]]; if (q) gg.lineTo(X(pp2), Y(pp2)); else gg.moveTo(X(pp2), Y(pp2)); } gg.stroke(); });
+    PRODUCERS_NO_MW.forEach(function(q){ var pp = [q[0], q[1], q[2]]; gg.strokeStyle = KIND_COL[q[4]] || '#3987e5'; gg.lineWidth = 1; gg.strokeRect(X(pp) - 2, Y(pp) - 2, 4, 4); }); }
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(GL.c, 0, 0); g.restore();
   links.forEach(function(l){ var key = lkey(l[0], l[1]), f = nat.flow[key] || 0;
     g.strokeStyle = cut[key] ? '#d03b3b' : (f ? col(f / LINE_MW) : '#2b3d50'); g.lineWidth = cut[key] ? 2 : (f ? 1.5 + Math.min(4, f / 400) : 1);
     g.setLineDash(cut[key] ? [5, 4] : []); g.beginPath(); g.moveTo(X(N[l[0]]), Y(N[l[0]])); g.lineTo(X(N[l[1]]), Y(N[l[1]])); g.stroke(); });
@@ -438,8 +463,10 @@ function row(t, k, v, chip){ var tr = document.createElement('tr'), a = document
   var b = document.createElement('td'); b.className = 'v';
   if (chip){ var c = document.createElement('span'); c.className = 'chip ' + chip[0]; c.textContent = chip[1]; b.appendChild(c); b.appendChild(document.createTextNode(' ')); }
   b.appendChild(document.createTextNode(v)); tr.appendChild(a); tr.appendChild(b); t.appendChild(tr); }
+function swapIn(id, tmp){ var e = el(id); if (e.innerHTML !== tmp.innerHTML) e.innerHTML = tmp.innerHTML; }
+function setText(id, v){ var e = el(id); if (e.textContent !== v) e.textContent = v; }
 function render(g0){
-  var tn = el('tNat'); tn.innerHTML = '';
+  var tn = document.createElement('table');
   var used = 0; PLACES.forEach(function(p, i){ used += loadMW(i); });
   var given = nat.given.reduce(function(a, b){ return a + b; }, 0), unfed = nat.feed.filter(function(x){ return x === null; }).length;
   var worst = 0; Object.keys(nat.flow).forEach(function(k){ worst = Math.max(worst, nat.flow[k] / LINE_MW); });
@@ -447,10 +474,17 @@ function render(g0){
   row(tn, 'Places Fed', (NP - unfed) + ' of ' + NP, [unfed ? 'c-crit' : 'c-ok', unfed ? 'NOT ALL' : 'ALL']);
   row(tn, 'Power Used', fi(used, 0) + ' MW, ' + fi(given, 0) + ' MW given');
   row(tn, 'Busiest Line', fi(worst * 100, 0) + ' per cent of its rating', [worst >= 1 ? 'c-crit' : (worst >= 0.8 ? 'c-warn' : 'c-ok'), worst >= 1 ? 'OVER' : (worst >= 0.8 ? 'HIGH' : 'OK')]);
-  if (nat !== lastNatSup){ lastNatSup = nat; var sb = el('sBody'), fr = document.createDocumentFragment();
+  if (nat !== lastNatSup && SUP_CELLS){ lastNatSup = nat;       /* after a cut only the giving and share of each producer change */
+    SUPPLY.forEach(function(s, k){ var c = SUP_CELLS[k], gv = fi(nat.given[k], nat.given[k] < 10 ? 2 : 0) + ' MW', sh = fi(nat.given[k] / s[3] * 100, 0) + ' %';
+      if (c[0].textContent !== gv) c[0].textContent = gv; if (c[1].textContent !== sh) c[1].textContent = sh; });
+    var tot0 = SUPPLY.reduce(function(a, s){ return a + s[3]; }, 0), giv0 = nat.given.reduce(function(a, b){ return a + b; }, 0);
+    setText('sNote', (SUPPLY.length + PRODUCERS_NO_MW.length) + ' producers and links: ' + SUPPLY.length + ' with an output given, ' + fi(tot0, 0) + ' MW, giving '
+      + fi(giv0, 0) + ' MW now; ' + PRODUCERS_NO_MW.length + ' with no output given on the map. Data: OpenStreetMap contributors.'); }
+  if (nat !== lastNatSup){ lastNatSup = nat; var sb = el('sBody'), fr = document.createDocumentFragment(); SUP_CELLS = [];
     SUPPLY.forEach(function(s, k){ var tr = document.createElement('tr'), d = SUPPLY_DET[k];
       [s[0], cap1(SUPPLY_KIND[k]), SUPPLY_MUN[k], fi(s[3], s[3] < 10 ? 2 : 0) + ' MW', fi(nat.given[k], nat.given[k] < 10 ? 2 : 0) + ' MW', fi(nat.given[k] / s[3] * 100, 0) + ' %', d.operator || '-', d.start || '-', genTxt(d)]
         .forEach(function(x, i){ var td = document.createElement('td'); td.className = i ? 'v' : 'k'; td.textContent = x; tr.appendChild(td); });
+      SUP_CELLS[k] = [tr.children[4], tr.children[5]];
       tr.style.cursor = 'pointer'; tr.onclick = function(){ showProducer(k, false); }; fr.appendChild(tr); });
     PRODUCERS_NO_MW.forEach(function(s, j){ var tr = document.createElement('tr'), d = DETAIL[s[6]] || {};
       [s[0], cap1(s[4]), s[5], 'Not given', '-', '-', d.operator || '-', d.start || '-', genTxt(d)].forEach(function(x, i){ var td = document.createElement('td'); td.className = i ? 'v' : 'k'; td.textContent = x; tr.appendChild(td); });
@@ -459,22 +493,24 @@ function render(g0){
     var tot = SUPPLY.reduce(function(a, s){ return a + s[3]; }, 0), giv = nat.given.reduce(function(a, b){ return a + b; }, 0);
     el('sNote').textContent = (SUPPLY.length + PRODUCERS_NO_MW.length) + ' producers and links: ' + SUPPLY.length + ' with an output given, ' + fi(tot, 0) + ' MW, giving '
       + fi(giv, 0) + ' MW now; ' + PRODUCERS_NO_MW.length + ' with no output given on the map. Data: OpenStreetMap contributors.'; }
-  var lb = el('liBody'); lb.innerHTML = '';
+  swapIn('tNat', tn); var lb = document.createElement('tbody');
   Object.keys(nat.flow).sort(function(a, b){ return nat.flow[b] - nat.flow[a]; }).slice(0, 8).forEach(function(k){
     var ab = k.split('-').map(Number), tr = document.createElement('tr');
     [N[ab[0]][0] + ' to ' + N[ab[1]][0], fi(nat.flow[k], 0) + ' MW', fi(nat.flow[k] / LINE_MW * 100, 0) + ' %']
       .forEach(function(x, i){ var td = document.createElement('td'); td.className = i ? 'v' : 'k'; td.textContent = x; tr.appendChild(td); }); lb.appendChild(tr); });
-  var L = loc; el('locTitle').textContent = 'Local View, One District Of ' + PLACES[L.pi][0];
-  var tl = el('tLoc'); tl.innerHTML = '';
+  swapIn('liBody', lb); var L = loc; setText('locTitle', 'Local View, One District Of ' + PLACES[L.pi][0]);
+  var tl = document.createElement('table');
   var stepName = ['Normal', 'Fault, relay timing', 'Breaker open', 'Section switched out', 'Breaker closed again', 'Rerouted through a tie', 'Repaired', 'Back to normal'][L.step];
   row(tl, 'State', stepName, [L.step === 0 || L.step === 7 ? 'c-ok' : (L.step >= 5 ? 'c-warn' : 'c-crit'), L.step === 0 || L.step === 7 ? 'NORMAL' : 'FAULT ' + L.sec[0]]);
   row(tl, 'District', L.F + ' feeders, ' + fi(g0.head / 1000, 1) + ' MW served, ' + fi(amps(g0.head), 0) + ' A');
   row(tl, 'City', fi(loadMW(L.pi), loadMW(L.pi) < 10 ? 1 : 0) + ' MW, ' + (L.districts === 1 ? 'one district, this one' : 'about ' + L.districts + ' districts like this one'));
   if (L.log.length) row(tl, 'Last', L.log[L.log.length - 1].replace(/^[0-9,]+ s  /, ''));
-  el('line').textContent = 'Finland: ' + (cutName ? 'line ' + cutName + ' cut, ' : '') + (NP - unfed) + ' of ' + NP + ' places fed, busiest line '
-    + fi(worst * 100, 0) + ' per cent - local view ' + PLACES[L.pi][0] + ' - real places, modelled grid';
+  swapIn('tLoc', tl); setText('line', 'Finland: ' + (cutName ? 'line ' + cutName + ' cut, ' : '') + (NP - unfed) + ' of ' + NP + ' places fed, busiest line '
+    + fi(worst * 100, 0) + ' per cent - local view ' + PLACES[L.pi][0] + ' - real places, modelled grid');
   if (document.activeElement !== el('cities')) el('cities').value = String(L.pi);
-  if (nat !== lastNatShown){ lastNatShown = nat; renderPlaces(); renderBig(); renderFinder(); if (!window.__grid) renderGrid(); if (!window.__pdet) showProducer(0, false); }
+  if (nat !== lastNatShown){ var first = lastNatShown === null, n0 = nat; lastNatShown = nat; renderBig();   /* the long tables one at a time, off the drawing frame */
+    if (first){ renderPlaces(); renderFinder(); } else [renderFinder, renderPlaces].forEach(function(fn, q){ setTimeout(function(){ if (nat === n0) fn(); }, 60 + q * 90); });
+    if (!window.__grid) renderGrid(); if (!window.__pdet) showProducer(0, false); }
   selfCheck(g0); refreshDownloads();
 }
 function renderSettings(){ var t = el('tSet'); t.innerHTML = '';
@@ -494,16 +530,31 @@ var WORDS = ('All Rights Reserved Copyright Finland Grid The Country Modelled Li
     (JSON.stringify(DETAIL) + ' ' + GRID_OPS.join(' ')).match(/\b[A-Z][a-z]{2,}/g) || [], 'Generators Make Model Started Owner Operator Heat Address Note Lat Feeds Kind Real Main Grid Lines Drawn Operators Listed Cross Link'.split(' '),
     /* the pieces the check itself sees: a name like Kaukolämpö is read up to its first letter outside a to z */
     PLACES.concat(SUPPLY, PRODUCERS_NO_MW).map(function(p){ return p[0]; }).concat(REGION).join(' ').match(/\b[A-Z][a-z]{2,}/g) || []);
-function selfCheck(g0){
+/* THE CHECK, split so it never jams the screen thread: the page text is read once and on request, the physics once
+   for each new result, the district at every step */
+var CK = { text: null, nat: null, natF: [], words: null };
+function selfCheck(g0, full){
+  var f = [];
+  if (full || !CK.text) CK.text = textCheck();
+  if (nat && (full || CK.nat !== nat)){ CK.nat = nat; CK.natF = natCheck(); }
+  f = f.concat(CK.text, CK.natF);
+  return finish(f, g0);
+}
+function textCheck(){
   var f = [], txt = document.body.innerText.replace(el('chk').innerText, '');
+  if (!CK.words) CK.words = new Set(WORDS);
   if (document.querySelectorAll('pre, code, textarea').length) f.push('a source block reached the page');
   if (/[$€£]\s?[0-9]|[0-9]\s?[$€£]|\b(price[sd]?|euro|dollars?)\b/i.test(txt)) f.push('money wording reached the page');
   if (/\b(Infinity|NaN|undefined|null)\b/.test(txt)) f.push('a figure with no value reached the page');
   if (el('crText').textContent.trim() !== 'AI2ORBIT CO. Network system Pat. pend. Founded in 2018. Copyright 2018-2027. All rights reserved.') f.push('the copyright line is not exact');
   var m = txt.match(/\b[A-Z][a-z]{2,} +[A-Z][a-z]{2,}\b/g) || [];
-  var bad = m.filter(function(s){ var w = s.split(/ +/); return WORDS.indexOf(w[0]) < 0 || WORDS.indexOf(w[1]) < 0; });
+  var bad = m.filter(function(s){ var w = s.split(/ +/); return !CK.words.has(w[0]) || !CK.words.has(w[1]); });
   if (bad.length) f.push('something reads as a name: ' + bad[0]);
   [].forEach.call(document.querySelectorAll('#pg td.k'), function(td){ var s = td.textContent.trim(); if (s && /^[a-z]/.test(s)) f.push('a row does not start with a capital: ' + s.slice(0, 30)); });
+  return f;
+}
+function natCheck(){
+  var f = [];
   if (nat){
     var used = 0; PLACES.forEach(function(p, i){ if (nat.feed[i] !== null) used += loadMW(i); });
     var given = nat.given.reduce(function(a, b){ return a + b; }, 0);
@@ -517,7 +568,10 @@ function selfCheck(g0){
       if (Math.abs(bs - window.__finder.now) > 1e-6) f.push('the finder does not cover the whole need'); }
     var b0 = bellman(NP, cut); PLACES.forEach(function(p, i){ if (Math.abs(b0[i] - nat.paths[0].d[i]) > 1e-6) f.push('a shortest way to ' + p[0] + ' is wrong'); });
   }
-  if (g0 && loc){
+  return f;
+}
+function finish(f, g0){
+  if (g0 && loc && loc.st){
     var served = 0; Object.keys(loc.nodes).forEach(function(n){ if (loc.nodes[n][2] && g0.fed[n]) served += loc.nodes[n][2]; });
     if (Math.abs(served - g0.head) > 1e-6) f.push('the district gives out more or less than it serves');
     if (g0.loop) f.push('a loop closed in the district');
@@ -549,10 +603,11 @@ function dxfOf(){
   N.forEach(function(n, i){ p(0, 'TEXT'); p(8, i >= NP ? 'SUPPLY' : 'PLACES'); p(10, n[2]); p(20, n[1]); p(30, 0); p(40, 0.08); p(1, n[0]); });
   p(0, 'ENDSEC'); p(0, 'EOF'); return o.join('\r\n') + '\r\n';
 }
-var lastDl = 0;
-function refreshDownloads(){ if (performance.now() - lastDl < 2000) return; lastDl = performance.now();
-  el('dlTxt').href = URL.createObjectURL(new Blob([textOf()], {type: 'text/plain'}));
-  el('dlDxf').href = URL.createObjectURL(new Blob([dxfOf()], {type: 'image/vnd.dxf'})); }
+/* the files are made at the tap, from the view as it is then - never in the background */
+function refreshDownloads(){}
+function makeDl(a, fn, type){ try { if (a.href && a.href.indexOf('blob:') === 0) URL.revokeObjectURL(a.href); } catch (e){} a.href = URL.createObjectURL(new Blob([fn()], { type: type })); }
+el('dlTxt').addEventListener('click', function(){ if (nat) makeDl(this, textOf, 'text/plain'); });
+el('dlDxf').addEventListener('click', function(){ if (nat) makeDl(this, dxfOf, 'image/vnd.dxf'); });
 
 /* ================= start, without a button ================= */
 PLACES.map(function(p, i){ return i; }).sort(function(a, b){ return PLACES[a][0].localeCompare(PLACES[b][0], 'fi'); }).forEach(function(i){
@@ -564,14 +619,14 @@ PLACES.map(function(p, i){ return i; }).sort(function(a, b){ return PLACES[a][0]
   var o = document.createElement('option'); o.value = String(i); o.textContent = PLACES[i][0] + ', ' + REGION[i]; el('fq').appendChild(o); });
 el('realGrid').onchange = function(){ drawFin(); };
 el('fq').value = '0'; el('fq').onchange = function(){ FQ = +this.value; renderFinder(); };
-loc = buildLocal(0); nat = solve({}); renderSettings(); lastLocSwitch = performance.now();
+loc = buildLocal(0); nat = BASE = solve({}); renderSettings(); lastLocSwitch = performance.now();
 var lastDraw = 0, lastG = null;
 function tick(){
   requestAnimationFrame(tick);
   var now = performance.now();                 /* the real clock, never the frame's own stamp */
   try {
     var t = (now - t0) / 1000;
-    if (Math.floor(t / CUT_EVERY) !== lastCut){ lastCut = Math.floor(t / CUT_EVERY); if (lastCut > 0) cutNext(); nat = solve(cut); }
+    if (Math.floor(t / CUT_EVERY) !== lastCut){ lastCut = Math.floor(t / CUT_EVERY); if (lastCut > 0) solveNext(); }
     /* the local view tours the country: the next place, rebuilt, every LOCAL_EVERY seconds */
     if (!locPinned && now - lastLocSwitch > LOCAL_EVERY * 1000){ lastLocSwitch = now; locIdx = (locIdx + 1) % NP; loc = buildLocal(locIdx); }
     lastG = locStep(loc, now);
@@ -616,7 +671,7 @@ window.__zoom = function(f){ zoomAt(f, el('fin').clientWidth / 2, el('fin').clie
 
 window.__read = function(){ return { cut: cutName, fed: nat.feed.filter(function(x){ return x !== null; }).length, given: nat.given, loc: PLACES[loc.pi][0],
   step: loc.step, links: links.length, fails: fails, bar: el('stamp').textContent + ' ' + el('line').textContent }; };
-window.__selfCheck = function(){ return selfCheck(lastG); };
+window.__selfCheck = function(){ return selfCheck(lastG, true); };
 window.__cut = function(){ cutNext(); nat = solve(cut); return cutName; };
 window.__pick = function(name){ for (var i = 0; i < NP; i++) if (PLACES[i][0] === name){ locPinned = true; locIdx = i; loc = buildLocal(i); } };
 window.__jumpLocal = function(s){ loc.t0 = performance.now() - s * 1000; };
