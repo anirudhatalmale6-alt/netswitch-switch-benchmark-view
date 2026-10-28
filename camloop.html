@@ -46,8 +46,7 @@
   <div class="card"><div class="ctl">
     <label>Colours <select id="kSel"></select></label>
     <label>Mask <select id="mSel"><option value="all">Whole picture</option><option value="centre">Centre circle</option><option value="moved">Changed pixels only</option></select></label>
-    <button class="btn" id="lens">Lens: back</button><button class="btn go" id="snap">Photo</button><button class="btn" id="scr">Screen</button>
-    <label class="btn" style="cursor:pointer">Open a photo<input id="file" type="file" accept="image/*" style="display:none"></label></div>
+    <button class="btn" id="lens">Lens: back</button><button class="btn go" id="snap">Photo</button><label class="btn go" style="cursor:pointer">Insert a photo<input id="file" type="file" accept="image/*" style="display:none"></label><button class="btn" id="scr">Screen</button></div>
     <div id="src" class="note"></div></div>
   <div class="two">
     <div class="card"><h3>Camera, Live</h3><video id="vid" playsinline muted autoplay></video><canvas id="test" style="display:none"></canvas></div>
@@ -58,7 +57,8 @@
   <h2>Map Reduce Log</h2>
   <div class="card"><div id="log"></div></div>
   <h2>The Photo In Binary And Hex</h2>
-  <div class="card"><canvas id="pmap" style="display:none;max-width:100%"></canvas><table id="ph"></table><div id="hex"></div></div>
+  <div class="card"><div class="note" id="phHint">Photo takes the camera picture; Insert a photo takes one from the gallery or files. The result is printed on the photo below.</div>
+    <canvas id="pstamp" style="display:none;max-width:100%"></canvas><canvas id="pmap" style="display:none;max-width:100%"></canvas><table id="ph"></table><div id="hex"></div></div>
   <h2>What Is Measured</h2>
   <div class="card"><table id="how"></table></div>
   <div id="chk" style="display:none"></div>
@@ -249,12 +249,38 @@ function takePhoto(srcEl, sw, sh, from){
     var pm = el('pmap'); drawMap(pm, lab, r.cent, w, h, null); pm.style.display = 'block';
     var allMs = performance.now() - t0;
     c.toBlob(function(blob){ blob.arrayBuffer().then(function(ab){ var by = new Uint8Array(ab);
-      sha256(ab).then(function(sha){
+      var tSha0 = performance.now();
+      Promise.all([sha256(ab), sha256(full.buffer.slice(0))]).then(function(two){ var sha = two[0], memSha = two[1], shaMs = performance.now() - tSha0;
         var ok = cnt.reduce(function(a, b){ return a + b; }, 0) === w * h;
-        photo = { from: from, w: w, h: h, bytes: by.length, sha: sha, prev: prevPhotoSha, cent: r.cent, counts: cnt, ms: allMs, head: by.slice(0, 256), check: ok ? null : 'the photo colours do not hold every pixel' };
+        /* the bytes as a turn: each red, green and blue byte is an angle of byte / 256 of a full turn; the sums of the
+           sines and cosines give the mean angle, and its 2 x 2 rotation matrix [cos -sin; sin cos] is printed with its sum */
+        var ss = 0, cs = 0, bsum = 0, TW = 2 * Math.PI / 256, SN = new Float64Array(256), CS = new Float64Array(256), hist = new Uint32Array(256);
+        for (var z = 0; z < 256; z++){ SN[z] = Math.sin(z * TW); CS[z] = Math.cos(z * TW); }
+        for (var y = 0; y < full.length; y += 4){ hist[full[y]]++; hist[full[y + 1]]++; hist[full[y + 2]]++; }
+        for (z = 0; z < 256; z++){ ss += hist[z] * SN[z]; cs += hist[z] * CS[z]; bsum = (bsum + hist[z] * z) >>> 0; }
+        var ang = Math.atan2(ss, cs), mc = Math.cos(ang), ms = Math.sin(ang), msum = mc - ms + ms + mc;
+        var timing = { colours: r.ms, every: allMs, sha: shaMs, perPixelNs: allMs * 1e6 / (w * h) };
+        var stamp = ['AI2ORBIT CAMERA MAP REDUCE - ' + stampNow() + ' - ' + from + ', ' + w + ' x ' + h,
+          'SHA-256 of the photo (PNG before this print): ' + (sha || 'not offered'),
+          'SHA-256 of its pixels in memory (RGBA, ' + nf(full.length) + ' bytes): ' + (memSha || 'not offered'),
+          'Byte sum (red, green, blue) 0x' + ('0000000' + bsum.toString(16).toUpperCase()).slice(-8) + ' - sin sum ' + fi(ss, 1) + ', cos sum ' + fi(cs, 1) + ', mean angle ' + fi(ang * 180 / Math.PI, 2) + ' degrees',
+          'Matrix [cos -sin; sin cos] = [' + fi(mc, 4) + ' ' + fi(-ms, 4) + '; ' + fi(ms, 4) + ' ' + fi(mc, 4) + '], sum ' + fi(msum, 4),
+          'Times: colours ' + fi(timing.colours, 1) + ' ms, every pixel ' + fi(timing.every, 1) + ' ms (' + fi(timing.perPixelNs, 1) + ' ns a pixel), fingerprints ' + fi(timing.sha, 1) + ' ms - in microseconds hex ' + [timing.colours, timing.every, timing.sha].map(function(t){ return '0x' + Math.round(t * 1000).toString(16).toUpperCase(); }).join(' '),
+          'AI2ORBIT CO. Network system Pat. pend. Founded in 2018. Copyright 2018-2027. All rights reserved.'];
+        var pst = el('pstamp'), fs = Math.max(11, Math.round(w / 95)), lh = Math.round(fs * 1.35), band = lh * stamp.length + Math.round(fs * 0.9);
+        pst.width = w; pst.height = h + band; var sg = pst.getContext('2d'); sg.drawImage(c, 0, 0); sg.fillStyle = '#05080c'; sg.fillRect(0, h, w, band);
+        sg.font = '400 ' + fs + 'px ui-monospace, monospace'; sg.textBaseline = 'top';
+        stamp.forEach(function(t, i){ sg.fillStyle = i === stamp.length - 1 ? '#d0cefd' : (i === 1 || i === 2 ? '#ffd23f' : '#d7e6f2');
+          var tt = t; while (sg.measureText(tt).width > w - 16 && tt.length > 10) tt = tt.slice(0, -1); sg.fillText(tt, 8, h + Math.round(fs * 0.45) + i * lh); });
+        pst.style.display = 'block'; window.__photoStamp = stamp;
+        photo = { from: from, w: w, h: h, bytes: by.length, sha: sha, memSha: memSha, prev: prevPhotoSha, cent: r.cent, counts: cnt, ms: allMs, head: by.slice(0, 256), timing: timing, bsum: bsum, ss: ss, cs: cs, stamp: stamp,
+          check: !ok ? 'the photo colours do not hold every pixel' : (hist.reduce(function(a, b){ return a + b; }, 0) !== w * h * 3 ? 'the byte count is not three bytes a pixel' : null) };
         prevPhotoSha = sha;
         rows('ph', [['Photo', from + ', ' + w + ' x ' + h + ' = ' + nf(w * h) + ' pixels, every one given its colour, ' + fi(allMs, 0) + ' ms'], ['File', 'PNG, ' + nf(by.length) + ' bytes'],
-          ['SHA-256 now', sha || 'Not offered by this browser'], ['SHA-256 before', photo.prev ? photo.prev + (photo.prev === sha ? ' - SAME' : ' - CHANGED') : 'First photo'],
+          ['SHA-256 now', sha || 'Not offered by this browser'], ['SHA-256 in memory', memSha ? memSha + ' - the RGBA pixels, ' + nf(full.length) + ' bytes' : 'Not offered by this browser'],
+          ['Byte sum', '0x' + ('0000000' + bsum.toString(16).toUpperCase()).slice(-8) + ', sin sum ' + fi(ss, 1) + ', cos sum ' + fi(cs, 1) + ', mean angle ' + fi(ang * 180 / Math.PI, 2) + ' degrees'],
+          ['Matrix sum', '[cos -sin; sin cos] of the mean angle = ' + fi(msum, 4)],
+          ['Times', 'Colours ' + fi(timing.colours, 1) + ' ms, every pixel ' + fi(timing.every, 1) + ' ms, ' + fi(timing.perPixelNs, 1) + ' ns a pixel, fingerprints ' + fi(timing.sha, 1) + ' ms'], ['SHA-256 before', photo.prev ? photo.prev + (photo.prev === sha ? ' - SAME' : ' - CHANGED') : 'First photo'],
           ['First 16 bytes, binary', Array.from(by.slice(0, 16)).map(function(b){ return ('0000000' + b.toString(2)).slice(-8); }).join(' ')]].concat(palRows(r.cent, cnt)));
         var hx = []; for (var o = 0; o < Math.min(256, by.length); o += 16){ var line = Array.from(by.slice(o, o + 16)); hx.push(('000' + o.toString(16).toUpperCase()).slice(-4) + '  ' + line.map(hex2).join(' ') + '  ' + line.map(function(b){ return b >= 32 && b < 127 ? String.fromCharCode(b) : '.'; }).join('')); }
         el('hex').textContent = hx.join('\n');
@@ -281,7 +307,7 @@ function textOf(){
   L.push('THE LOOP, LAST ' + frames.length + ' FRAMES');
   frames.forEach(function(f){ L.push('#' + f.n + ' ' + f.at.toTimeString().slice(0, 8) + ' sha256 ' + f.sha + (f.same ? ' SAME' : '') + ', changed ' + (f.changed === null ? '-' : fi(f.changed * 100, 1) + ' %') + ', ' + f.rounds + ' rounds, colours ' + f.cent.map(function(c){ return rgbHex(c.map(Math.round)); }).join(' ')); });
   L.push('', 'MAP REDUCE LOG'); logL.forEach(function(x){ L.push(x); });
-  if (photo){ L.push('', 'PHOTO', photo.from + ', ' + photo.w + ' x ' + photo.h + ', PNG ' + photo.bytes + ' bytes', 'SHA-256 ' + photo.sha, 'Colours ' + photo.cent.map(function(c, i){ return rgbHex(c.map(Math.round)) + ' ' + photo.counts[i]; }).join(', '), 'First 256 bytes:', el('hex').textContent); }
+  if (photo){ L.push('', 'PHOTO', photo.from + ', ' + photo.w + ' x ' + photo.h + ', PNG ' + photo.bytes + ' bytes', 'SHA-256 ' + photo.sha, 'Colours ' + photo.cent.map(function(c, i){ return rgbHex(c.map(Math.round)) + ' ' + photo.counts[i]; }).join(', '), 'First 256 bytes:', el('hex').textContent); L.push('', 'PRINTED ON THE PHOTO'); (photo.stamp || []).forEach(function(x){ L.push(x); }); }
   L.push('', 'AI2ORBIT CO. Network system Pat. pend. Founded in 2018. Copyright 2018-2027. All rights reserved.'); return L.join('\n'); }
 function dxfOf(){ var o = []; function p(a, b){ o.push(a, String(b)); } p(0, 'SECTION'); p(2, 'ENTITIES');
   frames.forEach(function(f, i){ if (i){ var a = frames[i - 1]; p(0, 'LINE'); p(8, 'CHANGED_PERCENT'); p(10, i - 1); p(20, (a.changed || 0) * 100); p(30, 0); p(11, i); p(21, (f.changed || 0) * 100); p(31, 0); }
@@ -290,7 +316,7 @@ function dxfOf(){ var o = []; function p(a, b){ o.push(a, String(b)); } p(0, 'SE
 function mk(a, fn, type){ try { if (a.href && a.href.indexOf('blob:') === 0) URL.revokeObjectURL(a.href); } catch (e){} a.href = URL.createObjectURL(new Blob([fn()], { type: type })); }
 el('dlTxt').addEventListener('click', function(){ mk(this, textOf, 'text/plain'); });
 el('dlDxf').addEventListener('click', function(){ mk(this, dxfOf, 'image/vnd.dxf'); });
-el('dlPng').addEventListener('click', function(){ this.href = (photo ? el('pmap') : el('map')).toDataURL('image/png'); });
+el('dlPng').addEventListener('click', function(){ this.href = (photo ? el('pstamp') : el('map')).toDataURL('image/png'); this.download = photo ? 'camera-photo-stamped.png' : 'camera-colour-map.png'; });
 
 /* ---------------- start, without a button ---------------- */
 how(); note(); startCamera();
@@ -299,5 +325,6 @@ document.addEventListener('visibilitychange', function(){ if (document.hidden) s
 window.__read = function(){ return { source: source, frames: frames.length, n: frameN, k: K, mask: MASK, last: last ? { same: last.same, changed: last.changed, rounds: last.rounds, masked: last.masked, ms: last.ms } : null, photo: photo ? { w: photo.w, h: photo.h, sha: photo.sha, bytes: photo.bytes } : null, worker: !!KMW, fails: fails }; };
 window.__selfCheck = selfCheck;
 window.__photo = function(){ el('snap').click(); };
+window.__stamp = function(){ return window.__photoStamp || null; };
 </script>
 </body></html>

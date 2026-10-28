@@ -39,6 +39,11 @@
       <tr><td class="k">Sound</td><td><input type="file" id="file" accept="audio/*,video/*,.mp3,.mp4,.m4a,.aac,.wav,.ogg,.oga,.opus,.flac,.webm,.mov,.3gp"> <button class="btn" id="bSample">Use the sample</button></td></tr>
       <tr><td class="k">Now using</td><td class="v" id="src">-</td></tr>
       <tr><td class="k">State</td><td class="v" id="state">-</td></tr>
+      <tr><td class="k">Track</td><td class="v" id="tLen">-</td></tr>
+      <tr><td class="k">Bitrate</td><td class="v" id="tRate">-</td></tr>
+      <tr><td class="k">SHA-256 file</td><td class="v" id="tSha" style="word-break:break-all">-</td></tr>
+      <tr><td class="k">SHA-256 sound in memory</td><td class="v" id="tPcm" style="word-break:break-all">-</td></tr>
+      <tr><td class="k">Processing time</td><td class="v" id="tCpu">-</td></tr>
       <tr><td class="k">Start</td><td><input type="range" id="start" min="0" max="1000" value="0"></td></tr>
       <tr><td class="k">Start at</td><td class="v" id="startv">-</td></tr>
       <tr><td colspan="2"><button class="btn" id="bAuto">Loudest part again</button></td></tr>
@@ -82,7 +87,7 @@
    any web page. Payment itself is the shop service's; nothing here
    takes money.
    ================================================================== */
-var LENS = [5, 15, 59], FADE_IN = 0.3, FADE_OUT = 0.8, PEAK_DB = -1, buf = null, srcName = '', tones = [], fails = [], err = null, ACtx = window.AudioContext || window.webkitAudioContext;
+var TRK = null, LENS = [5, 15, 59], FADE_IN = 0.3, FADE_OUT = 0.8, PEAK_DB = -1, buf = null, srcName = '', tones = [], fails = [], err = null, ACtx = window.AudioContext || window.webkitAudioContext;
 function el(id){ return document.getElementById(id); }
 function two(n){ return (n < 10 ? '0' : '') + n; }
 function stampNow(){ var d = new Date(); return String(d.getFullYear()) + two(d.getMonth() + 1) + two(d.getDate()) + two(d.getHours()) + two(d.getMinutes()) + two(d.getSeconds()); }
@@ -134,10 +139,27 @@ function build(useAuto){
 }
 /* decodeAudioData in its callback form too: older Safari returns no promise */
 function decode(ac, ab){ return new Promise(function(ok, no){ var p = ac.decodeAudioData(ab, ok, function(e){ no(e || new Error('the browser could not decode it')); }); if (p && p.then) p.then(ok, no); }); }
+/* THE TRACK FINGERPRINT: the file as it came (SHA-256 of its bytes, before decoding), its length, the average bitrate
+   (file bits over seconds), the decoded sound as it sits in memory (SHA-256 of every 32-bit sample, channel after channel)
+   and the time each step took on this device */
+function hexOf(h){ return Array.from(new Uint8Array(h)).map(function(b){ return (b < 16 ? '0' : '') + b.toString(16); }).join(''); }
+function mmss(s){ var m = Math.floor(s / 60), r = s - m * 60; return m + ':' + (r < 10 ? '0' : '') + r.toFixed(2).replace('.', ','); }
+async function fingerprint(fileBytes, b, decodeMs, name){
+  var t0 = performance.now(), fsha = (window.crypto && crypto.subtle && fileBytes) ? hexOf(await crypto.subtle.digest('SHA-256', fileBytes)) : null, t1 = performance.now();
+  var pcm = new Float32Array(b.length * b.numberOfChannels); for (var c = 0; c < b.numberOfChannels; c++) pcm.set(b.getChannelData(c), c * b.length);
+  var psha = (window.crypto && crypto.subtle) ? hexOf(await crypto.subtle.digest('SHA-256', pcm.buffer)) : null, t2 = performance.now();
+  TRK = { name: name, secs: b.duration, bytes: fileBytes ? fileBytes.byteLength : null, kbps: fileBytes ? fileBytes.byteLength * 8 / b.duration / 1000 : null, fsha: fsha, psha: psha, pcmBytes: pcm.byteLength,
+    decodeMs: decodeMs, fileShaMs: t1 - t0, pcmShaMs: t2 - t1 };
+  el('tLen').textContent = mmss(b.duration) + ' (' + fi(b.duration, 3) + ' s), ' + b.length.toLocaleString('fi-FI') + ' samples a channel, ' + b.numberOfChannels + ' channel(s), ' + b.sampleRate + ' Hz';
+  el('tRate').textContent = TRK.kbps ? fi(TRK.kbps, 0) + ' kbit/s average, ' + fi(TRK.bytes / 1048576, 2) + ' MB file' : 'Made here - no file';
+  el('tSha').textContent = fsha || (fileBytes ? 'Not offered by this browser' : 'Made here - no file');
+  el('tPcm').textContent = psha ? psha + ' - ' + fi(pcm.byteLength / 1048576, 1) + ' MB of 32-bit samples, as this browser decoded them (each browser decodes a little differently)' : 'Not offered by this browser';
+  el('tCpu').textContent = (decodeMs !== null ? 'Decoding ' + fi(decodeMs, 0) + ' ms (' + fi(decodeMs / Math.max(0.001, b.duration), 2) + ' ms a second of track), ' : '') + 'file fingerprint ' + fi(TRK.fileShaMs, 1) + ' ms, sound fingerprint ' + fi(TRK.pcmShaMs, 1) + ' ms';
+}
 async function load(arrayBuf, name){
   err = null; el('state').textContent = 'Reading ' + name + ' (' + fi(arrayBuf.byteLength / 1048576, 1) + ' MB)';
-  var ac = null;
-  try { ac = new ACtx(); var b = await decode(ac, arrayBuf); buf = b; srcName = name;
+  var ac = null, keep = arrayBuf.slice(0);           /* decoding hands the bytes over, so the fingerprint reads a copy */
+  try { ac = new ACtx(); var td = performance.now(); var b = await decode(ac, arrayBuf); var dms = performance.now() - td; buf = b; srcName = name; await fingerprint(keep, b, dms, name);
     el('src').textContent = name + ' - ' + fi(buf.duration, 1) + ' s, ' + buf.numberOfChannels + ' channel(s), ' + buf.sampleRate + ' Hz';
     el('state').textContent = 'Read - three ringtones made'; build(true); }
   catch (e){ el('state').innerHTML = '<span style="color:#ff8a80">' + esc(name) + ' could not be read in this browser - its sound format is not one this browser decodes. Chrome reads MP3, M4A and MP4 (AAC or MP3 sound); the last good sound stays loaded.</span>';
@@ -146,7 +168,7 @@ async function load(arrayBuf, name){
 }
 el('file').onchange = function(){ var f = el('file').files[0]; if (!f) return; el('state').textContent = 'Opening ' + f.name; var r = new FileReader();
   r.onload = function(){ load(r.result, f.name); }; r.onerror = function(){ el('state').textContent = f.name + ' could not be opened from the phone storage'; }; r.readAsArrayBuffer(f); el('file').value = ''; };
-el('bSample').onclick = async function(){ err = null; buf = await makeSample(); srcName = 'sample'; el('src').textContent = 'The sample melody - ' + fi(buf.duration, 1) + ' s'; el('state').textContent = 'Sample made - three ringtones ready'; build(true); };
+el('bSample').onclick = async function(){ err = null; buf = await makeSample(); srcName = 'sample'; await fingerprint(null, buf, null, 'sample'); el('src').textContent = 'The sample melody - ' + fi(buf.duration, 1) + ' s'; el('state').textContent = 'Sample made - three ringtones ready'; build(true); };
 el('bAuto').onclick = function(){ build(true); };
 el('start').oninput = function(){ build(false); };
 function snippet(){
@@ -171,7 +193,7 @@ function selfCheck(){                         /* a price text is typed by hand h
   if (err) f.push(err);
   fails = f; var box = el('chk'); if (f.length){ box.style.display = 'block'; box.innerHTML = '<b style="color:#e0645f">THIS PAGE IS NOT CLEAN</b><br>' + f.join('<br>'); } else box.style.display = 'none'; return f;
 }
-function textOf(){ var L = ['RINGTONE MAKER', 'AI2Orbit', 'Taken ' + stampNow(), 'Source: ' + srcName, '', 'LENGTH; START S; SECONDS; GAIN DB; BYTES; FILE'];
+function textOf(){ var L = ['RINGTONE MAKER', 'AI2Orbit', 'Taken ' + stampNow(), 'Source: ' + srcName].concat(TRK ? ['Track ' + mmss(TRK.secs) + ', ' + (TRK.kbps ? fi(TRK.kbps, 0) + ' kbit/s, ' : '') + 'SHA-256 file ' + (TRK.fsha || '-') + ', SHA-256 sound ' + (TRK.psha || '-') + ', decoding ' + (TRK.decodeMs === null ? '-' : fi(TRK.decodeMs, 0) + ' ms')] : []).concat(['', 'LENGTH; START S; SECONDS; GAIN DB; BYTES; FILE']);
   tones.forEach(function(t){ L.push(t.len + '; ' + fi(t.start, 2) + '; ' + fi(t.secs, 3) + '; ' + fi(t.gainDb, 2) + '; ' + t.size + '; ' + t.name); });
   L.push('', 'SALES LINK HTML', el('snippet').value, '', 'AI2ORBIT CO. Network system Pat. pend. Founded in 2018. Copyright 2018-2027. All rights reserved.'); return L.join('\n'); }
 function dxfOf(){ var o = []; function p(a, b){ o.push(a, String(b)); } p(0, 'SECTION'); p(2, 'ENTITIES');
