@@ -35,7 +35,7 @@
   #crText{color:#12261a;font-weight:400;font-size:9px;line-height:1.2;white-space:normal;}
   @media (max-width:600px){ #bar{font-size:11px;padding:5px 8px} #pg{padding-top:78px} h2{scroll-margin-top:80px} }
 </style></head><body>
-<div id="bar"><b id="stamp">B114</b><i id="line">Warming up</i></div>
+<div id="bar"><b id="stamp">B115</b><i id="line">Warming up</i></div>
 <div id="pg">
   <div id="jump"><a href="#s-heat">Thermals</a><a href="#s-brk">Breaker 3D</a><a href="#s-thr">Threads</a><a href="#s-mem">Memory DDR</a><a href="#s-bus">Bus</a><a href="#s-scr">Screen</a><a href="#s-gfx">Graphics</a><a href="#s-str">Screen Striper</a><a href="#s-sph">CPU Sphere</a><a href="#s-frm">Formulas</a><a href="#s-dev">Device</a><a href="#s-net">4G 5G</a><a href="#s-file">File Test 24 h</a><a href="#s-ref">Reference</a></div>
   <h2 id="s-heat">Browser Thermals</h2>
@@ -625,7 +625,15 @@ function b64bytes(s){ var bin = atob(s), u = new Uint8Array(bin.length); for (va
 async function sha(u){ return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', u))).map(function(x){ return (x < 16 ? '0' : '') + x.toString(16); }).join(''); }
 async function sendOne(size){
   var u = new Uint8Array(size); for (var i = 0; i < size; i += 65536) crypto.getRandomValues(u.subarray(i, Math.min(size, i + 65536)));
-  var h = await sha(u), r = await fetch(FAR + 'anything', { method: 'POST', body: u, headers: { 'Content-Type': 'application/octet-stream' }, cache: 'no-store' });
+  /* 429 = the free echo server limits how often it may be called (too many requests); that is the server, not the
+     network: wait as it asks (Retry-After) or 3, 6 then 12 s, and try again; still 429 = the round is skipped, not failed */
+  var h = await sha(u), r = null, wait = [3, 6, 12];
+  for (var k = 0; k <= wait.length; k++){
+    r = await fetch(FAR + 'anything', { method: 'POST', body: u, headers: { 'Content-Type': 'application/octet-stream' }, cache: 'no-store' });
+    if (r.status !== 429 && r.status !== 503) break; FT.retries = (FT.retries || 0) + 1; if (k === wait.length) break;
+    var ra = +r.headers.get('Retry-After'); await new Promise(function(ok){ setTimeout(ok, 1000 * (ra > 0 && ra < 60 ? ra : wait[k])); });
+  }
+  if (r.status === 429 || r.status === 503){ var be = new Error('the echo server is busy (' + r.status + ', too many requests) - not your network'); be.busy = true; throw be; }
   if (!r.ok) throw new Error('the server answered ' + r.status);
   var txt = await r.text(); USED.up += size; USED.down += txt.length;
   var j = JSON.parse(txt), d = String(j.data || ''), back = echoBytes(d);
@@ -639,15 +647,18 @@ async function ftRound(){
     try { var res = await Promise.all(Array.from({ length: n }, function(){ return sendOne(size); }));
       st.ms = performance.now() - t; st.mbit = 2 * n * size * 8 / st.ms / 1000;
       res.forEach(function(x){ round.files++; if (!x.sizeOk || !x.hashOk) round.changed++; }); }
-    catch (e){ st.ok = false; st.err = String(e.message || e).slice(0, 60); round.ok = false; }
+    catch (e){ st.ok = false; st.busy = !!(e && e.busy); st.err = String(e.message || e).slice(0, 90); round.ok = false; }
     round.stages.push(st);
   }
   var ok = round.stages.filter(function(s){ return s.ok; }); round.mbit = ok.length ? median(ok.map(function(s){ return s.mbit; })) : null;
   var before = FT.rounds.filter(function(r){ return r.ok && r.mbit; }).map(function(r){ return r.mbit; }); round.usual = before.length >= 3 ? median(before) : null;
-  if (!round.ok) ftAlert('Round ' + round.n + ' failed: ' + round.stages.filter(function(s){ return !s.ok; })[0].err);
+  var bad = round.stages.filter(function(s){ return !s.ok; }); round.busy = bad.length > 0 && bad.every(function(s){ return s.busy; });
+  if (round.busy){ var fa = el('falert'); fa.style.display = 'block'; fa.style.background = '#2a2410'; fa.style.borderColor = '#7a6a20'; fa.style.color = '#ffe9a8';
+    fa.textContent = clock(new Date()) + ' Round ' + round.n + ' skipped: the echo server httpbin.org is busy (429, too many requests) - it limits free use; your network is fine, the next round tries again'; }
+  else if (!round.ok) ftAlert('Round ' + round.n + ' failed: ' + bad[0].err);
   else if (round.changed) ftAlert('Round ' + round.n + ': ' + round.changed + ' file(s) came back changed');
   else if (round.usual && round.mbit < round.usual * 0.5){ round.drop = true; ftAlert('Round ' + round.n + ': speed dropped to ' + fi(round.mbit, 2) + ' Mbit/s, usual ' + fi(round.usual, 2)); }
-  round.alert = !round.ok || round.changed > 0 || !!round.drop;
+  round.alert = (!round.ok && !round.busy) || round.changed > 0 || !!round.drop;
   FT.rounds.push(round); FT.busy = false;
 }
 /* THE RING: a telephone ring, 440 and 480 Hz together, two rings of 0,4 s - on a network error or congestion and on a
@@ -657,7 +668,7 @@ function ringRing(){ if (!FT.allow) return; try { var ac = FT.ac || (FT.ac = new
   [0, 0.6].forEach(function(st){ [440, 480].forEach(function(f){ var o = ac.createOscillator(); o.frequency.value = f; o.connect(g); o.start(t0 + st); o.stop(t0 + st + 0.4); });
     g.gain.setValueAtTime(0.18, t0 + st); g.gain.setValueAtTime(0, t0 + st + 0.4); }); } catch (e){} }
 function ftAlert(msg){
-  FT.alerts++; FT.lastAlert = clock(new Date()) + ' ' + msg; var a = el('falert'); a.style.display = 'block'; a.textContent = 'ALERT ' + FT.lastAlert;
+  FT.alerts++; FT.lastAlert = clock(new Date()) + ' ' + msg; var a = el('falert'); a.style.display = 'block'; a.style.background = ''; a.style.borderColor = ''; a.style.color = ''; a.textContent = 'ALERT ' + FT.lastAlert;
   document.title = '! ALERT - BROWSER THERMALS';
   try { if (navigator.vibrate) navigator.vibrate([300, 100, 300]); } catch (e){}
   ringRing();
@@ -732,8 +743,10 @@ function renderProbes(){
     ['Disk, written', d && d.ok ? fi(d.size / d.writeMs / 1000, 0) + ' MB/s - ' + bytesTxt(d.size) + ' in ' + fi(d.writeMs, 0) + ' ms' : d ? 'Not available in this browser' : '-'],
     ['Disk, read back', d && d.ok ? fi(d.size / d.readMs / 1000, 0) + ' MB/s' + (d.same ? ', same bytes' : ', NOT THE SAME BYTES') + ' (may come from the memory cache)' : d ? 'Not available in this browser' : '-']] : [[P.phase || 'Waiting', '-']]);
   rows('tscr', s ? [['Refresh, measured', fi(s.hz, 1) + ' Hz, one frame every ' + fi(s.ms, 2) + ' ms'], ['Nearest common rate', s.near + ' Hz'],
+    /* about 30 is usually the browser, not the screen: Safari (Mac, iPhone, iPad) gives pages half the frames in Low Power Mode */
+    ].concat(s.hz > 24 && s.hz < 36 ? [['Why about 30', /Safari\//.test(navigator.userAgent) && !/Chrome|Chromium|Edg\//.test(navigator.userAgent) ? 'Safari gives pages 30 frames a second in Low Power Mode or energy saving; the screen itself runs at 60 or 120 Hz - switch Low Power Mode off and reload' : 'The browser gives this page about 30 frames a second - energy saving or a busy page; the screen itself may be faster']] : []).concat([
     ['Late frames', s.late + ' of ' + s.n + ' (longer than 1,5 frames)'], ['Screen, page pixels', s.sw + ' x ' + s.sh], ['Screen, device pixels', s.dw + ' x ' + s.dh + ' - ' + fi(s.dpr, 2) + ' device pixels a page pixel'],
-    ['Pixels a second at this rate', big(s.dw * s.dh * s.hz / 1e6, 0) + ' million'], ['Colour depth', s.depth + ' bits'], ['High dynamic range', s.hdr ? 'Yes' : 'No'], ['Wide colour, P3', s.p3 ? 'Yes' : 'No']] : [[P.phase || 'Waiting', '-']]);
+    ['Pixels a second at this rate', big(s.dw * s.dh * s.hz / 1e6, 0) + ' million'], ['Colour depth', s.depth + ' bits'], ['High dynamic range', s.hdr ? 'Yes' : 'No'], ['Wide colour, P3', s.p3 ? 'Yes' : 'No']]) : [[P.phase || 'Waiting', '-']]);
   rows('tgfx', q ? (q.ok ? [['Graphics chip, as the browser names it', q.renderer || 'Not given by this browser'], ['Maker, as the browser names it', q.vendor || 'Not given by this browser'],
     ['Largest picture', q.maxTex + ' x ' + q.maxTex + ' pixels'], ['Fill, graphics chip', big(q.gpuMpx, 0) + ' million pixels a second, half see-through'],
     ['Fill, processor, one thread', big(q.cpuMpx, 0) + ' million pixels a second, the same blend'], ['Graphics to processor ratio', fi(q.gpuMpx / q.cpuMpx, 1) + ' to 1'],
@@ -752,7 +765,7 @@ function renderProbes(){
       ['Radio unit and tower', 'Signal, cell and band are not given to web pages'], ['Data used by this page', bytesTxt(USED.up + USED.down)]]); }
   var R = FT.rounds, lr = R[R.length - 1], every = +el('fevery').value, perDay = perRoundBytes() * 24 * 60 / every;
   rows('tfile', [['Overseas end', 'Echo server httpbin.org, Virginia US - keeps nothing, sends each file straight back'], ['A round', '3 files at once, then 4, then 5 - each sent, returned, size and SHA-256 checked'],
-    ['Rounds done', R.length + (FT.busy ? ', one running now' : '')], ['Last round', lr ? (lr.ok ? fi(lr.mbit, 2) + ' Mbit/s, ' + lr.files + ' files, ' + (lr.changed ? lr.changed + ' CHANGED' : 'all came back the same') : 'FAILED') : 'On its way'],
+    ['Rounds done', R.length + (FT.busy ? ', one running now' : '')], ['Last round', lr ? (lr.ok ? fi(lr.mbit, 2) + ' Mbit/s, ' + lr.files + ' files, ' + (lr.changed ? lr.changed + ' CHANGED' : 'all came back the same') : (lr.busy ? 'SKIPPED - echo server busy (429)' : 'FAILED')) : 'On its way'], ['Waits for the echo server', FT.retries ? FT.retries + ' times it said 429 (too many requests); the page waited and tried again' : 'None'],
     ['Usual speed', lr && lr.usual ? fi(lr.usual, 2) + ' Mbit/s (middle of the rounds before)' : 'After 3 rounds'], ['Alert when', 'A round fails, a file comes back changed, or speed falls under half the usual'],
     ['Alerts', FT.alerts ? FT.alerts + ' - last ' + FT.lastAlert : 'None'], ['Next round', FT.next ? clock(new Date(FT.next)) : FT.startAt ? '24 hours done' : '-'],
     ['Runs until', FT.startAt ? dayTxt(new Date(FT.startAt + 24 * 3600e3)) + ', while this page stays open' : '-'],
