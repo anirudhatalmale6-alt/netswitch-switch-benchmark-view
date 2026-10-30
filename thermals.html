@@ -35,7 +35,7 @@
   #crText{color:#12261a;font-weight:400;font-size:9px;line-height:1.2;white-space:normal;}
   @media (max-width:600px){ #bar{font-size:11px;padding:5px 8px} #pg{padding-top:78px} h2{scroll-margin-top:80px} }
 </style></head><body>
-<div id="bar"><b id="stamp">B112</b><i id="line">Warming up</i></div>
+<div id="bar"><b id="stamp">B114</b><i id="line">Warming up</i></div>
 <div id="pg">
   <div id="jump"><a href="#s-heat">Thermals</a><a href="#s-brk">Breaker 3D</a><a href="#s-thr">Threads</a><a href="#s-mem">Memory DDR</a><a href="#s-bus">Bus</a><a href="#s-scr">Screen</a><a href="#s-gfx">Graphics</a><a href="#s-str">Screen Striper</a><a href="#s-sph">CPU Sphere</a><a href="#s-frm">Formulas</a><a href="#s-dev">Device</a><a href="#s-net">4G 5G</a><a href="#s-file">File Test 24 h</a><a href="#s-ref">Reference</a></div>
   <h2 id="s-heat">Browser Thermals</h2>
@@ -110,9 +110,18 @@
   <h2 id="s-dev">Device</h2>
   <div class="card"><table><tbody id="tdev"></tbody></table></div>
 
+  <h2 id="s-mod">Memory Modules: Slot, Maker, Part, Serial</h2>
+  <div class="card"><table><tbody>
+    <tr><td class="k">Memory report</td><td><label class="btn">Load memory-report.json or .txt<input type="file" id="mrFile" accept=".json,.txt,application/json,text/plain" style="display:none"></label></td></tr>
+    <tr><td class="k">Where it comes from</td><td class="v" id="mrNote">Browsers and phones are never told module serial numbers. On Windows run memory-report.ps1 (or Get-CimInstance Win32_PhysicalMemory), then load the file here</td></tr>
+  </tbody></table><div id="mrCards" class="grid" style="margin-top:8px"></div></div>
+
   <h2 id="s-net">Network, 4G And 5G</h2>
   <div class="grid">
-    <div class="card"><table><tbody id="tnet"></tbody></table></div>
+    <div class="card"><table><tbody id="tnet"></tbody></table>
+      <table style="margin-top:6px"><tbody><tr><td class="k">Network watch</td><td><button class="btn" id="nallow">Allow ring sound</button></td></tr></tbody></table>
+      <div id="nalert" style="display:none;margin-top:8px;padding:8px 10px;border:1px solid #a33;background:#3a0c0c;color:#ffd0d0;border-radius:4px;font-weight:700"></div>
+      <table style="margin-top:6px"><tbody id="twatch"></tbody></table></div>
     <div class="card"><canvas id="ladder"></canvas><div class="names"><span><i style="background:#4fd1ff"></i>Down, measured</span><span><i style="background:#ff8020"></i>Up, measured</span><span>Bands: typical speeds, peak marks: the standard</span></div></div>
   </div>
 
@@ -641,11 +650,17 @@ async function ftRound(){
   round.alert = !round.ok || round.changed > 0 || !!round.drop;
   FT.rounds.push(round); FT.busy = false;
 }
+/* THE RING: a telephone ring, 440 and 480 Hz together, two rings of 0,4 s - on a network error or congestion and on a
+   file test alert. Browsers only allow sound after one tap on the page, so the Allow button arms it. */
+function ringRing(){ if (!FT.allow) return; try { var ac = FT.ac || (FT.ac = new (window.AudioContext || window.webkitAudioContext)()); if (ac.state === 'suspended') ac.resume();
+  var t0 = ac.currentTime + 0.02, g = ac.createGain(); g.gain.value = 0; g.connect(ac.destination);
+  [0, 0.6].forEach(function(st){ [440, 480].forEach(function(f){ var o = ac.createOscillator(); o.frequency.value = f; o.connect(g); o.start(t0 + st); o.stop(t0 + st + 0.4); });
+    g.gain.setValueAtTime(0.18, t0 + st); g.gain.setValueAtTime(0, t0 + st + 0.4); }); } catch (e){} }
 function ftAlert(msg){
   FT.alerts++; FT.lastAlert = clock(new Date()) + ' ' + msg; var a = el('falert'); a.style.display = 'block'; a.textContent = 'ALERT ' + FT.lastAlert;
   document.title = '! ALERT - BROWSER THERMALS';
   try { if (navigator.vibrate) navigator.vibrate([300, 100, 300]); } catch (e){}
-  if (FT.allow){ try { var ac = FT.ac || (FT.ac = new (window.AudioContext || window.webkitAudioContext)()), o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = 880; o.connect(g); g.connect(ac.destination); g.gain.value = 0.2; o.start(); o.stop(ac.currentTime + 0.6); } catch (e){} }
+  ringRing();
   try { if (window.Notification && Notification.permission === 'granted') new Notification('File test alert', { body: msg }); } catch (e){}
 }
 function ftSchedule(){
@@ -655,6 +670,9 @@ function ftSchedule(){
   FT.timer = setTimeout(function(){ ftRound().then(ftSchedule); }, every);
 }
 el('fevery').onchange = ftSchedule;
+function allowSound(){ FT.allow = true; try { FT.ac = FT.ac || new (window.AudioContext || window.webkitAudioContext)(); FT.ac.resume(); } catch (e){}
+  try { if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch (e){} el('fallow').textContent = 'Sound on'; el('nallow').textContent = 'Ring sound on'; }
+el('nallow').onclick = function(){ allowSound(); ringRing(); };
 el('fallow').onclick = function(){ FT.allow = true; try { FT.ac = FT.ac || new (window.AudioContext || window.webkitAudioContext)(); FT.ac.resume(); } catch (e){}
   try { if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch (e){} el('fallow').textContent = 'Sound on'; };
 function perRoundBytes(){ var s = +el('fsize').value * 1024; return 12 * s * (1 + 4 / 3) + 12 * 600; }
@@ -849,6 +867,73 @@ el('refs').innerHTML = REFS.map(function(t){ return '<div class="card"><div styl
  ['Order', 'Screen, memory, bus, graphics, disk and the screen striper first with no load; then the heat load; network and the file test beside it']]
 .forEach(function(r){ el('thow').innerHTML += '<tr><td class="k">' + r[0] + '</td><td class="v">' + r[1] + '</td></tr>'; });
 
+/* ---------------- NETWORK WATCH: a tiny echo every 30 s; an error, a timeout or congestion rings ---------------- */
+/* Congestion = two echoes in a row over 3 times the usual echo and at least 150 ms more than it; usual = the middle of
+   the first 5 good echoes. Error = no answer in 5 s. The ring sounds once when the state turns bad, not on every echo. */
+var NWW = { hist: [], base: null, bad: false, slowRun: 0, alerts: 0, last: null, lastMsg: null };
+function netAlert(msg){ NWW.alerts++; NWW.lastMsg = clock(new Date()) + ' ' + msg; var a = el('nalert'); a.style.display = 'block'; a.textContent = 'NETWORK ' + NWW.lastMsg;
+  try { if (navigator.vibrate) navigator.vibrate([400, 200, 400]); } catch (e){} ringRing();
+  try { if (window.Notification && Notification.permission === 'granted') new Notification('Network alert', { body: msg }); } catch (e){} }
+async function netWatch(){
+  var ok = false, ms = null, why = null;
+  try { var ctl = window.AbortController ? new AbortController() : null, tm = setTimeout(function(){ if (ctl) ctl.abort(); }, 5000), t = performance.now();
+    var r = await fetch(NEAR + '__down?bytes=0&w=' + Date.now(), { cache: 'no-store', mode: 'cors', signal: ctl ? ctl.signal : undefined }); await r.arrayBuffer(); clearTimeout(tm);
+    ms = performance.now() - t; ok = r.ok; if (!ok) why = 'answer ' + r.status; } catch (e){ why = e && e.name === 'AbortError' ? 'no answer in 5 s' : 'no answer'; }
+  NWW.last = { at: new Date(), ok: ok, ms: ms, why: why }; NWW.hist.push(NWW.last); if (NWW.hist.length > 120) NWW.hist.shift();
+  var good = NWW.hist.filter(function(h){ return h.ok; }); if (!NWW.base && good.length >= 5) NWW.base = median(good.slice(0, 5).map(function(h){ return h.ms; }));
+  var slow = ok && NWW.base && ms > Math.max(3 * NWW.base, NWW.base + 150); NWW.slowRun = slow ? NWW.slowRun + 1 : 0;
+  var badNow = !ok || NWW.slowRun >= 2;
+  if (badNow && !NWW.bad) netAlert(!ok ? 'error: ' + why : 'congestion: echo ' + fi(ms, 0) + ' ms, usually ' + fi(NWW.base, 0) + ' ms');
+  if (!badNow && NWW.bad){ var a = el('nalert'); a.textContent = 'Network back to normal at ' + clock(new Date()) + ' - last alert ' + NWW.lastMsg; }
+  NWW.bad = badNow; renderWatch();
+}
+function renderWatch(){ var L = NWW.last; rows('twatch', [['Echo every 30 s', L ? (L.ok ? fi(L.ms, 0) + ' ms at ' + clock(L.at) : 'FAILED at ' + clock(L.at) + ' - ' + L.why) : 'First echo coming'],
+  ['Usual echo', NWW.base ? fi(NWW.base, 0) + ' ms, middle of the first 5' : 'After 5 echoes'], ['State', NWW.bad ? 'ALERT - ' + NWW.lastMsg : 'Normal'],
+  ['Alerts', NWW.alerts ? NWW.alerts + (FT.allow ? ', ring on' : ', ring off - tap Allow ring sound') : 'None'], ['Rings when', 'No answer in 5 s, or two echoes in a row over 3 times the usual']]); }
+
+/* ---------------- MEMORY MODULES: read from the memory report the user loads - a browser is never told serials ---------------- */
+var MR = null;
+function mrParse(text, name){
+  var t = String(text).replace(/^\uFEFF/, ''), out = { from: name, computer: null, taken: null, modules: [], bios: null };
+  try { var j = JSON.parse(t); if (j && (j.modules || Array.isArray(j))){ var mods = Array.isArray(j) ? j : j.modules;
+      out.computer = j.computer || null; out.taken = j.taken || null; out.bios = j.bios || null;
+      out.modules = mods.map(function(m){ return { slot: m.slot || m.DeviceLocator || '', bank: m.bank || m.BankLabel || '', kind: m.kind || '', gb: m.gb || (m.Capacity ? m.Capacity / 1073741824 : null), speed: m.speed || m.Speed || '', running: m.running || m.ConfiguredClockSpeed || '',
+        maker: m.maker || m.Manufacturer || '', part: m.part || m.PartNumber || '', serial: m.serial || m.SerialNumber || '' }; }); return out; } } catch (e){}
+  var lines = t.split(/\r?\n/), cur = null, inRom = false, hdr = lines.findIndex(function(l){ return /DeviceLocator/.test(l) && /SerialNumber/.test(l); });
+  if (hdr >= 0){ var cols = lines[hdr].trim().split(/\s+/);          /* the table Get-CimInstance ... | Select-Object prints */
+    lines.slice(hdr + 1).forEach(function(l){ if (!l.trim() || /^-+(\s+-+)*$/.test(l.trim())) return; var v = l.trim().split(/\s{2,}/); if (v.length < 2) return; var m = {}; cols.forEach(function(c, i){ m[c] = (v[i] || '').trim(); });
+      out.modules.push({ slot: m.DeviceLocator || '', bank: m.BankLabel || '', kind: '', gb: m.Capacity ? +m.Capacity / 1073741824 : null, speed: m.Speed || '', running: '', maker: m.Manufacturer || '', part: m.PartNumber || '', serial: m.SerialNumber || '' }); });
+    return out; }
+  lines.forEach(function(l){ var mm, kv = l.match(/^\s+([A-Za-z' ]+?)\s*:\s(.*)$/);
+    if ((mm = l.match(/^Computer (.*?), taken (.*)$/))){ out.computer = mm[1]; out.taken = mm[2]; return; }
+    if ((mm = l.match(/^Module \d+ - (\S*)\s*(.*)$/))){ cur = { slot: mm[1], bank: mm[2].trim(), kind: '', gb: null, speed: '', running: '', maker: '', part: '', serial: '' }; out.modules.push(cur); inRom = false; return; }
+    if (/^ROM \(BIOS/.test(l)){ inRom = true; cur = null; out.bios = {}; return; }
+    if (!kv) return; var k = kv[1].trim(), v = kv[2].trim();
+    if (inRom){ if (k === 'Maker') out.bios.maker = v; if (k === 'Version') out.bios.version = v; if (k === 'Released') out.bios.date = v; if (k === 'Serial number') out.bios.serial = v; return; }
+    if (!cur) return;
+    if (k === 'Kind'){ var p = v.split(','); cur.kind = p[0].trim(); var g = (p[1] || '').match(/([\d.]+)\s*GB/); if (g) cur.gb = +g[1]; }
+    if (k === 'Speed'){ var sp = v.match(/(\d+)\s*MT\/s rated,\s*(\d*)/); if (sp){ cur.speed = sp[1]; cur.running = sp[2]; } }
+    if (k === 'Maker') cur.maker = v; if (k === 'Part number') cur.part = v; if (k === 'Serial number') cur.serial = v; });
+  return out;
+}
+function mrCard(title, list){ return '<div class="card"><h3 style="margin:0 0 6px;font-size:12px;color:#ffd166">' + title + '</h3><table>' + list.map(function(r){ return '<tr><td class="k">' + r[0] + '</td><td class="v" style="word-break:break-all">' + mrEsc(r[1] || '-') + '</td></tr>'; }).join('') + '</table></div>'; }
+function mrEsc(x){ return String(x).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function renderModules(){
+  if (!MR){ el('mrCards').innerHTML = ''; return; }
+  var tot = MR.modules.reduce(function(a, m){ return a + (+m.gb || 0); }, 0);
+  el('mrNote').textContent = MR.modules.length + ' module(s)' + (tot ? ', ' + fi(tot, 2) + ' GB in all' : '') + ' - from ' + MR.from + (MR.computer ? ', computer ' + MR.computer : '') + (MR.taken ? ', taken ' + MR.taken : '');
+  var h = MR.modules.map(function(m, i){ return mrCard('Slot ' + (m.slot || i + 1), [['Bank', m.bank], ['Kind', m.kind], ['Size', m.gb ? fi(+m.gb, 2) + ' GB' : ''], ['Speed', m.speed ? m.speed + ' MT/s rated' + (m.running ? ', ' + m.running + ' running' : '') : ''],
+    ['Maker', m.maker], ['Part number', m.part], ['Serial number', m.serial]]); }).join('');
+  if (MR.bios) h += mrCard('ROM, BIOS / UEFI', [['Maker', MR.bios.maker], ['Version', MR.bios.version], ['Released', MR.bios.date], ['Serial number', MR.bios.serial]]);
+  var v = P.dev || {}, q = P.gfx || {};
+  h += mrCard('This Browser Sees', [['Processor threads', v.cores ? String(v.cores) : 'Not given'], ['Memory, rounded by the browser', v.mem ? v.mem + ' GB or more' : 'Not given'], ['Graphics chip', q.name || q.renderer || 'Not given'],
+    ['Screen', screen.width + ' x ' + screen.height + ' at ' + fi(window.devicePixelRatio || 1, 2) + ' pixel ratio'], ['System', (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || 'Not given']]);
+  el('mrCards').innerHTML = h;
+}
+el('mrFile').onchange = function(){ var f = this.files && this.files[0]; if (!f) return; var r = new FileReader();
+  r.onload = function(){ MR = mrParse(r.result, f.name.replace(/[<>&]/g, '')); try { localStorage.setItem('thermals.memreport', JSON.stringify(MR)); } catch (e){} renderModules(); }; r.readAsText(f); this.value = ''; };
+try { var mrk = localStorage.getItem('thermals.memreport'); if (mrk) MR = JSON.parse(mrk); } catch (e){}
+
 /* ---------------- START: no button ---------------- */
 try { for (var i = 0; i < NW; i++){ (function(){ var c = { w: new Worker(URLW), rep: [], load: 0, heat: 0, speed: null, base: null, cold: [], slowing: false, rate: null };
   c.w.onmessage = function(e){ c.rep.push([performance.now(), e.data.busy, e.data.wall, e.data.units]); }; c.w.onerror = function(e){ err = 'a thread failed: ' + (e.message || ''); }; C.push(c); })(); } }
@@ -857,7 +942,9 @@ requestAnimationFrame(gpuFrame);
 setInterval(function(){ try { step(); } catch (e){ err = String(e.message || e); } }, 100);
 setInterval(render, 250);
 probeAll();
-probeNet().then(function(){ FT.startAt = Date.now(); return ftRound(); }).then(ftSchedule);
+probeNet().then(function(){ var n = P.net || {}; var errs = ['nearErr', 'farErr', 'downErr', 'upErr'].filter(function(k){ return n[k]; }); if (errs.length) netAlert('error at the start: ' + errs.length + ' of 4 network tests did not answer'); FT.startAt = Date.now(); return ftRound(); }).then(ftSchedule);
+renderWatch(); renderModules(); setTimeout(renderModules, 4000); setTimeout(netWatch, 20000); setInterval(netWatch, 30000);
+window.__mrParse = mrParse; window.__netWatch = netWatch; window.__nww = function(){ return NWW; }; window.__ring = ringRing;
 window.__read = function(){ var L = hist[hist.length - 1]; return { cores: NW, started: started, heat: L ? L[1] : null, speed: L ? L[2] : null, load: L ? L[4] : null, gpuHeat: G.heat, slowing: C.filter(function(c){ return c.slowing; }).length,
   breaker: { tripped: BRK.tripped, trips: BRK.trips }, mem: P.mem, memX: P.memX, bus: P.bus, gfx: P.gfx, disk: P.disk, dev: P.dev, screen: P.screen, net: P.net, file: FT.rounds.map(function(r){ return { ok: r.ok, mbit: r.mbit, files: r.files, changed: r.changed, alert: r.alert }; }), fails: fails }; };
 window.__selfCheck = selfCheck;
