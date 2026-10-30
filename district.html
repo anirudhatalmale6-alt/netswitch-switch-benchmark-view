@@ -333,4 +333,5 @@ window.__read = function(){ return { place: PLACES[place][0], maps: M.map(functi
 window.__selfCheck = selfCheck; window.__pick = function(name){ for (var i = 0; i < PLACES.length; i++) if (PLACES[i][0] === name){ el('place').value = String(i); setup(i); } };
 window.__zoom = function(i, f){ var cv = el('cv' + i); M[i].zoomAt(f, cv.clientWidth / 2, cv.clientHeight / 2); return M[i].view.z; };
 </script>
+<!-- ai2o-foot --><footer id="ai2oFoot" style="margin:18px 12px 84px;padding:10px 12px;border-top:1px solid #16293a;font:400 13px/1.8 ui-monospace,monospace;color:#8ea9c2"><a href="menu.html" style="color:#4fd1ff;font-weight:700;text-decoration:none">Menu of all software and pages</a> &middot; <a href="local.html" style="color:#9fd6f5;text-decoration:none">Local copy</a> &middot; <a href="corporate.html" style="color:#9fd6f5;text-decoration:none">Corporate browsers</a> &middot; <a href="downloads/AI2Orbit-setup-pack-web-20261027.zip" style="color:#9fd6f5;text-decoration:none">Setup pack</a></footer>
 </body></html>

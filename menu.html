@@ -66,6 +66,9 @@ var ITEMS = [
   ['crypto.html', 'Crypto AI CEO',
    'The most important crypto currencies, easy to read on every screen - price, day and week change, a 7 day line, market size, '
    + 'how each coin is made, and the bitcoin network\'s electricity against Finland\'s'],
+  ['ratchet.html', 'Message Keys, Ratchet',
+   'The key schedule of the Signal Protocol from the Messenger Secret Conversations paper, worked in this browser: two key pairs (ECDH), the same shared secret on both sides, '
+   + 'RK0 and CK0 by HKDF, a new key for every message, AES-256-GCM seals, a changed byte refused - and how fast this device seals a data set'],
   ['fpga.html', 'FPGA Challenge, The Views',
    'The FPGA Engineering Technical Challenge paper as views: Euler and Runge-Kutta 4 from its spreadsheet against the exact solution, every worked example beside its own figure, '
    + 'the DDR4 and coil estimates worked through, and phone to Google Drive to phone: time and battery for any data set'],
@@ -262,4 +265,5 @@ build(); bar(0);
 window.__read = function(){ return { items: ITEMS.length,
   bar: document.getElementById('line').textContent }; };
 </script>
+<!-- ai2o-foot --><footer id="ai2oFoot" style="margin:18px 12px 84px;padding:10px 12px;border-top:1px solid #16293a;font:400 13px/1.8 ui-monospace,monospace;color:#8ea9c2"><a href="menu.html" style="color:#4fd1ff;font-weight:700;text-decoration:none">Menu of all software and pages</a> &middot; <a href="local.html" style="color:#9fd6f5;text-decoration:none">Local copy</a> &middot; <a href="corporate.html" style="color:#9fd6f5;text-decoration:none">Corporate browsers</a> &middot; <a href="downloads/AI2Orbit-setup-pack-web-20261027.zip" style="color:#9fd6f5;text-decoration:none">Setup pack</a></footer>
 </body></html>

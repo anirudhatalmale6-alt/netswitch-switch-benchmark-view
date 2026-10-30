@@ -175,8 +175,8 @@ function selfCheck(){
   if (document.querySelectorAll('iframe, video, audio, source, embed, object').length)
     fails.push('a media element is on the page - this must only link out');
 
-  /* every outgoing link must be youtube.com and nothing else */
-  var links = [].slice.call(document.querySelectorAll('a[href]'));
+  /* every outgoing link must be youtube.com and nothing else - the site's own footer (links to the other pages) aside */
+  var links = [].slice.call(document.querySelectorAll('a[href]')).filter(function(a){ return !a.closest('#ai2oFoot'); });
   links.forEach(function(a){
     var h = a.getAttribute('href') || '';
     if (h === '#') return;
@@ -208,4 +208,5 @@ window.__read = function(){ return { q: current(), play: playUrl(current()),
   search: searchUrl(current()), fails: window.__ytFails,
   bar: document.getElementById('line').textContent }; };
 </script>
+<!-- ai2o-foot --><footer id="ai2oFoot" style="margin:18px 12px 84px;padding:10px 12px;border-top:1px solid #16293a;font:400 13px/1.8 ui-monospace,monospace;color:#8ea9c2"><a href="menu.html" style="color:#4fd1ff;font-weight:700;text-decoration:none">Menu of all software and pages</a> &middot; <a href="local.html" style="color:#9fd6f5;text-decoration:none">Local copy</a> &middot; <a href="corporate.html" style="color:#9fd6f5;text-decoration:none">Corporate browsers</a> &middot; <a href="downloads/AI2Orbit-setup-pack-web-20261027.zip" style="color:#9fd6f5;text-decoration:none">Setup pack</a></footer>
 </body></html>
