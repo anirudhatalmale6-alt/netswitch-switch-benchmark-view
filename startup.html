@@ -612,5 +612,25 @@ window.__read = function(){ return {
   stamp: stampNow(),
   bar: document.getElementById('line').textContent }; };
 </script>
-<!-- ai2o-foot --><footer id="ai2oFoot" style="margin:18px 12px 84px;padding:10px 12px;border-top:1px solid #16293a;font:400 13px/1.8 ui-monospace,monospace;color:#8ea9c2"><a href="menu.html" style="color:#4fd1ff;font-weight:700;text-decoration:none">Menu of all software and pages</a> &middot; <a href="local.html" style="color:#9fd6f5;text-decoration:none">Local copy</a> &middot; <a href="corporate.html" style="color:#9fd6f5;text-decoration:none">Corporate browsers</a> &middot; <a href="downloads/AI2Orbit-setup-pack-web-20261027.zip" style="color:#9fd6f5;text-decoration:none">Setup pack</a></footer>
+<!-- ai2o-foot --><footer id="ai2oFoot" style="margin:18px 12px 84px;padding:10px 12px;border-top:1px solid #16293a;font:400 13px/1.8 ui-monospace,monospace;color:#8ea9c2"><style>/* ai2o-ser */#ai2oSer::after{content:attr(data-t)}</style><div id="ai2oSer" data-t="Device serials" style="font:400 9px/1.5 ui-monospace,monospace;color:#6d8ba3;word-break:break-word;margin:0 0 6px"></div><a href="menu.html" style="color:#4fd1ff;font-weight:700;text-decoration:none">Menu of all software and pages</a> &middot; <a href="local.html" style="color:#9fd6f5;text-decoration:none">Local copy</a> &middot; <a href="corporate.html" style="color:#9fd6f5;text-decoration:none">Corporate browsers</a> &middot; <a href="downloads/AI2Orbit-setup-pack-web-20261027.zip" style="color:#9fd6f5;text-decoration:none">Setup pack</a><script>/* ai2o-ser */(function(){try{
+var d=document.getElementById('ai2oSer');if(!d)return;var live=[],rows=[];
+function T(x){return String(x==null?'':x).replace(/\s+/g,' ').trim();}
+function base(){var mr=null,r=[];try{mr=JSON.parse(localStorage.getItem('thermals.memreport')||'null');}catch(e){}
+var hd='Device serials'+(mr&&mr.computer?', computer '+T(mr.computer):'')+(mr&&mr.taken?', report '+T(mr.taken):'');
+if(mr&&mr.serials&&mr.serials.length){r.push(hd);mr.serials.forEach(function(x){r.push(T(x.k)+': '+T(x.v));});}
+else if(mr&&mr.modules&&mr.modules.length){r.push(hd);mr.modules.forEach(function(m,i){r.push('DDR '+(i+1)+(m.slot?' '+T(m.slot):'')+': '+T((m.maker||'')+' '+(m.part||''))+', serial '+(T(m.serial)||'not given'));});
+if(mr.bios)r.push('ROM: '+T((mr.bios.maker||'')+' '+(mr.bios.version||''))+', serial '+(T(mr.bios.serial)||'not given'));
+r.push('CPU, GPU, fan, serial bus, socket, motherboard, RF unit, antenna, battery: run memory-report.ps1 2.3 and load its .json on Thermals');}
+else r.push('Device serials: browsers are never told serial numbers. Run memory-report.ps1 on the PC, load memory-report.json on Thermals, Memory Modules');
+rows=r;show();}
+function show(){d.setAttribute('data-t',rows.concat(live).join(' · '));}
+base();addEventListener('ai2o-memreport',base);addEventListener('storage',function(e){if(e.key==='thermals.memreport')base();});
+function go(){try{var c=document.createElement('canvas');c.width=c.height=16;var t0=performance.now(),gl=c.getContext('webgl')||c.getContext('experimental-webgl');
+if(!gl)live.push('GPU this browser: WebGL off');else{var x=gl.getExtension('WEBGL_debug_renderer_info'),nm=x?gl.getParameter(x.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER),t1=performance.now(),px=new Uint8Array(4),i;
+gl.clearColor(0.1,0.2,0.3,1);var t2=performance.now();for(i=0;i<20;i++){gl.clear(gl.COLOR_BUFFER_BIT);gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);}var t3=performance.now();
+live.push('GPU this browser: '+T(nm)+', start '+(t1-t0).toFixed(1)+' ms, round trip '+((t3-t2)/20).toFixed(2)+' ms');var lo=gl.getExtension('WEBGL_lose_context');if(lo)lo.loseContext();}}catch(e){live.push('GPU this browser: not read');}
+live.push('CPU threads this browser: '+(navigator.hardwareConcurrency||'not given'));show();
+try{if(navigator.getBattery)navigator.getBattery().then(function(b){live.push('Battery this device: '+Math.round(b.level*100)+' %'+(b.charging?', charging':'')+', serial not readable in a browser');show();},function(){});}catch(e){}}
+if(document.readyState==='complete')setTimeout(go,1200);else addEventListener('load',function(){setTimeout(go,1200);});
+}catch(e){}})();</script></footer>
 </body></html>
