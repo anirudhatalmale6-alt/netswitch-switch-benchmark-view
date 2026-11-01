@@ -54,7 +54,7 @@
    another host, a different tag mid-queue, or a page that is not on
    https is reported. Nothing here is modelled.
    ================================================================== */
-var MAPS = [{"name": "Network buildings, street level", "path": "buildings.html", "sha": "fb8d05699f9785b9e089b146d4159b5748d4349d8830faf23911607985574b6b", "built": "2026-11-01 06:36"}, {"name": "Finland grid", "path": "finland.html", "sha": "e58e00c3aae63688f9a1f5ceace47df5453165bc3fcbc82d0b13d3abdb67eb52", "built": "2026-11-01 06:36"}, {"name": "Network octets", "path": "octets.html", "sha": "f7d15bddfdf0ee0657ac350bd93884d4effdf1a7e0cdcdd73a4aac51048eaacf", "built": "2026-11-01 06:36"}, {"name": "Electric grid", "path": "grid.html", "sha": "056ec82303e7c394022c906c5f94eb3b86535b6afdb3953965befb145a1f4f90", "built": "2026-11-01 06:36"}, {"name": "Europe routes", "path": "../football-ai-3d/routes-europe.html", "sha": "846cd48ecee01ebe9e824c931d3e5e26b900d208a35f4f6f384de531607a7f91", "built": "2026-10-27 10:02"}];
+var MAPS = [{"name": "Network buildings, street level", "path": "buildings.html", "sha": "9f86796bb6fe5b3a521d1b1566d553e1e6e4a900b7b7842b6ba98c013c968bde", "built": "2026-11-01 09:33"}, {"name": "Finland grid", "path": "finland.html", "sha": "3cfe8f2c17ec1ffc497cf514f4a64042352d913ce2b4d4d22b2d300822ab44a4", "built": "2026-11-01 09:33"}, {"name": "Network octets", "path": "octets.html", "sha": "4be4091d0b90cbeb03a4f5844c215dd12a021b6d2daa29bd9a577d30d62130ec", "built": "2026-11-01 09:33"}, {"name": "Electric grid", "path": "grid.html", "sha": "aa1272e5c78e2b7906cb392e4dd2416e8a2c12ef9612bb6912b8424abacbf0ee", "built": "2026-11-01 09:33"}, {"name": "Europe routes", "path": "../football-ai-3d/routes-europe.html", "sha": "846cd48ecee01ebe9e824c931d3e5e26b900d208a35f4f6f384de531607a7f91", "built": "2026-10-27 10:02"}];
 function el(id){ return document.getElementById(id); }
 function two(n){ return (n < 10 ? '0' : '') + n; }
 function stampNow(){ var d = new Date(); return String(d.getFullYear()) + two(d.getMonth() + 1) + two(d.getDate()) + two(d.getHours()) + two(d.getMinutes()) + two(d.getSeconds()); }
@@ -152,7 +152,7 @@ how(); render();
 window.__read = function(){ return { done: done, err: err, results: R.map(function(r){ return { name: r.name, original: r.original, allMatch: r.allMatch, tagSteady: r.tagSteady, sameOrigin: r.sameOrigin, redirected: r.redirected, msRow: avg(r.msRow), msQueue: avg(r.msQueue) }; }), fails: fails }; };
 window.__selfCheck = selfCheck;
 </script>
-<!-- ai2o-foot --><footer id="ai2oFoot" style="margin:18px 12px 84px;padding:10px 12px;border-top:1px solid #16293a;font:400 13px/1.8 ui-monospace,monospace;color:#8ea9c2"><style>/* ai2o-ser */#ai2oSer::after,#ai2oTim::after{content:attr(data-t)}</style><div id="ai2oSer" data-t="Device serials" style="font:400 9px/1.5 ui-monospace,monospace;color:#6d8ba3;word-break:break-word;margin:0 0 6px"></div><div id="ai2oTim" data-t="Timing" style="font:400 9px/1.5 ui-monospace,monospace;color:#6d8ba3;word-break:break-word;margin:0 0 6px"></div><a href="menu.html" style="color:#4fd1ff;font-weight:700;text-decoration:none">Menu of all software and pages</a> &middot; <a href="local.html" style="color:#9fd6f5;text-decoration:none">Local copy</a> &middot; <a href="corporate.html" style="color:#9fd6f5;text-decoration:none">Corporate browsers</a> &middot; <a href="downloads/AI2Orbit-setup-pack-web-20261027.zip" style="color:#9fd6f5;text-decoration:none">Setup pack</a><script>/* ai2o-ser */(function(){try{
+<!-- ai2o-foot --><footer id="ai2oFoot" style="margin:18px 12px 84px;padding:10px 12px;border-top:1px solid #16293a;font:400 13px/1.8 ui-monospace,monospace;color:#8ea9c2"><style>/* ai2o-ser */#ai2oSer::after,#ai2oTim::after,.ai2oStat::after{content:attr(data-t)}.ai2oStat{font:400 9px/1.4 ui-monospace,monospace;color:#6d8ba3;text-align:right;margin:2px 0 6px;word-break:break-word}</style><div id="ai2oSer" data-t="Device serials" style="font:400 9px/1.5 ui-monospace,monospace;color:#6d8ba3;word-break:break-word;margin:0 0 6px"></div><div id="ai2oTim" data-t="Timing" style="font:400 9px/1.5 ui-monospace,monospace;color:#6d8ba3;word-break:break-word;margin:0 0 6px"></div><a href="menu.html" style="color:#4fd1ff;font-weight:700;text-decoration:none">Menu of all software and pages</a> &middot; <a href="local.html" style="color:#9fd6f5;text-decoration:none">Local copy</a> &middot; <a href="corporate.html" style="color:#9fd6f5;text-decoration:none">Corporate browsers</a> &middot; <a href="downloads/AI2Orbit-setup-pack-web-20261027.zip" style="color:#9fd6f5;text-decoration:none">Setup pack</a><script>/* ai2o-ser */(function(){try{
 var d=document.getElementById('ai2oSer');if(!d)return;var live=[],rows=[];
 function T(x){return String(x==null?'':x).replace(/\s+/g,' ').trim();}
 function base(){var mr=null,r=[];try{mr=JSON.parse(localStorage.getItem('thermals.memreport')||'null');}catch(e){}
@@ -185,5 +185,22 @@ tm.setAttribute('data-t','Timing this page: P'+(fr.length?(ok/fr.length).toFixed
 ' \u00b7 Notes: LB1 Accountancy \u00b7 LB2 Telecommunications Act \u00b7 LB3 Information Technology \u00b7 FTR number');}
 requestAnimationFrame(step);}
 if(document.readyState==='complete')setTimeout(tim,500);else addEventListener('load',function(){setTimeout(tim,500);});
+/* right side, small: max, median and lower quartile of every numeric column of every table, from the table itself (test pages) */
+var SP=['commodities.html','oil.html','thermals.html','worldpower.html'],pg=(location.pathname.split('/').pop()||'index.html');
+if(SP.indexOf(pg)>=0){var fi=function(v){return v.toLocaleString('fi-FI',{maximumFractionDigits:Math.abs(v)<10?3:Math.abs(v)<1000?1:0});};
+var num=function(t){t=String(t).replace(/[\u00a0\u202f]/g,' ').replace(/\u2212/g,'-');var m=t.match(/-?\d{1,3}(?: \d{3})+(?:,\d+)?|-?\d+(?:[.,]\d+)?/);if(!m)return null;var v=parseFloat(m[0].replace(/ /g,'').replace(',','.'));return isFinite(v)?v:null;};
+var q=function(s,f){var i=(s.length-1)*f,a=Math.floor(i),b=Math.ceil(i);return s[a]+(s[b]-s[a])*(i-a);};
+var stats=function(){[].forEach.call(document.querySelectorAll('table'),function(tb){if(tb.closest('#ai2oFoot'))return;var t0=performance.now(),rows=[].filter.call(tb.querySelectorAll('tr'),function(r){return !r.closest('thead')&&r.cells.length>1;});
+if(rows.length<3)return;var hr=tb.querySelector('thead tr'),nc=0;rows.forEach(function(r){nc=Math.max(nc,r.cells.length);});var out=[];
+for(var c=1;c<nc;c++){var v=[],filled=0;rows.forEach(function(r){var x=r.cells[c];if(!x)return;var tx=x.textContent.trim();if(!tx||tx==='-')return;filled++;var n=num(tx);if(n!==null)v.push(n);});
+var nm=hr&&hr.cells[c]?hr.cells[c].textContent.trim():'';if(!nm||/year|month|date|since|time|day|week|hour|clock|built|commission/i.test(nm))continue;
+if(v.length<3||v.length<filled*0.7||v.every(function(x){return x===Math.round(x)&&x>=1900&&x<=2100;}))continue;v.sort(function(a,b){return a-b;});
+out.push(nm+': max '+fi(v[v.length-1])+' \u00b7 median '+fi(q(v,0.5))+' \u00b7 lower quartile '+fi(q(v,0.25))+' ('+v.length+' rows)');}
+var st=tb.nextElementSibling&&tb.nextElementSibling.classList.contains('ai2oStat')?tb.nextElementSibling:null;
+if(!out.length){if(st)st.remove();return;}if(!st){st=document.createElement('div');st.className='ai2oStat';tb.parentNode.insertBefore(st,tb.nextSibling);}
+var tx=out.join(' | ')+' \u00b7 computed in '+(performance.now()-t0).toFixed(2)+' ms';if(st.getAttribute('data-t')!==tx.replace(/computed in [\d.]+ ms/,'')&&st.getAttribute('data-t')!==tx)st.setAttribute('data-t',tx);});};
+var pend=0;var kick=function(){if(pend)return;pend=setTimeout(function(){pend=0;stats();},1500);};
+try{new MutationObserver(function(ms){if(ms.some(function(m){return [].some.call(m.addedNodes,function(n){return !(n.classList&&n.classList.contains('ai2oStat'));});}))kick();}).observe(document.body,{childList:true,subtree:true});}catch(e){}
+if(document.readyState==='complete')setTimeout(stats,1500);else addEventListener('load',function(){setTimeout(stats,1500);});}
 }catch(e){}})();</script></footer>
 </body></html>
