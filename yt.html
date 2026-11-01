@@ -208,7 +208,7 @@ window.__read = function(){ return { q: current(), play: playUrl(current()),
   search: searchUrl(current()), fails: window.__ytFails,
   bar: document.getElementById('line').textContent }; };
 </script>
-<!-- ai2o-foot --><footer id="ai2oFoot" style="margin:18px 12px 84px;padding:10px 12px;border-top:1px solid #16293a;font:400 13px/1.8 ui-monospace,monospace;color:#8ea9c2"><style>/* ai2o-ser */#ai2oSer::after{content:attr(data-t)}</style><div id="ai2oSer" data-t="Device serials" style="font:400 9px/1.5 ui-monospace,monospace;color:#6d8ba3;word-break:break-word;margin:0 0 6px"></div><a href="menu.html" style="color:#4fd1ff;font-weight:700;text-decoration:none">Menu of all software and pages</a> &middot; <a href="local.html" style="color:#9fd6f5;text-decoration:none">Local copy</a> &middot; <a href="corporate.html" style="color:#9fd6f5;text-decoration:none">Corporate browsers</a> &middot; <a href="downloads/AI2Orbit-setup-pack-web-20261027.zip" style="color:#9fd6f5;text-decoration:none">Setup pack</a><script>/* ai2o-ser */(function(){try{
+<!-- ai2o-foot --><footer id="ai2oFoot" style="margin:18px 12px 84px;padding:10px 12px;border-top:1px solid #16293a;font:400 13px/1.8 ui-monospace,monospace;color:#8ea9c2"><style>/* ai2o-ser */#ai2oSer::after,#ai2oTim::after{content:attr(data-t)}</style><div id="ai2oSer" data-t="Device serials" style="font:400 9px/1.5 ui-monospace,monospace;color:#6d8ba3;word-break:break-word;margin:0 0 6px"></div><div id="ai2oTim" data-t="Timing" style="font:400 9px/1.5 ui-monospace,monospace;color:#6d8ba3;word-break:break-word;margin:0 0 6px"></div><a href="menu.html" style="color:#4fd1ff;font-weight:700;text-decoration:none">Menu of all software and pages</a> &middot; <a href="local.html" style="color:#9fd6f5;text-decoration:none">Local copy</a> &middot; <a href="corporate.html" style="color:#9fd6f5;text-decoration:none">Corporate browsers</a> &middot; <a href="downloads/AI2Orbit-setup-pack-web-20261027.zip" style="color:#9fd6f5;text-decoration:none">Setup pack</a><script>/* ai2o-ser */(function(){try{
 var d=document.getElementById('ai2oSer');if(!d)return;var live=[],rows=[];
 function T(x){return String(x==null?'':x).replace(/\s+/g,' ').trim();}
 function base(){var mr=null,r=[];try{mr=JSON.parse(localStorage.getItem('thermals.memreport')||'null');}catch(e){}
@@ -228,5 +228,18 @@ live.push('GPU this browser: '+T(nm)+', start '+(t1-t0).toFixed(1)+' ms, round t
 live.push('CPU threads this browser: '+(navigator.hardwareConcurrency||'not given'));show();
 try{if(navigator.getBattery)navigator.getBattery().then(function(b){live.push('Battery this device: '+Math.round(b.level*100)+' %'+(b.charging?', charging':'')+', serial not readable in a browser');show();},function(){});}catch(e){}}
 if(document.readyState==='complete')setTimeout(go,1200);else addEventListener('load',function(){setTimeout(go,1200);});
+/* timing of this page: P = share of screen frames on time in 3 s after load (within 1.5x the median frame), T gross = page
+   ready, T net = processor work in long tasks (given by Chromium browsers only) */
+var tm=document.getElementById('ai2oTim'),lt=[],longOK=false;
+try{if(PerformanceObserver.supportedEntryTypes.indexOf('longtask')>=0){new PerformanceObserver(function(l){l.getEntries().forEach(function(e){lt.push([e.startTime,e.duration]);});}).observe({type:'longtask',buffered:true});longOK=true;}}catch(e){}
+function tim(){if(!tm)return;var fr=[],last=0,t0=performance.now();
+function step(t){if(last)fr.push(t-last);last=t;if(t-t0<3000)requestAnimationFrame(step);else done();}
+function done(){var s=fr.slice().sort(function(a,b){return a-b;}),med=s[s.length>>1]||16.7,ok=fr.filter(function(x){return x<=med*1.5;}).length,
+nav=(performance.getEntriesByType&&performance.getEntriesByType('navigation')[0])||null,gross=Math.round((nav&&nav.loadEventEnd?nav.loadEventEnd:performance.now())*10)/10,busy=0;
+lt.forEach(function(x){busy+=Math.max(0,Math.min(x[0]+x[1],gross)-Math.max(x[0],0));});
+tm.setAttribute('data-t','Timing this page: P'+(fr.length?(ok/fr.length).toFixed(3):'-')+' ('+fr.length+' frames, '+med.toFixed(1)+' ms each) \u00b7 T gross '+gross.toFixed(0)+' ms page ready ('+Math.round(gross*1e9).toLocaleString('en-US').replace(/,/g,' ')+' ps) \u00b7 T net '+(longOK?busy.toFixed(0)+' ms long-task processor work up to page ready':'not given by this browser')+
+' \u00b7 Notes: LB1 Accountancy \u00b7 LB2 Telecommunications Act \u00b7 LB3 Information Technology \u00b7 FTR number');}
+requestAnimationFrame(step);}
+if(document.readyState==='complete')setTimeout(tim,500);else addEventListener('load',function(){setTimeout(tim,500);});
 }catch(e){}})();</script></footer>
 </body></html>
